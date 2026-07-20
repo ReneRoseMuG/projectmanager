@@ -1,6 +1,8 @@
 import { TICKET_RESOLUTIONS } from "@taskmanager/shared-types";
 import type {
   Attachment,
+  AttachmentFolder,
+  AttachmentLibrarySelection,
   BacklogItem,
   BacklogItemInput,
   BacklogItemUpdate,
@@ -99,11 +101,18 @@ const ticketListParentSchema = z.object({
   parentType: z.enum(["project", "milestone", "task", "feature", "useCase"]),
   parentId: z.number().int().positive()
 });
-const attachmentFileSchema = z.object({
+const base64FileSchema = z.object({
   fileName: z.string().min(1),
   contentBase64: z.string().min(1),
   mimetype: z.string().min(1).optional()
 });
+const attachmentFileSchema = base64FileSchema.extend({
+  libraryVisibility: z.enum(["attachment-only", "document-library"])
+});
+const documentImportSchema = base64FileSchema.extend({
+  folderId: z.number().int().positive().nullable().optional(),
+  tagIds: z.array(z.number().int().positive()).max(20).optional()
+}).strict();
 const taskInputSchema = parentSchema.extend({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
@@ -464,7 +473,7 @@ function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
   return arrayBuffer;
 }
 
-function attachmentFileFormData(input: z.infer<typeof attachmentFileSchema>): FormData {
+function attachmentFileFormData(input: z.infer<typeof base64FileSchema>): FormData {
   const formData = new FormData();
   const blob = new Blob([bufferToArrayBuffer(decodeBase64Content(input.contentBase64))], {
     type: input.mimetype ?? "application/octet-stream"
@@ -616,7 +625,26 @@ async function uploadAttachmentFile(
   parentId: number,
   attachment: z.infer<typeof attachmentFileSchema>
 ): Promise<Attachment> {
-  return client.postForm<Attachment>(`${attachmentOwnerPath(parentType, parentId)}/attachments`, attachmentFileFormData(attachment));
+  const path = `${attachmentOwnerPath(parentType, parentId)}/attachments?libraryVisibility=${attachment.libraryVisibility satisfies AttachmentLibrarySelection}`;
+  return client.postForm<Attachment>(path, attachmentFileFormData(attachment));
+}
+
+async function loadDocumentLibraryOptions(client: ProjectManagerApiClient): Promise<{ folders: AttachmentFolder[]; tags: Tag[] }> {
+  const folders = await client.get<AttachmentFolder[]>("attachment-folders");
+  const tags = await client.get<Tag[]>("tags?domain=dms");
+  return { folders, tags: tags.filter((tag) => tag.domain === "dms" && !tag.isSystem) };
+}
+
+async function importDocumentToLibrary(client: ProjectManagerApiClient, input: z.infer<typeof documentImportSchema>): Promise<Attachment> {
+  const query = new URLSearchParams();
+  if (input.folderId !== undefined && input.folderId !== null) {
+    query.set("folder", String(input.folderId));
+  }
+  if ((input.tagIds?.length ?? 0) > 0) {
+    query.set("tags", [...new Set(input.tagIds)].join(","));
+  }
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return client.postForm<Attachment>(`documents${suffix}`, attachmentFileFormData(input));
 }
 
 async function createNotesBulk(client: ProjectManagerApiClient, input: z.infer<typeof noteListInputSchema>): Promise<BulkToolResult<Note>> {
@@ -1187,16 +1215,30 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
     defineTool({
       name: "add_attachment_to_parent",
       title: "Attachment hinzufügen",
-      description: "Hängt eine Base64-codierte Datei an Projekt, Meilenstein, Task, Feature oder Ticket.",
+      description: "Hängt eine Base64-codierte Datei an Projekt, Meilenstein, Task, Feature oder Ticket. libraryVisibility muss seit MS-80 (19.07.26) explizit als attachment-only oder document-library angegeben werden.",
       inputSchema: attachmentInputSchema,
-      execute: (input) => client.postForm<Attachment>(`${attachmentOwnerPath(input.parentType, input.parentId)}/attachments`, attachmentFormData(input))
+      execute: (input) => uploadAttachmentFile(client, input.parentType, input.parentId, input)
     }),
     defineTool({
       name: "add_attachments_to_parent",
       title: "Attachments hinzufügen",
-      description: "Hängt mehrere Base64-codierte Dateien seriell an Projekt, Meilenstein, Task, Feature oder Ticket.",
+      description: "Hängt mehrere Base64-codierte Dateien seriell an Projekt, Meilenstein, Task, Feature oder Ticket. Jede Datei verlangt seit MS-80 (19.07.26) eine explizite libraryVisibility.",
       inputSchema: attachmentListInputSchema,
       execute: (input) => createAttachmentsBulk(client, input)
+    }),
+    defineTool({
+      name: "list_document_library_options",
+      title: "Dokumentbibliothek-Optionen lesen",
+      description: "Liest die hierarchischen Sammlungen und zuweisbaren DMS-Tags für einen Dokumentimport.",
+      inputSchema: z.object({}),
+      execute: () => loadDocumentLibraryOptions(client)
+    }),
+    defineTool({
+      name: "add_document_to_library",
+      title: "Dokument importieren",
+      description: "Importiert eine Base64-codierte Datei in den bestehenden DMS-Speicherpfad, optional in genau eine direkte Sammlung und mit DMS-Tags. Kategorie- und Mehrfachsammlungsfelder werden seit MS-80 (19.07.26) abgelehnt.",
+      inputSchema: documentImportSchema,
+      execute: (input) => importDocumentToLibrary(client, input)
     }),
     defineTool({
       name: "list_tags",

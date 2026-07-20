@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Test Scope: Tasks API
  *
  * Covers task CRUD, owner-board positions, task details, status transitions, and cascades.
@@ -127,7 +127,7 @@ describe("Tasks API", () => {
     await createNoteForTask(app, countedTask.id);
     await createComment(app, countedTask.id);
     await supertest(app.server)
-      .post(`/api/tasks/${countedTask.id}/attachments`)
+      .post(`/api/tasks/${countedTask.id}/attachments?libraryVisibility=document-library`)
       .attach("file", Buffer.from("Task-Datei"), { filename: "task.txt", contentType: "text/plain" })
       .expect(201);
 

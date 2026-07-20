@@ -351,13 +351,14 @@ export async function getTicketTagsMap(database: DbClient, ticketIds: number[]):
 
 export async function createTag(database: DbClient, input: { name?: string; color?: string; domain?: TagDomain }, actor?: JournalActor | null): Promise<Tag> {
   const name = requireNonEmpty(input.name, "name");
-  const existing = await tagRepository.findByName(database, name);
+  const domain = input.domain ?? "pm";
+  const existing = await tagRepository.findByName(database, name, domain);
   if (existing) {
-    throw conflict(`Tag "${name}" already exists`);
+    throw conflict(`Tag "${name}" already exists in domain "${domain}"`);
   }
 
   const created = await database.transaction(async (tx) => {
-    const tag = await tagRepository.create(tx, { name, color: input.color ?? "#94a3b8", domain: input.domain ?? "pm" }, actor?.actorUserId ?? undefined);
+    const tag = await tagRepository.create(tx, { name, color: input.color ?? "#94a3b8", domain }, actor?.actorUserId ?? undefined);
     const journalObject = tagJournalObject(tag);
     await recordJournalEntry(tx, {
       operation: "create",
@@ -388,6 +389,12 @@ export async function updateTag(database: DbClient, id: number, input: { name?: 
     const current = await tagRepository.findById(tx, id);
     if (!current) {
       throw notFound(`Tag with id ${id} not found`);
+    }
+    if (values.name !== undefined && values.name !== current.name) {
+      const duplicate = await tagRepository.findByName(tx, values.name, current.domain);
+      if (duplicate && duplicate.id !== id) {
+        throw conflict(`Tag "${values.name}" already exists in domain "${current.domain}"`);
+      }
     }
     const tag = await tagRepository.update(tx, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
     if (!tag) {

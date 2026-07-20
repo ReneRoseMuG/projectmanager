@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Test Scope:
  *
  * Test-Ebene:
@@ -222,7 +222,7 @@ describe("Milestones API", () => {
     expect(comments.body).toEqual([expect.objectContaining({ id: comment.body.id, body: "<p>Milestone-Kommentar</p>" })]);
 
     const attachment = await supertest(app.server)
-      .post(`/api/milestones/${milestone.id}/attachments`)
+      .post(`/api/milestones/${milestone.id}/attachments?libraryVisibility=document-library`)
       .attach("file", Buffer.from("Milestone-Datei"), { filename: "milestone.txt", contentType: "text/plain" })
       .expect(201);
     expect(attachment.body.owners).toEqual([{ type: "milestone", id: milestone.id }]);
@@ -280,7 +280,7 @@ describe("Milestones API", () => {
     const note = await supertest(app.server).post(`/api/milestones/${milestone.id}/notes`).send({ title: "Delete Note", contentJson: { type: "doc" } }).expect(201);
     const comment = await supertest(app.server).post(`/api/milestones/${milestone.id}/comments`).send({ body: "Delete Comment" }).expect(201);
     const attachment = await supertest(app.server)
-      .post(`/api/milestones/${milestone.id}/attachments`)
+      .post(`/api/milestones/${milestone.id}/attachments?libraryVisibility=document-library`)
       .attach("file", Buffer.from("Delete"), { filename: "delete.txt", contentType: "text/plain" })
       .expect(201);
     const event = await supertest(app.server)
@@ -315,7 +315,7 @@ describe("Milestones API", () => {
     const milestone = await createMilestone(app, project.id);
     const note = await supertest(app.server).post(`/api/milestones/${milestone.id}/notes`).send({ title: "Projekt Delete Note", contentJson: { type: "doc" } }).expect(201);
     const attachment = await supertest(app.server)
-      .post(`/api/milestones/${milestone.id}/attachments`)
+      .post(`/api/milestones/${milestone.id}/attachments?libraryVisibility=document-library`)
       .attach("file", Buffer.from("Project Delete"), { filename: "project-delete.txt", contentType: "text/plain" })
       .expect(201);
 

@@ -96,8 +96,6 @@ try {
         <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="14"/>
         <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="14"/>
-        <ColumnDefinition Width="*"/>
       </Grid.ColumnDefinitions>
 
       <Border Grid.Column="0" BorderBrush="#CBD5E1" BorderThickness="1" Background="White" Padding="12">
@@ -107,7 +105,7 @@ try {
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
-          <TextBlock Text="Sammlungen" FontWeight="SemiBold" Foreground="#334155"/>
+          <TextBlock Text="Sammlung (optional, genau eine)" FontWeight="SemiBold" Foreground="#334155"/>
           <TextBox Name="FolderSearch" Grid.Row="1" Height="30" Margin="0,8,0,10" Padding="8,4" ToolTip="Sammlungen durchsuchen"/>
           <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <StackPanel Name="FoldersPanel"/>
@@ -116,21 +114,6 @@ try {
       </Border>
 
       <Border Grid.Column="2" BorderBrush="#CBD5E1" BorderThickness="1" Background="White" Padding="12">
-        <Grid>
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-          </Grid.RowDefinitions>
-          <TextBlock Text="Kategorien" FontWeight="SemiBold" Foreground="#334155"/>
-          <TextBox Name="CategorySearch" Grid.Row="1" Height="30" Margin="0,8,0,10" Padding="8,4" ToolTip="Kategorien durchsuchen"/>
-          <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-            <StackPanel Name="CategoriesPanel"/>
-          </ScrollViewer>
-        </Grid>
-      </Border>
-
-      <Border Grid.Column="4" BorderBrush="#CBD5E1" BorderThickness="1" Background="White" Padding="12">
         <Grid>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto"/>
@@ -188,8 +171,6 @@ $summaryText = $window.FindName("SummaryText")
 $fileList = $window.FindName("FileList")
 $folderSearch = $window.FindName("FolderSearch")
 $foldersPanel = $window.FindName("FoldersPanel")
-$categorySearch = $window.FindName("CategorySearch")
-$categoriesPanel = $window.FindName("CategoriesPanel")
 $tagSearch = $window.FindName("TagSearch")
 $tagsPanel = $window.FindName("TagsPanel")
 $newTagName = $window.FindName("NewTagName")
@@ -211,26 +192,24 @@ $progressText.Text = "Bereit zum Import"
 $currentFileText.Text = "Noch nicht gestartet"
 $importButton.Content = if ($Mode -eq "move") { "Dateien verschieben" } else { "Dateien kopieren" }
 
-$folderCheckboxes = @()
-foreach ($folder in @($options.folders)) {
-  $checkbox = New-Object System.Windows.Controls.CheckBox
-  $checkbox.Content = $folder.label
-  $checkbox.Tag = $folder
-  $checkbox.Margin = "0,0,0,8"
-  $checkbox.Padding = "2"
-  $foldersPanel.Children.Add($checkbox) | Out-Null
-  $folderCheckboxes += $checkbox
-}
+$noFolderRadio = New-Object System.Windows.Controls.RadioButton
+$noFolderRadio.Content = "Keine Sammlung"
+$noFolderRadio.GroupName = "DocumentFolder"
+$noFolderRadio.Margin = "0,0,0,8"
+$noFolderRadio.Padding = "2"
+$noFolderRadio.IsChecked = $true
+$foldersPanel.Children.Add($noFolderRadio) | Out-Null
 
-$categoryCheckboxes = @()
-foreach ($category in @($options.categories)) {
-  $checkbox = New-Object System.Windows.Controls.CheckBox
-  $checkbox.Content = $category.name
-  $checkbox.Tag = $category
-  $checkbox.Margin = "0,0,0,8"
-  $checkbox.Padding = "2"
-  $categoriesPanel.Children.Add($checkbox) | Out-Null
-  $categoryCheckboxes += $checkbox
+$folderRadios = @()
+foreach ($folder in @($options.folders)) {
+  $radio = New-Object System.Windows.Controls.RadioButton
+  $radio.Content = $folder.label
+  $radio.Tag = $folder
+  $radio.GroupName = "DocumentFolder"
+  $radio.Margin = "0,0,0,8"
+  $radio.Padding = "2"
+  $foldersPanel.Children.Add($radio) | Out-Null
+  $folderRadios += $radio
 }
 
 $script:tagCheckboxes = @()
@@ -246,15 +225,8 @@ foreach ($tag in @($options.tags)) {
 
 $folderSearch.Add_TextChanged({
   $needle = $folderSearch.Text.Trim()
-  foreach ($checkbox in $folderCheckboxes) {
-    $checkbox.Visibility = if ([string]::IsNullOrWhiteSpace($needle) -or $checkbox.Content.ToString().IndexOf($needle, [StringComparison]::CurrentCultureIgnoreCase) -ge 0) { "Visible" } else { "Collapsed" }
-  }
-})
-
-$categorySearch.Add_TextChanged({
-  $needle = $categorySearch.Text.Trim()
-  foreach ($checkbox in $categoryCheckboxes) {
-    $checkbox.Visibility = if ([string]::IsNullOrWhiteSpace($needle) -or $checkbox.Content.ToString().IndexOf($needle, [StringComparison]::CurrentCultureIgnoreCase) -ge 0) { "Visible" } else { "Collapsed" }
+  foreach ($radio in $folderRadios) {
+    $radio.Visibility = if ([string]::IsNullOrWhiteSpace($needle) -or $radio.Content.ToString().IndexOf($needle, [StringComparison]::CurrentCultureIgnoreCase) -ge 0) { "Visible" } else { "Collapsed" }
   }
 })
 
@@ -350,23 +322,22 @@ $importButton.Add_Click({
 
   $script:importStarted = $true
   $folderSearch.IsEnabled = $false
-  $categorySearch.IsEnabled = $false
   $tagSearch.IsEnabled = $false
   $newTagName.IsEnabled = $false
   $createTagButton.IsEnabled = $false
-  foreach ($checkbox in $folderCheckboxes) { $checkbox.IsEnabled = $false }
-  foreach ($checkbox in $categoryCheckboxes) { $checkbox.IsEnabled = $false }
+  $noFolderRadio.IsEnabled = $false
+  foreach ($radio in $folderRadios) { $radio.IsEnabled = $false }
   foreach ($checkbox in $script:tagCheckboxes) { $checkbox.IsEnabled = $false }
   $importButton.IsEnabled = $false
   $cancelButton.IsEnabled = $false
   $progressText.Text = "Import wird vorbereitet"
   $currentFileText.Text = "Dateien werden geprüft"
 
+  $selectedFolder = $folderRadios | Where-Object IsChecked | Select-Object -First 1
   $request = [ordered]@{
     mode = $Mode
     filePaths = @($resolvedFiles)
-    folderIds = @($folderCheckboxes | Where-Object IsChecked | ForEach-Object { [int]$_.Tag.id })
-    categoryIds = @($categoryCheckboxes | Where-Object IsChecked | ForEach-Object { [int]$_.Tag.id })
+    folderId = if ($null -eq $selectedFolder) { $null } else { [int]$selectedFolder.Tag.id }
     tagIds = @($script:tagCheckboxes | Where-Object IsChecked | ForEach-Object { [int]$_.Tag.id })
   }
 

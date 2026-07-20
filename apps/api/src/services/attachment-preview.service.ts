@@ -147,7 +147,7 @@ function isOfficeMimeType(mimetype: string): boolean {
 }
 
 function assetUrl(record: AttachmentRecord): string {
-  return `/uploads/${record.filename.replaceAll("\\", "/")}`;
+  return `/api/attachments/${record.id}/content`;
 }
 
 async function readTextPreview(filePath: string): Promise<AttachmentTextPreview> {
@@ -172,8 +172,8 @@ function previewFilename(record: AttachmentRecord): string {
   return `attachment-${record.id}-${hash}.pdf`;
 }
 
-function previewUrl(filename: string): string {
-  return `/previews/${filename}`;
+function previewUrl(attachmentId: number): string {
+  return `/api/attachments/${attachmentId}/preview-file`;
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
@@ -257,7 +257,7 @@ async function convertOfficePreview(record: AttachmentRecord, filePath: string):
   if (!result.ok) {
     return failedPreview(record, profile, result.message);
   }
-  return availablePreview(record, profile, previewUrl(path.basename(result.path)), null, null);
+  return availablePreview(record, profile, previewUrl(record.id), null, null);
 }
 
 function availablePreview(record: AttachmentRecord, profile: AttachmentPreviewProfile, url: string | null, text: AttachmentTextPreview | null, message: string | null): AttachmentPreviewInfo {
@@ -480,4 +480,21 @@ export async function removeAttachmentPreviews(id: number): Promise<void> {
       await fs.rm(path.join(config.previewCacheDir, entry), { force: true });
     }
   }
+}
+
+export async function getAttachmentPreviewFile(database: DbClient, id: number): Promise<{ diskPath: string; size: number }> {
+  const record = firstRow(await database.select().from(attachments).where(eq(attachments.id, id)));
+  if (!record) {
+    throw notFound(`Attachment with id ${id} not found`);
+  }
+  const preview = await getAttachmentPreview(database, id);
+  if (preview.status !== "available" || preview.kind !== "generatedPdf" || !preview.previewUrl) {
+    throw notFound(`No generated preview available for attachment with id ${id}`);
+  }
+  assertSafeTestDirectoryPath(config.previewCacheDir, "PREVIEW_CACHE_DIR");
+  const diskPath = path.resolve(config.previewCacheDir, previewFilename(record));
+  if (!isSameOrInside(diskPath, config.previewCacheDir) || !(await fileExists(diskPath))) {
+    throw notFound(`No generated preview available for attachment with id ${id}`);
+  }
+  return { diskPath, size: (await fs.stat(diskPath)).size };
 }

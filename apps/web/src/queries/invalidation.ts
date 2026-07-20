@@ -29,7 +29,11 @@ export async function invalidateAdminRoles(queryClient: QueryClient): Promise<vo
 }
 
 export async function invalidateDocuments(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.documents.root, queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.documents.root, queryKeys.attachments.root, queryKeys.globalSearch.root]);
+}
+
+export async function invalidateDocumentDuplicateCheck(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.documents.duplicateCheck()]);
 }
 
 export async function invalidateMilestones(queryClient: QueryClient): Promise<void> {
@@ -243,7 +247,7 @@ export async function invalidateAllAttachments(queryClient: QueryClient): Promis
 }
 
 export async function invalidateAttachments(queryClient: QueryClient, ownerType: QueryOwnerType, ownerId: number): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.attachments.owner(ownerType, ownerId), ...attachmentOwnerKeys(ownerType, ownerId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.attachments.owner(ownerType, ownerId), queryKeys.documents.root, ...attachmentOwnerKeys(ownerType, ownerId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateTags(queryClient: QueryClient): Promise<void> {

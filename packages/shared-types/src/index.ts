@@ -188,32 +188,23 @@ export function getSettingDefinition(key: string): SettingDefinition | undefined
 export const settingDefinitions = Object.values(settingsRegistry) as SettingDefinition[];
 
 // --- Kalender-Synchronisation: zentrale Server-Konfiguration (MS-79, DB-gestützt) ---
-// Diese Konfiguration wird zentral in der Datenbank gehalten, damit sie nur einmal gepflegt werden
-// muss statt an jedem Arbeitsplatz in der .env. Das Google-Client-Secret wird serverseitig
-// verschlüsselt abgelegt (derselbe Cipher wie für die Kalender-Zugangsdaten) und NIE im Klartext
-// an den Client ausgeliefert — die View meldet nur, ob ein Secret hinterlegt ist.
 export const CALENDAR_SYNC_MIN_INTERVAL_MS = 60_000;
 export const CALENDAR_SYNC_DEFAULT_INTERVAL_MS = 15 * 60_000;
 
 export interface CalendarSyncConfigView {
   googleClientId: string;
-  /** Maskiert: true, sobald ein Client-Secret hinterlegt ist (DB oder .env-Fallback). Nie der Klartext. */
   googleClientSecretSet: boolean;
   googleRedirectUri: string;
   syncEnabled: boolean;
   syncIntervalMs: number;
   googlePushWebhookUrl: string;
-  /** Optimistic-Locking-Version der DB-Zeile; 0, solange noch keine gespeichert wurde. */
   version: number;
-  /** true, wenn noch keine DB-Konfiguration existiert und die Werte aus der .env stammen. */
   usingEnvFallback: boolean;
-  /** true, wenn CALENDAR_ENCRYPTION_KEY gesetzt ist; ohne ihn lässt sich kein Secret speichern. */
   encryptionKeyConfigured: boolean;
 }
 
 export interface UpdateCalendarSyncConfigRequest {
   googleClientId: string;
-  /** Weggelassen/null = Secret unverändert lassen; "" = Secret entfernen; nicht-leer = neu setzen. */
   googleClientSecret?: string | null;
   googleRedirectUri: string;
   syncEnabled: boolean;
@@ -983,36 +974,17 @@ export interface NoteMoveInput {
   target: MoveOwner<NoteMoveTargetType>;
 }
 
-export interface AttachmentCategory {
-  id: number;
-  name: string;
-  color: string;
-  sortOrder: number;
-  version: number;
-}
-
 export interface AttachmentFolder {
   id: number;
   parentId: number | null;
   projectId: number | null;
   name: string;
-  sortOrder: number;
+  childCount: number;
+  directDocumentCount: number;
   version: number;
 }
 
-export interface AttachmentOrderItem {
-  id: number;
-  expectedVersion: number;
-}
-
-export interface AttachmentCategoryOrderInput {
-  items: AttachmentOrderItem[];
-}
-
-export interface AttachmentFolderOrderInput {
-  parentId: number | null;
-  items: AttachmentOrderItem[];
-}
+export type AttachmentLibrarySelection = "attachment-only" | "document-library";
 
 export interface Attachment {
   id: number;
@@ -1024,12 +996,51 @@ export interface Attachment {
   mimetype: string;
   size: number;
   url: string;
-  categories?: AttachmentCategory[];
+  contentHash: string | null;
+  isInDocumentLibrary: boolean;
   tags?: Tag[];
+  folder?: AttachmentFolder | null;
   folders?: AttachmentFolder[];
   createdAt: string;
   updatedAt: string;
   version: number;
+}
+
+export type DocumentDuplicateCheckStatus = "idle" | "running" | "completed" | "failed";
+export type DocumentDuplicateCheckIssueKind = "missing" | "unreadable" | "changed";
+
+export interface DocumentDuplicateCheckDocument {
+  id: number;
+  originalName: string;
+  displayName: string | null;
+  size: number;
+  createdAt: string;
+  folder: AttachmentFolder | null;
+  owners: AttachmentOwner[];
+}
+
+export interface DocumentDuplicateGroup {
+  hash: string;
+  documents: DocumentDuplicateCheckDocument[];
+}
+
+export interface DocumentDuplicateCheckIssue {
+  attachmentId: number;
+  originalName: string;
+  kind: DocumentDuplicateCheckIssueKind;
+  message: string;
+}
+
+export interface DocumentDuplicateCheck {
+  id: string | null;
+  status: DocumentDuplicateCheckStatus;
+  total: number;
+  processed: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  groups: DocumentDuplicateGroup[];
+  issues: DocumentDuplicateCheckIssue[];
+  error: string | null;
 }
 
 export type AttachmentOwner =

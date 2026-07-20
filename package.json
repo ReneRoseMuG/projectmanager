@@ -18,7 +18,7 @@
     "build": "npm run build -w packages/shared-types && npm run build -w apps/api && npm run build -w apps/mcp-server && npm run build -w apps/windows-importer && npm run build -w apps/web",
     "db:generate": "npm run db:generate -w apps/api",
     "db:migrate": "npm run build -w packages/shared-types && npm run db:migrate -w apps/api",
-    "test": "npm run test -w apps/api && npm run test -w apps/mcp-server && npm run test -w apps/windows-importer",
+    "test": "node scripts/run-tests.mjs",
     "lint": "npm run lint -w apps/web && npm run lint -w apps/api",
     "format": "prettier --write ."
   },

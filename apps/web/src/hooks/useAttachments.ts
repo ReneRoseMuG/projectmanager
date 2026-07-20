@@ -1,14 +1,15 @@
+import type { Attachment, AttachmentLibrarySelection } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
-  deleteAttachment as deleteAttachmentRequest,
-  deleteWikiPageAttachment,
+  deleteAttachmentPermanently as deleteAttachmentPermanentlyRequest,
   getFeatureAttachments,
   getMilestoneAttachments,
   getProjectAttachments,
   getTaskAttachments,
   getWikiPageAttachments,
   openAttachment as openAttachmentRequest,
+  unlinkOwnerAttachment,
   uploadMilestoneAttachment,
   uploadFeatureAttachment,
   uploadProjectAttachment,
@@ -64,26 +65,26 @@ export function useAttachments(owner: AttachmentOwner | null) {
   }, [attachmentsQuery, hasOwner]);
 
   const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, librarySelection }: { file: File; librarySelection: AttachmentLibrarySelection }) => {
       if (!hasOwner) {
         return null;
       }
       if (ownerType === "project") {
-        return uploadProjectAttachment(ownerId as number, file);
+        return uploadProjectAttachment(ownerId as number, file, librarySelection);
       }
       if (ownerType === "task") {
-        return uploadTaskAttachment(ownerId as number, file);
+        return uploadTaskAttachment(ownerId as number, file, librarySelection);
       }
       if (ownerType === "milestone") {
-        return uploadMilestoneAttachment(ownerId as number, file);
+        return uploadMilestoneAttachment(ownerId as number, file, librarySelection);
       }
       if (ownerType === "ticket") {
-        return uploadTicketAttachment(ownerId as number, file);
+        return uploadTicketAttachment(ownerId as number, file, librarySelection);
       }
       if (ownerType === "wikiPage") {
-        return uploadWikiPageAttachment(ownerId as number, file);
+        return uploadWikiPageAttachment(ownerId as number, file, librarySelection);
       }
-      return uploadFeatureAttachment(ownerId as number, file);
+      return uploadFeatureAttachment(ownerId as number, file, librarySelection);
     },
     onSuccess: () => {
       if (hasOwner) {
@@ -92,14 +93,23 @@ export function useAttachments(owner: AttachmentOwner | null) {
     }
   });
 
-  const removeMutation = useMutation({
-    mutationFn: async (id: number) => {
-      if (ownerType === "wikiPage" && ownerId !== undefined) {
-        await deleteWikiPageAttachment(ownerId, id);
+  const unlinkMutation = useMutation({
+    mutationFn: async (attachment: Attachment) => {
+      if (!owner) {
         return;
       }
-      await deleteAttachmentRequest(id);
+      const orphanAction = !attachment.isInDocumentLibrary && attachment.owners.length <= 1 ? "add-to-library" as const : undefined;
+      await unlinkOwnerAttachment(owner, attachment, orphanAction);
     },
+    onSuccess: () => {
+      if (hasOwner) {
+        void invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);
+      }
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteAttachmentPermanentlyRequest,
     onSuccess: () => {
       if (hasOwner) {
         void invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);
@@ -112,17 +122,24 @@ export function useAttachments(owner: AttachmentOwner | null) {
   });
 
   const uploadAttachment = useCallback(
-    async (file: File) => {
-      return uploadMutation.mutateAsync(file);
+    async (file: File, librarySelection: AttachmentLibrarySelection) => {
+      return uploadMutation.mutateAsync({ file, librarySelection });
     },
     [uploadMutation]
   );
 
-  const removeAttachment = useCallback(
-    async (id: number) => {
-      await removeMutation.mutateAsync(id);
+  const unlinkAttachment = useCallback(
+    async (attachment: Attachment) => {
+      await unlinkMutation.mutateAsync(attachment);
     },
-    [removeMutation]
+    [unlinkMutation]
+  );
+
+  const deleteAttachmentPermanently = useCallback(
+    async (attachment: Attachment) => {
+      await deleteMutation.mutateAsync(attachment);
+    },
+    [deleteMutation]
   );
 
   const openAttachment = useCallback(
@@ -138,7 +155,8 @@ export function useAttachments(owner: AttachmentOwner | null) {
     error: toQueryError(attachmentsQuery.error),
     reload,
     uploadAttachment,
-    removeAttachment,
+    unlinkAttachment,
+    deleteAttachmentPermanently,
     openAttachment,
     openingAttachmentId: openMutation.isPending ? (openMutation.variables ?? null) : null
   };

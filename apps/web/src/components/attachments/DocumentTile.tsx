@@ -1,6 +1,6 @@
 import type { Attachment } from "@taskmanager/shared-types";
-import { Download, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Download, Trash2, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { assetUrl } from "../../api/client";
 import { documentThumbnailUrl } from "../../api/documents";
 import { describeAttachmentType, type AttachmentFamily } from "./attachmentTypes";
@@ -49,8 +49,11 @@ interface DocumentTileProps {
   onToggleSelect: () => void;
   onOpen: () => void;
   onDownload: () => void;
+  canRemoveFromLibrary?: boolean;
+  onRemoveFromLibrary?: () => void;
   canDelete: boolean;
   onDelete: () => void;
+  pills?: ReactNode;
 }
 
 export function DocumentTile({
@@ -59,8 +62,11 @@ export function DocumentTile({
   onToggleSelect,
   onOpen,
   onDownload,
+  canRemoveFromLibrary = false,
+  onRemoveFromLibrary,
   canDelete,
   onDelete,
+  pills,
 }: DocumentTileProps) {
   const meta = describeAttachmentType(document);
   const Icon = meta.Icon;
@@ -134,6 +140,21 @@ export function DocumentTile({
             <Download size={14} />
           </button>
 
+          {canRemoveFromLibrary && onRemoveFromLibrary ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemoveFromLibrary();
+              }}
+              className="rounded-md bg-white/90 p-1 text-steel-500 shadow-sm transition hover:bg-tangerine/10 hover:text-tangerine"
+              title="Aus der Dokumentenbibliothek entfernen"
+              aria-label="Aus der Dokumentenbibliothek entfernen"
+            >
+              <X size={14} />
+            </button>
+          ) : null}
+
           {canDelete ? (
             <button
               type="button"
@@ -153,6 +174,7 @@ export function DocumentTile({
 
       <div className="min-w-0 px-2 py-1.5">
         <p className="truncate text-center text-xs font-medium text-ink">{title}</p>
+        {pills ? <div className="mt-1 flex min-h-5 justify-center">{pills}</div> : null}
       </div>
     </article>
   );

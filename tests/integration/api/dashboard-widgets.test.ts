@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -174,11 +174,11 @@ describe("Dashboard widget data API", () => {
       .send({ body: "Bearbeiteter Kommentar", expectedVersion: editedComment.body.version })
       .expect(200);
     await admin
-      .post(`/api/projects/${otherProject.body.id}/attachments`)
+      .post(`/api/projects/${otherProject.body.id}/attachments?libraryVisibility=document-library`)
       .attach("file", Buffer.from("Dashboard-Datei"), { filename: "global-widget.txt", contentType: "text/plain" })
       .expect(201);
     await admin
-      .post(`/api/features/${feature.body.id}/attachments`)
+      .post(`/api/features/${feature.body.id}/attachments?libraryVisibility=document-library`)
       .attach("file", Buffer.from("Feature-Datei"), { filename: "feature-widget.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -267,7 +267,7 @@ describe("Dashboard widget data API", () => {
 
     // Attachment für Meilenstein A
     await admin
-      .post(`/api/milestones/${ms.body.id}/attachments`)
+      .post(`/api/milestones/${ms.body.id}/attachments?libraryVisibility=document-library`)
       .attach("file", Buffer.from("MS-Anhang"), { filename: "ms-anhang.txt", contentType: "text/plain" })
       .expect(201);
 

@@ -48,8 +48,10 @@ function doc(overrides: Partial<Attachment> = {}): Attachment {
     mimetype: "application/pdf",
     size: 2048,
     url: "/uploads/stored-1.pdf",
-    categories: [],
+    contentHash: null,
+    isInDocumentLibrary: true,
     tags: [],
+    folder: null,
     folders: [],
     createdAt: "2026-07-07T08:00:00.000Z",
     updatedAt: "2026-07-07T08:00:00.000Z",
@@ -165,6 +167,19 @@ describe("DocumentTile", () => {
   it("bietet ohne Löschrecht keinen Löschen-Button", () => {
     renderTile({ canDelete: false });
     expect(screen.queryByRole("button", { name: "Endgültig löschen" })).not.toBeInTheDocument();
+  });
+
+  it("zeigt MS-80-Tags und trennt Bibliotheksentfernung vom endgültigen Löschen", () => {
+    const onRemoveFromLibrary = vi.fn();
+    renderTile({
+      canRemoveFromLibrary: true,
+      onRemoveFromLibrary,
+      pills: <span>Wichtig</span>,
+    });
+
+    expect(screen.getByText("Wichtig")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Aus der Dokumentenbibliothek entfernen" }));
+    expect(onRemoveFromLibrary).toHaveBeenCalledTimes(1);
   });
 });
 

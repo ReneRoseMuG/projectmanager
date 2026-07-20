@@ -78,7 +78,7 @@ vi.mock("../../../../../apps/web/src/hooks/useNotes", () => ({
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/useAttachments", () => ({
-  useAttachments: () => ({ attachments: [], loading: false, uploadAttachment: vi.fn(), removeAttachment: vi.fn(), openAttachment: vi.fn(), openingAttachmentId: null }),
+  useAttachments: () => ({ attachments: [], loading: false, uploadAttachment: vi.fn(), unlinkAttachment: vi.fn(), deleteAttachmentPermanently: vi.fn(), openAttachment: vi.fn(), openingAttachmentId: null }),
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/useTicketDetail", () => ({

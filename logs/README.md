@@ -2,6 +2,25 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 20.07.26 | 10:08:24 | Feature | MS-80 auf Work-Stand wiederhergestellt | ⚠️ |
+| 19.07.26 | 21:02:18 | 18 | Browserabnahme blockiert | 🔴 |
+| 19.07.26 | 21:02:17 | 17 | Gesamttest und Build | ⚠️ |
+| 19.07.26 | 20:44:36 | 16 | Serielle Testorchestrierung | ✅ |
+| 19.07.26 | 20:43:21 | 15 | MCP-MySQL-Testisolation | ⚠️ |
+| 19.07.26 | 20:41:02 | 14 | API-Testnachführung | ✅ |
+| 19.07.26 | 20:41:01 | 13 | Legacy-Kategorievertrag | ✅ |
+| 19.07.26 | 19:31:32 | 12 | Kategorie-Cleanup und Rollout | ⚠️ |
+| 19.07.26 | 19:01:11 | 11 | Berechtigungen, Versionierung und Dateischutz | ⚠️ |
+| 19.07.26 | 18:42:07 | 10 | Importer- und MCP-Verträge | ⚠️ |
+| 19.07.26 | 18:29:01 | 9 | DMS-Navigation und Karten | ⚠️ |
+| 19.07.26 | 18:16:57 | 8 | SQL-Dokumentfilter | ⚠️ |
+| 19.07.26 | 18:02:54 | 7 | Kategorien zu Tags | ⚠️ |
+| 19.07.26 | 17:53:15 | 6 | Sammlungshierarchie | ⚠️ |
+| 19.07.26 | 17:39:11 | 5 | Attachment-Lebenszyklus | ⚠️ |
+| 19.07.26 | 17:23:47 | 4 | Upload-Bibliothekssichtbarkeit | ⚠️ |
+| 19.07.26 | 17:09:45 | 3 | Manueller Duplikat-Check | ⚠️ |
+| 19.07.26 | 16:58:30 | 2 | DMS-Schema und gemeinsame Typen | ⚠️ |
+| 19.07.26 | 16:50:40 | 1 | DMS-Bestandsaufnahme | ⚠️ |
 | 12.07.26 | 04:14:02 | Feature | DMS-Sortierung für Sammlungen und Kategorien | ⚠️ |
 | 12.07.26 | 03:38:33 | Fix | DMS mit eigenem Scrollcontainer | ✅ |
 | 12.07.26 | 03:25:27 | Fix | DMS-Filterzeile sticky | ✅ |

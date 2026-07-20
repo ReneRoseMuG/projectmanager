@@ -133,7 +133,8 @@ vi.mock("../../../../../apps/web/src/hooks/useAttachments", () => ({
       error: null,
       reload: vi.fn(),
       uploadAttachment: vi.fn(),
-      removeAttachment: vi.fn(),
+      unlinkAttachment: vi.fn(),
+      deleteAttachmentPermanently: vi.fn(),
       openAttachment: vi.fn(),
       openingAttachmentId: null,
     };
