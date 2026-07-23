@@ -258,7 +258,7 @@ if (Test-Path "$root\Stop.ps1") {
 
 Write-StartLog "starting api"
 $api = Start-Process -FilePath "node" `
-    -ArgumentList "dist\index.js" `
+    -ArgumentList "dist\index.js", "--project-manager-runtime=api" `
     -WorkingDirectory "$root\apps\api" `
     -WindowStyle Hidden `
     -RedirectStandardOutput "$logDir\api.out.log" `
@@ -267,7 +267,7 @@ $api = Start-Process -FilePath "node" `
 
 Write-StartLog "starting web"
 $web = Start-Process -FilePath "node" `
-    -ArgumentList "scripts\serve-static.mjs", "apps\web\dist" `
+    -ArgumentList "scripts\serve-static.mjs", "apps\web\dist", "--project-manager-runtime=web" `
     -WorkingDirectory $root `
     -WindowStyle Hidden `
     -RedirectStandardOutput "$logDir\web.out.log" `
@@ -288,7 +288,7 @@ $startPs1Content += @"
 `$env:MCP_HTTP_PATH                = "$mcpPath"
 Write-StartLog "starting mcp"
 `$mcp = Start-Process -FilePath "node" ``
-    -ArgumentList "apps\mcp-server\dist\http.js" ``
+    -ArgumentList "apps\mcp-server\dist\http.js", "--project-manager-runtime=mcp" ``
     -WorkingDirectory `$root ``
     -WindowStyle Hidden ``
     -RedirectStandardOutput "`$logDir\mcp.out.log" ``
@@ -299,7 +299,11 @@ Write-StartLog "starting mcp"
 
 # Statischer Teil 2: PID-Datei, Warten, Browser oeffnen
 $startPs1Content += @'
-"$($api.Id) $($web.Id) $($mcp.Id)" | Set-Content $pidFile -Encoding UTF8
+@(
+    "api|$($api.Id)|$($api.StartTime.ToUniversalTime().Ticks)"
+    "web|$($web.Id)|$($web.StartTime.ToUniversalTime().Ticks)"
+    "mcp|$($mcp.Id)|$($mcp.StartTime.ToUniversalTime().Ticks)"
+) | Set-Content $pidFile -Encoding UTF8
 Write-StartLog "pid file written: $($api.Id) $($web.Id) $($mcp.Id)"
 
 Wait-HttpReady "API" "http://127.0.0.1:3001/api/health" $api
@@ -315,61 +319,11 @@ exit 0
 Set-Content -Path $startPs1Path -Value $startPs1Content -Encoding UTF8
 
 $stopPs1Path = "$Target\Stop.ps1"
-$stopPs1Content = @'
-# Stop.ps1 - Projekt Manager beenden
-$ErrorActionPreference = "Stop"
-$root = $PSScriptRoot
-$pidFile = "$root\pm-pids.txt"
-
-$targetPids = [System.Collections.Generic.HashSet[int]]::new()
-
-if (Test-Path $pidFile) {
-    (Get-Content $pidFile -Raw).Trim() -split '\s+' |
-        Where-Object { $_ -match '^\d+$' } |
-        ForEach-Object { [void]$targetPids.Add([int]$_) }
+$stopPs1SourcePath = Join-Path $PSScriptRoot "stop.ps1"
+if (-not (Test-Path $stopPs1SourcePath)) {
+    throw "Stop-Script nicht gefunden: $stopPs1SourcePath"
 }
-
-foreach ($port in @(3001, 5173, 3010)) {
-    $conn = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
-    if ($conn) {
-        foreach ($item in @($conn)) {
-            [void]$targetPids.Add([int]$item.OwningProcess)
-        }
-    }
-}
-
-if ($targetPids.Count -eq 0) {
-    Write-Host "Keine laufenden Projekt-Manager-Prozesse gefunden." -ForegroundColor Yellow
-} else {
-    foreach ($p in $targetPids) {
-        $proc = Get-Process -Id $p -ErrorAction SilentlyContinue
-        if ($proc) {
-            Stop-Process -Id $p -Force
-            if (-not $proc.WaitForExit(10000)) {
-                throw "Prozess $p ($($proc.Name)) konnte nicht beendet werden."
-            }
-            Write-Host "Prozess $p ($($proc.Name)) beendet." -ForegroundColor Green
-        }
-    }
-}
-
-foreach ($port in @(3001, 5173, 3010)) {
-    $deadline = (Get-Date).AddSeconds(10)
-    do {
-        $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
-        if (-not $listener) { break }
-        Start-Sleep -Milliseconds 250
-    } while ((Get-Date) -lt $deadline)
-
-    if ($listener) {
-        throw "Port $port ist nach dem Stoppen weiterhin belegt."
-    }
-}
-
-if (Test-Path $pidFile) { Remove-Item $pidFile -Force }
-Write-Host "Projekt Manager gestoppt." -ForegroundColor Green
-'@
-Set-Content -Path $stopPs1Path -Value $stopPs1Content -Encoding UTF8
+Copy-Item -Path $stopPs1SourcePath -Destination $stopPs1Path -Force
 
 Write-Host "[7/7] Toolbar-Verknüpfungen werden eingerichtet und gestartet..." -ForegroundColor Yellow
 

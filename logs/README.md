@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 23.07.26 | 10:58:46 | Fix | Sichere Prozessbeendigung | ✅ |
 | 20.07.26 | 10:08:24 | Feature | MS-80 auf Work-Stand wiederhergestellt | ⚠️ |
 | 19.07.26 | 21:02:18 | 18 | Browserabnahme blockiert | 🔴 |
 | 19.07.26 | 21:02:17 | 17 | Gesamttest und Build | ⚠️ |

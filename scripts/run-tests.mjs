@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 
 const npmCliPath = process.env.npm_execpath;
 const workspaces = ["apps/api", "apps/mcp-server", "apps/windows-importer", "apps/web"];
-const failedWorkspaces = [];
+const failedTargets = [];
 
 if (!npmCliPath) {
   throw new Error("npm_execpath ist nicht gesetzt. Bitte den Testlauf mit 'npm test' starten.");
@@ -24,20 +24,39 @@ function runWorkspaceTests(workspace) {
   });
 }
 
+console.log("[tests] Starte Deployment-Skripte");
+const scriptTest = spawn(process.execPath, ["--test", "tests/integration/scripts/stop-script.test.mjs"], {
+  stdio: "inherit",
+  shell: false
+});
+const scriptTestExitCode = await new Promise((resolve) => {
+  scriptTest.once("error", (error) => {
+    console.error(`[tests] Deployment-Skripte konnten nicht getestet werden: ${error.message}`);
+    resolve(1);
+  });
+  scriptTest.once("exit", (code) => resolve(code ?? 1));
+});
+if (scriptTestExitCode !== 0) {
+  failedTargets.push("Deployment-Skripte");
+  console.error(`[tests] Deployment-Skripte fehlgeschlagen (Exit ${scriptTestExitCode})`);
+} else {
+  console.log("[tests] Deployment-Skripte erfolgreich");
+}
+
 for (const workspace of workspaces) {
   console.log(`[tests] Starte ${workspace}`);
   const exitCode = await runWorkspaceTests(workspace);
   if (exitCode !== 0) {
-    failedWorkspaces.push(workspace);
+    failedTargets.push(workspace);
     console.error(`[tests] ${workspace} fehlgeschlagen (Exit ${exitCode})`);
   } else {
     console.log(`[tests] ${workspace} erfolgreich`);
   }
 }
 
-if (failedWorkspaces.length > 0) {
-  console.error(`[tests] Fehlgeschlagene Workspaces: ${failedWorkspaces.join(", ")}`);
+if (failedTargets.length > 0) {
+  console.error(`[tests] Fehlgeschlagene Testziele: ${failedTargets.join(", ")}`);
   process.exitCode = 1;
 } else {
-  console.log("[tests] Alle Workspace-Tests erfolgreich");
+  console.log("[tests] Alle Testziele erfolgreich");
 }
