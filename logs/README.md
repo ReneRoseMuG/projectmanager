@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 27.07.26 | 10:17:18 | 2 | Attachment-Regressionstests | ✅ |
+| 27.07.26 | 10:17:17 | 1 | Attachment-FK-Migration | ✅ |
 | 23.07.26 | 10:58:46 | Fix | Sichere Prozessbeendigung | ✅ |
 | 20.07.26 | 10:08:24 | Feature | MS-80 auf Work-Stand wiederhergestellt | ⚠️ |
 | 19.07.26 | 21:02:18 | 18 | Browserabnahme blockiert | 🔴 |

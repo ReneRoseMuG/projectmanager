@@ -1,9 +1,30 @@
 /**
- * Test Scope: Tasks API
+ * Test Scope:
  *
- * Covers task CRUD, owner-board positions, task details, status transitions, and cascades.
+ * Test-Ebene:
+ * - Integration
+ *
+ * Realitätsgrad:
+ * - Echte Fastify-App, echte temporäre MySQL-Datenbank und echtes temporäres Upload-Dateisystem.
+ *
+ * Mock-Entscheidung:
+ * - Keine Mocks.
+ *
+ * Isolation:
+ * - Eigene Testdatenbank über createTestDb, truncateAll vor jedem Test und Temp-Upload-Root.
+ *
+ * Abgedeckte Regeln:
+ * - Task-CRUD, Owner-Boards, Details, Statusübergänge, Kaskaden und Support-Counter.
+ * - Card-Counter und Attachment-Detaildaten bleiben nach endgültigem Löschen konsistent.
+ *
+ * Fehlerfälle:
+ * - Ungültige Eingaben, fehlende Owner, Konflikte und gelöschte Attachments.
+ *
+ * Ziel:
+ * Die Task-API einschließlich ihrer persistierten Relationen und sichtbaren Zähler absichern.
  */
 
+import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -11,6 +32,7 @@ import path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { config } from "../../../apps/api/src/config.js";
+import { taskAttachments } from "../../../apps/api/src/db/schema.js";
 import {
   buildTestApp,
   createComment,
@@ -137,6 +159,43 @@ describe("Tasks API", () => {
 
     expect(counted).toMatchObject({ attachmentCount: 1, noteCount: 1, commentCount: 1 });
     expect(empty).toMatchObject({ attachmentCount: 0, noteCount: 0, commentCount: 0 });
+  });
+
+  it("hält Card-Counter und Detailanhänge nach endgültigem Löschen konsistent", async () => {
+    const project = await createProject(app);
+    const milestone = await createMilestone(app, project.id, { name: "Attachment-Meilenstein" });
+    const taskResponse = await supertest(app.server)
+      .post(`/api/milestones/${milestone.id}/tasks`)
+      .send({ title: "Attachment-Aufgabe" })
+      .expect(201);
+    const taskId = Number(taskResponse.body.id);
+
+    const firstUpload = await supertest(app.server)
+      .post(`/api/tasks/${taskId}/attachments?libraryVisibility=document-library`)
+      .attach("file", Buffer.from("Erste Datei"), { filename: "erste-datei.txt", contentType: "text/plain" })
+      .expect(201);
+    const secondUpload = await supertest(app.server)
+      .post(`/api/tasks/${taskId}/attachments?libraryVisibility=document-library`)
+      .attach("file", Buffer.from("Zweite Datei"), { filename: "zweite-datei.txt", contentType: "text/plain" })
+      .expect(201);
+
+    const boardBefore = await supertest(app.server).get(`/api/milestones/${milestone.id}/tasks`).expect(200);
+    expect(boardBefore.body.find((task: { id: number }) => task.id === taskId)).toMatchObject({ attachmentCount: 2 });
+    await supertest(app.server).get(`/api/tasks/${taskId}/attachments`).expect(200).expect((response) => {
+      expect(response.body).toHaveLength(2);
+    });
+
+    await supertest(app.server)
+      .delete(`/api/attachments/${firstUpload.body.id}?expectedVersion=${firstUpload.body.version}`)
+      .expect(204);
+    await supertest(app.server)
+      .delete(`/api/attachments/${secondUpload.body.id}?expectedVersion=${secondUpload.body.version}`)
+      .expect(204);
+
+    const boardAfter = await supertest(app.server).get(`/api/milestones/${milestone.id}/tasks`).expect(200);
+    expect(boardAfter.body.find((task: { id: number }) => task.id === taskId)).toMatchObject({ attachmentCount: 0 });
+    await supertest(app.server).get(`/api/tasks/${taskId}/attachments`).expect(200).expect([]);
+    expect(await testDb.db.select().from(taskAttachments).where(eq(taskAttachments.taskId, taskId))).toHaveLength(0);
   });
 
   it("GET /api/projects/:id/tasks liefert direkte und Meilenstein-Aufgaben kumulativ", async () => {
