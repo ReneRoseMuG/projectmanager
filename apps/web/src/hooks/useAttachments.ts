@@ -1,14 +1,30 @@
-import type { Attachment, AttachmentLibrarySelection } from "@taskmanager/shared-types";
+import type {
+  Attachment,
+  AttachmentLibrarySelection,
+  AttachmentLocalFileInput,
+  AttachmentOwner as SharedAttachmentOwner,
+  AttachmentVersionInput
+} from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
   deleteAttachmentPermanently as deleteAttachmentPermanentlyRequest,
+  bulkDeleteAttachments as bulkDeleteAttachmentsRequest,
+  bulkSetAttachmentFolder as bulkSetAttachmentFolderRequest,
+  bulkUnlinkAttachments as bulkUnlinkAttachmentsRequest,
+  createAttachmentLocalFolder,
+  deleteAttachmentLocalFolder,
+  downloadAttachmentArchive,
   getFeatureAttachments,
   getMilestoneAttachments,
   getProjectAttachments,
   getTaskAttachments,
   getWikiPageAttachments,
+  getAttachmentLocalEntries,
+  getAttachmentLocalFolders,
   openAttachment as openAttachmentRequest,
+  openAttachmentLocalFile,
+  pickAttachmentLocalFolderPath,
   unlinkOwnerAttachment,
   uploadMilestoneAttachment,
   uploadFeatureAttachment,
@@ -20,14 +36,9 @@ import { getTicketAttachments, uploadTicketAttachment } from "../api/tickets";
 import { invalidateAttachments } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
+import { useProgressiveList } from "./useProgressiveList";
 
-export type AttachmentOwner =
-  | { type: "project"; id: number }
-  | { type: "milestone"; id: number }
-  | { type: "task"; id: number }
-  | { type: "feature"; id: number }
-  | { type: "ticket"; id: number }
-  | { type: "wikiPage"; id: number };
+export type AttachmentOwner = SharedAttachmentOwner;
 
 export function useAttachments(owner: AttachmentOwner | null) {
   const queryClient = useQueryClient();
@@ -57,12 +68,23 @@ export function useAttachments(owner: AttachmentOwner | null) {
     },
     enabled: hasOwner
   });
+  const localFoldersQuery = useQuery({
+    queryKey: queryKeys.attachments.localFolders(ownerType ?? "project", ownerId ?? 0),
+    queryFn: () => getAttachmentLocalFolders(owner as AttachmentOwner),
+    enabled: hasOwner
+  });
+
+  const invalidate = useCallback(async () => {
+    if (hasOwner) {
+      await invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);
+    }
+  }, [hasOwner, ownerId, ownerType, queryClient]);
 
   const reload = useCallback(async () => {
     if (hasOwner) {
-      await attachmentsQuery.refetch();
+      await Promise.all([attachmentsQuery.refetch(), localFoldersQuery.refetch()]);
     }
-  }, [attachmentsQuery, hasOwner]);
+  }, [attachmentsQuery, hasOwner, localFoldersQuery]);
 
   const uploadMutation = useMutation({
     mutationFn: async ({ file, librarySelection }: { file: File; librarySelection: AttachmentLibrarySelection }) => {
@@ -86,11 +108,7 @@ export function useAttachments(owner: AttachmentOwner | null) {
       }
       return uploadFeatureAttachment(ownerId as number, file, librarySelection);
     },
-    onSuccess: () => {
-      if (hasOwner) {
-        void invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);
-      }
-    }
+    onSuccess: invalidate
   });
 
   const unlinkMutation = useMutation({
@@ -101,24 +119,87 @@ export function useAttachments(owner: AttachmentOwner | null) {
       const orphanAction = !attachment.isInDocumentLibrary && attachment.owners.length <= 1 ? "add-to-library" as const : undefined;
       await unlinkOwnerAttachment(owner, attachment, orphanAction);
     },
-    onSuccess: () => {
-      if (hasOwner) {
-        void invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);
-      }
-    }
+    onSuccess: invalidate
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteAttachmentPermanentlyRequest,
-    onSuccess: () => {
-      if (hasOwner) {
-        void invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);
-      }
-    }
+    onSuccess: invalidate
   });
 
   const openMutation = useMutation({
     mutationFn: openAttachmentRequest
+  });
+
+  const bulkUnlinkMutation = useMutation({
+    mutationFn: (items: AttachmentVersionInput[]) => {
+      if (!owner) {
+        return Promise.resolve();
+      }
+      return bulkUnlinkAttachmentsRequest(owner, items);
+    },
+    onSuccess: invalidate
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (items: AttachmentVersionInput[]) => {
+      if (!owner) {
+        return Promise.resolve();
+      }
+      return bulkDeleteAttachmentsRequest(owner, items);
+    },
+    onSuccess: invalidate
+  });
+
+  const bulkFolderMutation = useMutation({
+    mutationFn: ({
+      items,
+      folderId
+    }: {
+      items: AttachmentVersionInput[];
+      folderId: number | null;
+    }) => {
+      if (!owner) {
+        return Promise.resolve();
+      }
+      return bulkSetAttachmentFolderRequest(owner, items, folderId);
+    },
+    onSuccess: invalidate
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: ({
+      attachmentIds,
+      localFiles
+    }: {
+      attachmentIds: number[];
+      localFiles: AttachmentLocalFileInput[];
+    }) => {
+      if (!owner) {
+        return Promise.reject(new Error("Attachment owner is required"));
+      }
+      return downloadAttachmentArchive(owner, attachmentIds, localFiles);
+    }
+  });
+
+  const createLocalFolderMutation = useMutation({
+    mutationFn: ({ rootPath, name }: { rootPath: string; name?: string }) => {
+      if (!owner) {
+        return Promise.reject(new Error("Attachment owner is required"));
+      }
+      return createAttachmentLocalFolder(owner, rootPath, name);
+    },
+    onSuccess: invalidate
+  });
+
+  const deleteLocalFolderMutation = useMutation({
+    mutationFn: ({ id, expectedVersion }: { id: number; expectedVersion: number }) =>
+      deleteAttachmentLocalFolder(id, expectedVersion),
+    onSuccess: invalidate
+  });
+
+  const pickLocalFolderMutation = useMutation({
+    mutationFn: pickAttachmentLocalFolderPath
   });
 
   const uploadAttachment = useCallback(
@@ -151,13 +232,51 @@ export function useAttachments(owner: AttachmentOwner | null) {
 
   return {
     attachments: attachmentsQuery.data ?? [],
-    loading: attachmentsQuery.isLoading,
-    error: toQueryError(attachmentsQuery.error),
+    localFolders: localFoldersQuery.data ?? [],
+    loading: attachmentsQuery.isLoading || localFoldersQuery.isLoading,
+    error: toQueryError(attachmentsQuery.error ?? localFoldersQuery.error),
     reload,
     uploadAttachment,
     unlinkAttachment,
     deleteAttachmentPermanently,
     openAttachment,
+    bulkUnlinkAttachments: (items: AttachmentVersionInput[]) =>
+      bulkUnlinkMutation.mutateAsync(items),
+    bulkDeleteAttachments: (items: AttachmentVersionInput[]) =>
+      bulkDeleteMutation.mutateAsync(items),
+    bulkSetAttachmentFolder: (items: AttachmentVersionInput[], folderId: number | null) =>
+      bulkFolderMutation.mutateAsync({ items, folderId }),
+    downloadArchive: (attachmentIds: number[], localFiles: AttachmentLocalFileInput[]) =>
+      archiveMutation.mutateAsync({ attachmentIds, localFiles }),
+    pickLocalFolderPath: () => pickLocalFolderMutation.mutateAsync(),
+    createLocalFolder: (rootPath: string, name?: string) =>
+      createLocalFolderMutation.mutateAsync({ rootPath, name }),
+    deleteLocalFolder: (id: number, expectedVersion: number) =>
+      deleteLocalFolderMutation.mutateAsync({ id, expectedVersion }),
     openingAttachmentId: openMutation.isPending ? (openMutation.variables ?? null) : null
+  };
+}
+
+export function useAttachmentLocalEntries(folderId: number | null, relativePath: string) {
+  const list = useProgressiveList(
+    queryKeys.attachments.localEntries(folderId ?? 0, relativePath),
+    (page, pageSize) =>
+      getAttachmentLocalEntries(folderId as number, relativePath, page, pageSize),
+    { enabled: folderId !== null }
+  );
+  const openMutation = useMutation({
+    mutationFn: ({ selectedFolderId, selectedPath }: { selectedFolderId: number; selectedPath: string }) =>
+      openAttachmentLocalFile(selectedFolderId, selectedPath)
+  });
+  return {
+    entries: list.items,
+    total: list.total,
+    loadedCount: list.loadedCount,
+    loading: list.loading,
+    loadingMore: list.loadingMore,
+    error: list.error,
+    openLocalFile: (selectedFolderId: number, selectedPath: string) =>
+      openMutation.mutateAsync({ selectedFolderId, selectedPath }),
+    openingPath: openMutation.isPending ? (openMutation.variables?.selectedPath ?? null) : null
   };
 }

@@ -94,7 +94,11 @@ export const queryKeys = {
   attachments: {
     root: ["attachments"] as const,
     owner: (ownerType: QueryOwnerType, ownerId: number) => [...queryKeys.attachments.root, ownerType, ownerId] as const,
-    preview: (attachmentId: number) => [...queryKeys.attachments.root, "preview", attachmentId] as const
+    preview: (attachmentId: number) => [...queryKeys.attachments.root, "preview", attachmentId] as const,
+    localFolders: (ownerType: QueryOwnerType, ownerId: number) =>
+      [...queryKeys.attachments.root, "localFolders", ownerType, ownerId] as const,
+    localEntries: (folderId: number, relativePath: string) =>
+      [...queryKeys.attachments.root, "localEntries", folderId, relativePath] as const
   },
   tags: {
     root: ["tags"] as const,

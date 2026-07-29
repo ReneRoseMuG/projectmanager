@@ -2,6 +2,12 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 29.07.26 | 16:19:09 | Abschluss | Tickets 164 bis 167 | ✅ |
+| 29.07.26 | 15:42:03 | Feature | Lokale Attachment-Ordnerquelle | ✅ |
+| 29.07.26 | 15:42:02 | Feature | TKT-167 Attachment-Bulk-Operationen | ✅ |
+| 29.07.26 | 15:42:01 | Feature | TKT-165 Attachment-Ansichten | ✅ |
+| 29.07.26 | 15:42:00 | Feature | TKT-164 Virtuelle Attachment-Ordner | ✅ |
+| 29.07.26 | 15:10:57 | Fix | Sticky Sub-Item-Steuerzeile | ✅ |
 | 27.07.26 | 10:17:18 | 2 | Attachment-Regressionstests | ✅ |
 | 27.07.26 | 10:17:17 | 1 | Attachment-FK-Migration | ✅ |
 | 23.07.26 | 10:58:46 | Fix | Sichere Prozessbeendigung | ✅ |

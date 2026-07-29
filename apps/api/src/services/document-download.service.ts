@@ -1,4 +1,5 @@
 import type { Archiver } from "archiver";
+import type { AttachmentLocalFileInput, AttachmentOwner } from "@taskmanager/shared-types";
 import { createRequire } from "node:module";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -6,6 +7,8 @@ import type { DbClient } from "../db/client.js";
 import { config } from "../config.js";
 import { attachmentRepository } from "../repositories/attachment.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
+import { getAttachmentLocalFileForOwner } from "./attachment-local-folder.service.js";
+import { getAttachmentFilesForOwner } from "./attachments.service.js";
 
 // archiver v8 exportiert Format-Klassen (ZipArchive/TarArchive/…) statt einer aufrufbaren
 // Default-Funktion und stellt unter ESM keinen Default-Export bereit; die installierten
@@ -110,6 +113,55 @@ export async function buildDocumentsArchive(database: DbClient, attachmentIds: n
   }
   if (appended === 0) {
     throw notFound("Keine der ausgewählten Dateien wurde im Upload-Verzeichnis gefunden.");
+  }
+  return archive;
+}
+
+export async function buildAttachmentArchive(
+  database: DbClient,
+  owner: AttachmentOwner,
+  attachmentIds: number[],
+  localFiles: AttachmentLocalFileInput[]
+): Promise<Archiver> {
+  const uniqueAttachmentIds = [...new Set(attachmentIds)];
+  const uniqueLocalFiles = [
+    ...new Map(
+      localFiles.map((file) => [`${file.folderId}:${file.relativePath}`, file])
+    ).values()
+  ];
+  const selectedCount = uniqueAttachmentIds.length + uniqueLocalFiles.length;
+  if (selectedCount === 0) {
+    throw badRequest("Es wurden keine Dateien ausgewählt.");
+  }
+  if (selectedCount > 100) {
+    throw badRequest("Höchstens 100 Dateien können gleichzeitig als ZIP heruntergeladen werden.");
+  }
+
+  const managedFiles = await getAttachmentFilesForOwner(database, owner, uniqueAttachmentIds);
+  const resolvedLocalFiles = [];
+  for (const file of uniqueLocalFiles) {
+    resolvedLocalFiles.push(
+      await getAttachmentLocalFileForOwner(
+        database,
+        owner,
+        file.folderId,
+        file.relativePath
+      )
+    );
+  }
+
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  const usedNames = new Set<string>();
+  for (const file of managedFiles) {
+    archive.file(file.diskPath, {
+      name: uniqueEntryName(file.originalName, usedNames)
+    });
+  }
+  for (const file of resolvedLocalFiles) {
+    const sourceName = `${file.folder.name}/${file.relativePath}`.replaceAll("\\", "/");
+    archive.file(file.diskPath, {
+      name: uniqueEntryName(sourceName, usedNames)
+    });
   }
   return archive;
 }

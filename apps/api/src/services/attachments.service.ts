@@ -1,5 +1,5 @@
-import type { Attachment, AttachmentLibrarySelection, AttachmentOwner, JournalObjectType, RecentAttachment } from "@taskmanager/shared-types";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import type { Attachment, AttachmentFolder, AttachmentLibrarySelection, AttachmentOwner, JournalObjectType, RecentAttachment } from "@taskmanager/shared-types";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
@@ -8,6 +8,7 @@ import type { DbClient, DbSession } from "../db/client.js";
 import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
 import {
   attachments,
+  attachmentFolders,
   featureAttachments,
   features,
   milestoneAttachments,
@@ -18,6 +19,7 @@ import {
   projectTasks,
   projectTickets,
   projects,
+  folderAttachments,
   taskAttachments,
   tasks,
   ticketAttachments,
@@ -81,10 +83,14 @@ const attachmentSelect = {
   updatedAt: attachments.updatedAt
 };
 
-async function mapAttachment(database: DbClient, record: AttachmentRecord): Promise<Attachment> {
+function buildAttachment(
+  record: AttachmentRecord,
+  owners: AttachmentOwner[],
+  folders: AttachmentFolder[]
+): Attachment {
   return {
     id: record.id,
-    owners: await listAttachmentOwners(database, record.id),
+    owners,
     originalName: record.originalName,
     filename: record.filename,
     mimetype: record.mimetype,
@@ -94,10 +100,61 @@ async function mapAttachment(database: DbClient, record: AttachmentRecord): Prom
     url: `/api/attachments/${record.id}/content`,
     contentHash: record.contentHash,
     isInDocumentLibrary: record.isInDocumentLibrary,
+    folder: folders[0] ?? null,
+    folders,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     version: record.version
   };
+}
+
+async function loadAttachmentFoldersForIds(
+  database: DbClient,
+  attachmentIds: number[]
+): Promise<Map<number, AttachmentFolder[]>> {
+  const result = new Map<number, AttachmentFolder[]>();
+  if (attachmentIds.length === 0) {
+    return result;
+  }
+  const rows = await database
+    .select({
+      attachmentId: folderAttachments.attachmentId,
+      id: attachmentFolders.id,
+      parentId: attachmentFolders.parentId,
+      projectId: attachmentFolders.projectId,
+      name: attachmentFolders.name,
+      version: attachmentFolders.version
+    })
+    .from(folderAttachments)
+    .innerJoin(attachmentFolders, eq(folderAttachments.folderId, attachmentFolders.id))
+    .where(inArray(folderAttachments.attachmentId, attachmentIds))
+    .orderBy(attachmentFolders.name);
+  for (const row of rows) {
+    const folder: AttachmentFolder = {
+      id: row.id,
+      parentId: row.parentId,
+      projectId: row.projectId,
+      name: row.name,
+      childCount: 0,
+      directDocumentCount: 0,
+      version: row.version
+    };
+    const existing = result.get(row.attachmentId);
+    if (existing) {
+      existing.push(folder);
+    } else {
+      result.set(row.attachmentId, [folder]);
+    }
+  }
+  return result;
+}
+
+async function mapAttachment(database: DbClient, record: AttachmentRecord): Promise<Attachment> {
+  const [owners, foldersById] = await Promise.all([
+    listAttachmentOwners(database, record.id),
+    loadAttachmentFoldersForIds(database, [record.id])
+  ]);
+  return buildAttachment(record, owners, foldersById.get(record.id) ?? []);
 }
 
 async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {
@@ -142,7 +199,7 @@ async function ensureWikiPageExists(database: DbClient, wikiPageId: number): Pro
   }
 }
 
-async function ensureOwnerExists(database: DbClient, owner: AttachmentOwner): Promise<void> {
+export async function ensureAttachmentOwnerExists(database: DbClient, owner: AttachmentOwner): Promise<void> {
   if (owner.type === "project") {
     await ensureProjectExists(database, owner.id);
     return;
@@ -357,6 +414,83 @@ async function deleteAttachmentLink(database: DbSession, owner: AttachmentOwner,
   return mutationAffectedRows(await database.delete(ticketAttachments).where(and(eq(ticketAttachments.ticketId, owner.id), eq(ticketAttachments.attachmentId, attachmentId))));
 }
 
+async function deleteAttachmentLinks(
+  database: DbSession,
+  owner: AttachmentOwner,
+  attachmentIds: number[]
+): Promise<number> {
+  if (owner.type === "project") {
+    return mutationAffectedRows(
+      await database
+        .delete(projectAttachments)
+        .where(
+          and(
+            eq(projectAttachments.projectId, owner.id),
+            inArray(projectAttachments.attachmentId, attachmentIds)
+          )
+        )
+    );
+  }
+  if (owner.type === "task") {
+    return mutationAffectedRows(
+      await database
+        .delete(taskAttachments)
+        .where(
+          and(
+            eq(taskAttachments.taskId, owner.id),
+            inArray(taskAttachments.attachmentId, attachmentIds)
+          )
+        )
+    );
+  }
+  if (owner.type === "milestone") {
+    return mutationAffectedRows(
+      await database
+        .delete(milestoneAttachments)
+        .where(
+          and(
+            eq(milestoneAttachments.milestoneId, owner.id),
+            inArray(milestoneAttachments.attachmentId, attachmentIds)
+          )
+        )
+    );
+  }
+  if (owner.type === "feature") {
+    return mutationAffectedRows(
+      await database
+        .delete(featureAttachments)
+        .where(
+          and(
+            eq(featureAttachments.featureId, owner.id),
+            inArray(featureAttachments.attachmentId, attachmentIds)
+          )
+        )
+    );
+  }
+  if (owner.type === "wikiPage") {
+    return mutationAffectedRows(
+      await database
+        .delete(wikiPageAttachments)
+        .where(
+          and(
+            eq(wikiPageAttachments.wikiPageId, owner.id),
+            inArray(wikiPageAttachments.attachmentId, attachmentIds)
+          )
+        )
+    );
+  }
+  return mutationAffectedRows(
+    await database
+      .delete(ticketAttachments)
+      .where(
+        and(
+          eq(ticketAttachments.ticketId, owner.id),
+          inArray(ticketAttachments.attachmentId, attachmentIds)
+        )
+      )
+  );
+}
+
 async function hasAnyAttachmentOwner(database: DbSession, attachmentId: number): Promise<boolean> {
   const ownerTables = [
     projectAttachments,
@@ -466,13 +600,21 @@ export async function createUnboundAttachment(database: DbClient, upload: Attach
   return mapAttachment(database, created);
 }
 
-async function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Promise<AttachmentRecord[]> {
+async function selectOwnerAttachments(
+  database: DbClient,
+  owner: AttachmentOwner,
+  attachmentIds?: number[]
+): Promise<AttachmentRecord[]> {
+  if (attachmentIds && attachmentIds.length === 0) {
+    return [];
+  }
+  const idsCondition = attachmentIds ? inArray(attachments.id, attachmentIds) : undefined;
   if (owner.type === "project") {
     return database
       .select(attachmentSelect)
       .from(projectAttachments)
       .innerJoin(attachments, eq(projectAttachments.attachmentId, attachments.id))
-      .where(eq(projectAttachments.projectId, owner.id))
+      .where(idsCondition ? and(eq(projectAttachments.projectId, owner.id), idsCondition) : eq(projectAttachments.projectId, owner.id))
       .orderBy(desc(attachments.createdAt))
       ;
   }
@@ -481,7 +623,7 @@ async function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner
       .select(attachmentSelect)
       .from(taskAttachments)
       .innerJoin(attachments, eq(taskAttachments.attachmentId, attachments.id))
-      .where(eq(taskAttachments.taskId, owner.id))
+      .where(idsCondition ? and(eq(taskAttachments.taskId, owner.id), idsCondition) : eq(taskAttachments.taskId, owner.id))
       .orderBy(desc(attachments.createdAt))
       ;
   }
@@ -490,7 +632,7 @@ async function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner
       .select(attachmentSelect)
       .from(milestoneAttachments)
       .innerJoin(attachments, eq(milestoneAttachments.attachmentId, attachments.id))
-      .where(eq(milestoneAttachments.milestoneId, owner.id))
+      .where(idsCondition ? and(eq(milestoneAttachments.milestoneId, owner.id), idsCondition) : eq(milestoneAttachments.milestoneId, owner.id))
       .orderBy(desc(attachments.createdAt))
       ;
   }
@@ -499,7 +641,7 @@ async function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner
       .select(attachmentSelect)
       .from(featureAttachments)
       .innerJoin(attachments, eq(featureAttachments.attachmentId, attachments.id))
-      .where(eq(featureAttachments.featureId, owner.id))
+      .where(idsCondition ? and(eq(featureAttachments.featureId, owner.id), idsCondition) : eq(featureAttachments.featureId, owner.id))
       .orderBy(desc(attachments.createdAt))
       ;
   }
@@ -508,7 +650,7 @@ async function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner
       .select(attachmentSelect)
       .from(wikiPageAttachments)
       .innerJoin(attachments, eq(wikiPageAttachments.attachmentId, attachments.id))
-      .where(eq(wikiPageAttachments.wikiPageId, owner.id))
+      .where(idsCondition ? and(eq(wikiPageAttachments.wikiPageId, owner.id), idsCondition) : eq(wikiPageAttachments.wikiPageId, owner.id))
       .orderBy(desc(attachments.createdAt))
       ;
   }
@@ -516,7 +658,7 @@ async function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner
     .select(attachmentSelect)
     .from(ticketAttachments)
     .innerJoin(attachments, eq(ticketAttachments.attachmentId, attachments.id))
-    .where(eq(ticketAttachments.ticketId, owner.id))
+    .where(idsCondition ? and(eq(ticketAttachments.ticketId, owner.id), idsCondition) : eq(ticketAttachments.ticketId, owner.id))
     .orderBy(desc(attachments.createdAt))
     ;
 }
@@ -839,9 +981,20 @@ export async function listRecentAttachments(database: DbClient, options: { owner
 }
 
 async function listOwnerAttachments(database: DbClient, owner: AttachmentOwner): Promise<Attachment[]> {
-  await ensureOwnerExists(database, owner);
-  const attachments = await selectOwnerAttachments(database, owner);
-  return Promise.all(attachments.map((attachment) => mapAttachment(database, attachment)));
+  await ensureAttachmentOwnerExists(database, owner);
+  const ownerAttachments = await selectOwnerAttachments(database, owner);
+  const attachmentIds = ownerAttachments.map((attachment) => attachment.id);
+  const [ownersById, foldersById] = await Promise.all([
+    listAttachmentOwnersForIds(database, attachmentIds),
+    loadAttachmentFoldersForIds(database, attachmentIds)
+  ]);
+  return ownerAttachments.map((attachment) =>
+    buildAttachment(
+      attachment,
+      ownersById.get(attachment.id) ?? [],
+      foldersById.get(attachment.id) ?? []
+    )
+  );
 }
 
 export async function listProjectAttachments(database: DbClient, projectId: number): Promise<Attachment[]> {
@@ -870,42 +1023,42 @@ export async function listWikiPageAttachments(database: DbClient, wikiPageId: nu
 
 export async function createProjectAttachment(database: DbClient, projectId: number, upload: OwnerAttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "project" as const, id: projectId };
-  await ensureOwnerExists(database, owner);
+  await ensureAttachmentOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function createTaskAttachment(database: DbClient, taskId: number, upload: OwnerAttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "task" as const, id: taskId };
-  await ensureOwnerExists(database, owner);
+  await ensureAttachmentOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function createMilestoneAttachment(database: DbClient, milestoneId: number, upload: OwnerAttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "milestone" as const, id: milestoneId };
-  await ensureOwnerExists(database, owner);
+  await ensureAttachmentOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function createFeatureAttachment(database: DbClient, featureId: number, upload: OwnerAttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "feature" as const, id: featureId };
-  await ensureOwnerExists(database, owner);
+  await ensureAttachmentOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function createTicketAttachment(database: DbClient, ticketId: number, upload: OwnerAttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "ticket" as const, id: ticketId };
-  await ensureOwnerExists(database, owner);
+  await ensureAttachmentOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function createWikiPageAttachment(database: DbClient, wikiPageId: number, upload: OwnerAttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "wikiPage" as const, id: wikiPageId };
-  await ensureOwnerExists(database, owner);
+  await ensureAttachmentOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function linkAttachment(database: DbClient, owner: AttachmentOwner, attachmentId: number, actor?: JournalActor | null): Promise<Attachment> {
-  await ensureOwnerExists(database, owner);
+  await ensureAttachmentOwnerExists(database, owner);
   const attachment = await attachmentRepository.findById(database, attachmentId);
   if (!attachment) {
     throw notFound(`Attachment with id ${attachmentId} not found`);
@@ -935,7 +1088,7 @@ export async function unlinkAttachment(
   input: { expectedVersion: number; orphanAction?: "add-to-library" },
   actor?: JournalActor | null
 ): Promise<void> {
-  await ensureOwnerExists(database, owner);
+  await ensureAttachmentOwnerExists(database, owner);
   const record = await attachmentRepository.findById(database, attachmentId);
   if (!record) {
     throw notFound(`Attachment with id ${attachmentId} not found`);
@@ -968,6 +1121,219 @@ export async function unlinkAttachment(
         : buildUnlinkSummary(attachmentObject, ownerObject),
       actor,
       contexts: [makeJournalContext(ownerObject, "owner")]
+    });
+  });
+}
+
+interface AttachmentVersionSelection {
+  id: number;
+  expectedVersion: number;
+}
+
+function normalizeAttachmentVersionSelection(
+  items: AttachmentVersionSelection[]
+): AttachmentVersionSelection[] {
+  if (items.length === 0) {
+    throw badRequest("Es wurden keine Attachments ausgewählt.");
+  }
+  if (items.length > 100) {
+    throw badRequest("Höchstens 100 Attachments können gleichzeitig bearbeitet werden.");
+  }
+  const byId = new Map<number, AttachmentVersionSelection>();
+  for (const item of items) {
+    const existing = byId.get(item.id);
+    if (existing && existing.expectedVersion !== item.expectedVersion) {
+      throw badRequest(`Attachment ${item.id} wurde mit widersprüchlichen Versionen ausgewählt.`);
+    }
+    byId.set(item.id, item);
+  }
+  return [...byId.values()];
+}
+
+async function loadSelectedOwnerAttachments(
+  database: DbClient,
+  owner: AttachmentOwner,
+  items: AttachmentVersionSelection[]
+): Promise<{ selections: AttachmentVersionSelection[]; records: AttachmentRecord[] }> {
+  await ensureAttachmentOwnerExists(database, owner);
+  const selections = normalizeAttachmentVersionSelection(items);
+  const records = await selectOwnerAttachments(
+    database,
+    owner,
+    selections.map((item) => item.id)
+  );
+  if (records.length !== selections.length) {
+    throw notFound("Mindestens ein ausgewähltes Attachment ist nicht mehr mit diesem Item verknüpft.");
+  }
+  const recordById = new Map(records.map((record) => [record.id, record]));
+  for (const selection of selections) {
+    const record = recordById.get(selection.id);
+    if (!record) {
+      throw notFound(`Attachment with id ${selection.id} not found`);
+    }
+    assertVersion(record.version, selection.expectedVersion);
+  }
+  return { selections, records };
+}
+
+function versionSelectionCondition(items: AttachmentVersionSelection[]) {
+  const condition = or(
+    ...items.map((item) =>
+      and(eq(attachments.id, item.id), eq(attachments.version, item.expectedVersion))
+    )
+  );
+  if (!condition) {
+    throw badRequest("Es wurden keine Attachments ausgewählt.");
+  }
+  return condition;
+}
+
+export async function bulkUnlinkAttachments(
+  database: DbClient,
+  owner: AttachmentOwner,
+  items: AttachmentVersionSelection[],
+  actor?: JournalActor | null
+): Promise<void> {
+  const { selections, records } = await loadSelectedOwnerAttachments(database, owner, items);
+  const ownerObject = await getOwnerJournalObject(database, owner);
+  const ownersById = await listAttachmentOwnersForIds(
+    database,
+    selections.map((item) => item.id)
+  );
+  const promoteIds = records
+    .filter((record) => {
+      const otherOwners = (ownersById.get(record.id) ?? []).filter(
+        (currentOwner) => currentOwner.type !== owner.type || currentOwner.id !== owner.id
+      );
+      return !record.isInDocumentLibrary && otherOwners.length === 0;
+    })
+    .map((record) => record.id);
+  const promoteIdSet = new Set(promoteIds);
+  const promoteSelections = selections.filter((item) => promoteIdSet.has(item.id));
+  const regularSelections = selections.filter((item) => !promoteIdSet.has(item.id));
+  const now = new Date().toISOString();
+
+  await database.transaction(async (tx) => {
+    if ((await deleteAttachmentLinks(tx, owner, selections.map((item) => item.id))) !== selections.length) {
+      throw conflict("Mindestens eine Attachment-Verknüpfung wurde zwischenzeitlich geändert.");
+    }
+    let updatedCount = 0;
+    if (promoteSelections.length > 0) {
+      updatedCount += mutationAffectedRows(
+        await tx
+          .update(attachments)
+          .set({
+            isInDocumentLibrary: true,
+            version: sql`${attachments.version} + 1`,
+            updatedBy: actor?.actorUserId ?? null,
+            updatedAt: now
+          })
+          .where(versionSelectionCondition(promoteSelections))
+      );
+    }
+    if (regularSelections.length > 0) {
+      updatedCount += mutationAffectedRows(
+        await tx
+          .update(attachments)
+          .set({
+            version: sql`${attachments.version} + 1`,
+            updatedBy: actor?.actorUserId ?? null,
+            updatedAt: now
+          })
+          .where(versionSelectionCondition(regularSelections))
+      );
+    }
+    if (updatedCount !== selections.length) {
+      throw conflict("Mindestens ein Attachment wurde zwischenzeitlich geändert.");
+    }
+    await recordJournalEntry(tx, {
+      operation: "update",
+      object: ownerObject,
+      summary: `${selections.length} Attachment-Verknüpfung(en) wurden gesammelt gelöst.${promoteIds.length > 0 ? ` ${promoteIds.length} ownerlose Datei(en) wurden in die Dokumentenbibliothek aufgenommen.` : ""}`,
+      actor
+    });
+  });
+}
+
+export async function bulkDeleteAttachments(
+  database: DbClient,
+  owner: AttachmentOwner,
+  items: AttachmentVersionSelection[],
+  actor?: JournalActor | null
+): Promise<void> {
+  const { selections, records } = await loadSelectedOwnerAttachments(database, owner, items);
+  const ownerObject = await getOwnerJournalObject(database, owner);
+  await database.transaction(async (tx) => {
+    await recordJournalEntry(tx, {
+      operation: "update",
+      object: ownerObject,
+      summary: `${selections.length} Attachment(s) wurden gesammelt endgültig gelöscht.`,
+      actor
+    });
+    const deleted = mutationAffectedRows(
+      await tx.delete(attachments).where(versionSelectionCondition(selections))
+    );
+    if (deleted !== selections.length) {
+      throw conflict("Mindestens ein Attachment wurde zwischenzeitlich geändert.");
+    }
+  });
+  try {
+    await removeAttachmentFiles(records);
+  } catch {
+    throw internalError("Die Attachment-Datensätze wurden gelöscht, mindestens eine physische Datei konnte jedoch nicht vollständig entfernt werden.");
+  }
+}
+
+export async function bulkSetAttachmentFolder(
+  database: DbClient,
+  owner: AttachmentOwner,
+  items: AttachmentVersionSelection[],
+  folderId: number | null,
+  actor?: JournalActor | null
+): Promise<void> {
+  const { selections } = await loadSelectedOwnerAttachments(database, owner, items);
+  if (folderId !== null) {
+    const folder = firstRow(
+      await database
+        .select({ id: attachmentFolders.id })
+        .from(attachmentFolders)
+        .where(eq(attachmentFolders.id, folderId))
+    );
+    if (!folder) {
+      throw notFound(`Attachment folder with id ${folderId} not found`);
+    }
+  }
+  const ownerObject = await getOwnerJournalObject(database, owner);
+  const attachmentIds = selections.map((item) => item.id);
+  const now = new Date().toISOString();
+  await database.transaction(async (tx) => {
+    await tx.delete(folderAttachments).where(inArray(folderAttachments.attachmentId, attachmentIds));
+    if (folderId !== null) {
+      await tx
+        .insert(folderAttachments)
+        .values(attachmentIds.map((attachmentId) => ({ folderId, attachmentId })));
+    }
+    const updated = mutationAffectedRows(
+      await tx
+        .update(attachments)
+        .set({
+          version: sql`${attachments.version} + 1`,
+          updatedBy: actor?.actorUserId ?? null,
+          updatedAt: now
+        })
+        .where(versionSelectionCondition(selections))
+    );
+    if (updated !== selections.length) {
+      throw conflict("Mindestens ein Attachment wurde zwischenzeitlich geändert.");
+    }
+    await recordJournalEntry(tx, {
+      operation: "update",
+      object: ownerObject,
+      summary:
+        folderId === null
+          ? `${selections.length} Attachment(s) wurden aus ihrem virtuellen Ordner entfernt.`
+          : `${selections.length} Attachment(s) wurden in den virtuellen Ordner ${folderId} verschoben.`,
+      actor
     });
   });
 }
@@ -1079,4 +1445,35 @@ export async function getAttachmentFile(database: DbClient, id: number): Promise
     throw notFound("Die Datei wurde im Upload-Verzeichnis nicht gefunden.");
   }
   return { diskPath, originalName: record.originalName, mimetype: record.mimetype, size: record.size };
+}
+
+export async function getAttachmentFilesForOwner(
+  database: DbClient,
+  owner: AttachmentOwner,
+  attachmentIds: number[]
+): Promise<AttachmentFile[]> {
+  await ensureAttachmentOwnerExists(database, owner);
+  const uniqueIds = [...new Set(attachmentIds)];
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
+  const records = await selectOwnerAttachments(database, owner, uniqueIds);
+  if (records.length !== uniqueIds.length) {
+    throw notFound("Mindestens ein ausgewähltes Attachment ist nicht mehr mit diesem Item verknüpft.");
+  }
+  const files: AttachmentFile[] = [];
+  for (const record of records) {
+    const diskPath = attachmentDiskPath(record);
+    if (!(await fileExists(diskPath))) {
+      throw notFound(`Die Datei "${record.originalName}" wurde im Upload-Verzeichnis nicht gefunden.`);
+    }
+    files.push({
+      diskPath,
+      originalName: record.originalName,
+      mimetype: record.mimetype,
+      size: record.size
+    });
+  }
+  return files;
 }

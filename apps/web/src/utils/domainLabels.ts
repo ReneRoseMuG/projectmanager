@@ -101,3 +101,21 @@ export const ticketRelationTypeLabels: Record<TicketRelationType, string> = {
   related: "Verwandt",
   duplicate: "Duplikat",
 };
+
+export const attachmentViewModeLabels = {
+  list: "Liste",
+  details: "Details",
+  small: "Kleine Symbole",
+  medium: "Mittelgroße Symbole",
+  large: "Große Symbole",
+} as const;
+
+export const attachmentActionLabels = {
+  archive: "Als ZIP herunterladen",
+  bulkDelete: "Endgültig löschen",
+  bulkUnlink: "Verknüpfungen lösen",
+  createFolder: "Virtuellen Ordner anlegen",
+  linkLocalFolder: "Lokalen Ordner verknüpfen",
+  removeLocalFolder: "Ordner-Verknüpfung lösen",
+  moveToFolder: "In Ordner verschieben",
+} as const;

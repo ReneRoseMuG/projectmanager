@@ -1130,13 +1130,7 @@ export function ProjectForm({
             {project ? (
               <div className="grid gap-4">
                 <AttachmentUploader visibilityMode="owner" onUpload={uploadAttachment} />
-                <AttachmentList
-                  attachments={attachments.attachments}
-                  onUnlink={attachments.unlinkAttachment}
-                  onDeletePermanently={attachments.deleteAttachmentPermanently}
-                  onOpen={(attachment) => attachments.openAttachment(attachment.id)}
-                  openingAttachmentId={attachments.openingAttachmentId}
-                />
+                <AttachmentList manager={attachments} />
               </div>
             ) : (
               <PendingFileList

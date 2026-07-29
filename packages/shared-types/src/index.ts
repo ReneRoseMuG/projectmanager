@@ -984,6 +984,10 @@ export interface AttachmentFolder {
   version: number;
 }
 
+export const ATTACHMENT_OWNER_TYPES = ["project", "milestone", "task", "feature", "wikiPage", "ticket"] as const;
+
+export type AttachmentOwnerType = (typeof ATTACHMENT_OWNER_TYPES)[number];
+
 export type AttachmentLibrarySelection = "attachment-only" | "document-library";
 
 export interface Attachment {
@@ -1050,6 +1054,37 @@ export type AttachmentOwner =
   | { type: "feature"; id: number }
   | { type: "wikiPage"; id: number }
   | { type: "ticket"; id: number };
+
+export interface AttachmentLocalFolder {
+  id: number;
+  owner: AttachmentOwner;
+  name: string;
+  rootPath: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AttachmentLocalEntry {
+  folderId: number;
+  kind: "directory" | "file";
+  name: string;
+  relativePath: string;
+  mimetype: string | null;
+  size: number | null;
+  updatedAt: string;
+  url: string | null;
+}
+
+export interface AttachmentVersionInput {
+  id: number;
+  expectedVersion: number;
+}
+
+export interface AttachmentLocalFileInput {
+  folderId: number;
+  relativePath: string;
+}
 
 export type AttachmentPreviewKind = "image" | "pdf" | "text" | "csv" | "audio" | "video" | "generatedPdf" | "unsupported";
 export type AttachmentPreviewStatus = "available" | "unsupported" | "failed";

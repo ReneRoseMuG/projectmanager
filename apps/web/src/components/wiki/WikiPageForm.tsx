@@ -503,13 +503,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
               {attachments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{attachments.error}</div> : null}
               <div className="grid gap-4">
                 <AttachmentUploader visibilityMode="owner" size="sm" onUpload={uploadAttachment} />
-                <AttachmentList
-                  attachments={attachments.attachments}
-                  onUnlink={attachments.unlinkAttachment}
-                  onDeletePermanently={attachments.deleteAttachmentPermanently}
-                  onOpen={(attachment) => attachments.openAttachment(attachment.id)}
-                  openingAttachmentId={attachments.openingAttachmentId}
-                />
+                <AttachmentList manager={attachments} />
               </div>
             </Section>
             </div>

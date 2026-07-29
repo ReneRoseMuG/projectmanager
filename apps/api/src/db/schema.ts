@@ -1,4 +1,5 @@
 ﻿import { sql } from "drizzle-orm";
+import { ATTACHMENT_OWNER_TYPES } from "@taskmanager/shared-types";
 import type { AnyMySqlColumn } from "drizzle-orm/mysql-core";
 import { boolean, check, double, index, int, longblob, longtext, mysqlTable, primaryKey, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
@@ -718,6 +719,31 @@ export const attachmentFolders = mysqlTable("attachment_folders", {
   createdAt: timestampText("created_at"),
   updatedAt: timestampText("updated_at")
 });
+
+export const attachmentLocalFolders = mysqlTable(
+  "attachment_local_folders",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerType: shortText("owner_type", { enum: ATTACHMENT_OWNER_TYPES }).notNull(),
+    ownerId: int("owner_id").notNull(),
+    name: shortText("name").notNull(),
+    rootPath: longtext("root_path").notNull(),
+    rootPathHash: varchar("root_path_hash", { length: 64 }).notNull(),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  },
+  (table) => ({
+    ownerIndex: index("attachment_local_folders_owner_idx").on(table.ownerType, table.ownerId),
+    ownerPathUnique: uniqueIndex("attachment_local_folders_owner_path_unique").on(
+      table.ownerType,
+      table.ownerId,
+      table.rootPathHash
+    )
+  })
+);
 
 export const attachmentTags = mysqlTable(
   "attachment_tags",

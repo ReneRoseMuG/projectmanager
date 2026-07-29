@@ -1,4 +1,10 @@
-import type { AttachmentLibrarySelection } from "@taskmanager/shared-types";
+import {
+  ATTACHMENT_OWNER_TYPES,
+  type AttachmentLibrarySelection,
+  type AttachmentLocalFileInput,
+  type AttachmentOwner,
+  type AttachmentVersionInput
+} from "@taskmanager/shared-types";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { createReadStream } from "node:fs";
 import { requireCurrentUser } from "../plugins/auth.js";
@@ -8,6 +14,9 @@ import {
   createProjectAttachment,
   createTaskAttachment,
   createWikiPageAttachment,
+  bulkDeleteAttachments,
+  bulkSetAttachmentFolder,
+  bulkUnlinkAttachments,
   deleteAttachment,
   getAttachmentFile,
   unlinkAttachment,
@@ -20,6 +29,7 @@ import {
   openAttachment
 } from "../services/attachments.service.js";
 import { getAttachmentPreview, getAttachmentPreviewFile } from "../services/attachment-preview.service.js";
+import { buildAttachmentArchive } from "../services/document-download.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
@@ -103,6 +113,76 @@ const recentAttachmentsQuerySchema = {
   }
 } as const;
 
+const attachmentOwnerProperties = {
+  ownerType: { type: "string", enum: ATTACHMENT_OWNER_TYPES },
+  ownerId: { type: "integer", minimum: 1 }
+} as const;
+
+const attachmentVersionSelectionSchema = {
+  type: "object",
+  required: ["id", "expectedVersion"],
+  additionalProperties: false,
+  properties: {
+    id: { type: "integer", minimum: 1 },
+    expectedVersion: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+const bulkAttachmentBodySchema = {
+  type: "object",
+  required: ["ownerType", "ownerId", "attachments"],
+  additionalProperties: false,
+  properties: {
+    ...attachmentOwnerProperties,
+    attachments: {
+      type: "array",
+      minItems: 1,
+      maxItems: 100,
+      items: attachmentVersionSelectionSchema
+    }
+  }
+} as const;
+
+const bulkAttachmentFolderBodySchema = {
+  ...bulkAttachmentBodySchema,
+  required: ["ownerType", "ownerId", "attachments", "folderId"],
+  properties: {
+    ...bulkAttachmentBodySchema.properties,
+    folderId: { anyOf: [{ type: "integer", minimum: 1 }, { type: "null" }] }
+  }
+} as const;
+
+const attachmentArchiveBodySchema = {
+  type: "object",
+  required: ["ownerType", "ownerId", "attachmentIds", "localFiles"],
+  additionalProperties: false,
+  properties: {
+    ...attachmentOwnerProperties,
+    attachmentIds: {
+      type: "array",
+      maxItems: 100,
+      items: { type: "integer", minimum: 1 }
+    },
+    localFiles: {
+      type: "array",
+      maxItems: 100,
+      items: {
+        type: "object",
+        required: ["folderId", "relativePath"],
+        additionalProperties: false,
+        properties: {
+          folderId: { type: "integer", minimum: 1 },
+          relativePath: { type: "string", minLength: 1, maxLength: 32767 }
+        }
+      }
+    }
+  }
+} as const;
+
+function attachmentOwner(input: { ownerType: AttachmentOwner["type"]; ownerId: number }): AttachmentOwner {
+  return { type: input.ownerType, id: input.ownerId };
+}
+
 function recentAttachmentOwnerFromQuery(query: { ownerType?: "project" | "milestone" | "task"; ownerId?: number; mine?: boolean }) {
   if (query.ownerType !== undefined || query.ownerId !== undefined) {
     if (query.ownerType === undefined || query.ownerId === undefined) {
@@ -143,6 +223,115 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     async (request) => {
       const currentUser = await requireCurrentUser(request);
       return listRecentAttachments(app.db, { owner: recentAttachmentOwnerFromQuery(request.query), currentUserId: currentUser.id, limit: request.query.limit, mine: request.query.mine });
+    }
+  );
+
+  app.post<{
+    Body: {
+      ownerType: AttachmentOwner["type"];
+      ownerId: number;
+      attachments: AttachmentVersionInput[];
+    };
+  }>(
+    "/attachments/bulk-unlink",
+    {
+      config: { auth: { resource: "attachments", action: "write" } },
+      schema: {
+        body: bulkAttachmentBodySchema,
+        response: { 204: { type: "null" } }
+      }
+    },
+    async (request, reply) => {
+      await bulkUnlinkAttachments(
+        app.db,
+        attachmentOwner(request.body),
+        request.body.attachments,
+        createJournalActor(request.currentUser)
+      );
+      return reply.status(204).send();
+    }
+  );
+
+  app.post<{
+    Body: {
+      ownerType: AttachmentOwner["type"];
+      ownerId: number;
+      attachments: AttachmentVersionInput[];
+      folderId: number | null;
+    };
+  }>(
+    "/attachments/bulk-folder",
+    {
+      config: { auth: { resource: "attachments", action: "write" } },
+      schema: {
+        body: bulkAttachmentFolderBodySchema,
+        response: { 204: { type: "null" } }
+      }
+    },
+    async (request, reply) => {
+      await bulkSetAttachmentFolder(
+        app.db,
+        attachmentOwner(request.body),
+        request.body.attachments,
+        request.body.folderId,
+        createJournalActor(request.currentUser)
+      );
+      return reply.status(204).send();
+    }
+  );
+
+  app.post<{
+    Body: {
+      ownerType: AttachmentOwner["type"];
+      ownerId: number;
+      attachments: AttachmentVersionInput[];
+    };
+  }>(
+    "/attachments/bulk-delete",
+    {
+      config: { auth: { resource: "attachments", action: "delete" } },
+      schema: {
+        body: bulkAttachmentBodySchema,
+        response: { 204: { type: "null" } }
+      }
+    },
+    async (request, reply) => {
+      await bulkDeleteAttachments(
+        app.db,
+        attachmentOwner(request.body),
+        request.body.attachments,
+        createJournalActor(request.currentUser)
+      );
+      return reply.status(204).send();
+    }
+  );
+
+  app.post<{
+    Body: {
+      ownerType: AttachmentOwner["type"];
+      ownerId: number;
+      attachmentIds: number[];
+      localFiles: AttachmentLocalFileInput[];
+    };
+  }>(
+    "/attachments/archive",
+    {
+      config: { auth: { resource: "attachments", action: "read" } },
+      schema: { body: attachmentArchiveBodySchema }
+    },
+    async (request, reply) => {
+      const archive = await buildAttachmentArchive(
+        app.db,
+        attachmentOwner(request.body),
+        request.body.attachmentIds,
+        request.body.localFiles
+      );
+      archive.on("error", (error) => reply.raw.destroy(error));
+      reply
+        .type("application/zip")
+        .header("Content-Disposition", "attachment; filename=\"attachments.zip\"");
+      void archive.finalize();
+      return reply.send(archive);
     }
   );
 

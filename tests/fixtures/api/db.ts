@@ -191,6 +191,7 @@ const truncateTables = [
   "project_tags",
   "task_notes",
   "project_notes",
+  "attachment_local_folders",
   "attachment_folders",
   "attachments",
   "sent_notifications",

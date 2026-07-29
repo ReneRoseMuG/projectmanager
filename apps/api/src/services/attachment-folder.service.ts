@@ -1,5 +1,5 @@
 import type { AttachmentFolder } from "@taskmanager/shared-types";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
 import { firstRow } from "../db/query-utils.js";
 import { attachmentFolders, folderAttachments, projects } from "../db/schema.js";
@@ -36,7 +36,7 @@ function cleanName(value: string | undefined): string {
 
 async function ensureAttachmentExists(database: DbClient, attachmentId: number) {
   const attachment = await attachmentRepository.findById(database, attachmentId);
-  if (!attachment || !attachment.isInDocumentLibrary) {
+  if (!attachment) {
     throw notFound(`Attachment with id ${attachmentId} not found`);
   }
   return attachment;
