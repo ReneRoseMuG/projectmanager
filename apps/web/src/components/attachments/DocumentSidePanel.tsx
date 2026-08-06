@@ -82,7 +82,7 @@ export const DocumentSidePanel = forwardRef<HTMLElement, DocumentSidePanelProps>
       <aside
         ref={ref}
         style={useStyleWidth ? { width: widthPx } : undefined}
-        className={`relative flex shrink-0 flex-col overflow-hidden rounded-lg bg-gradient-to-b from-steel-800 to-steel-900 text-white shadow-panel lg:sticky lg:top-0 lg:max-h-[calc(100vh-3rem)] lg:self-start ${useStyleWidth && side === "right" ? "" : "transition-[width] duration-200"} ${widthClass}`}
+        className={`relative flex shrink-0 flex-col overflow-hidden rounded-lg bg-gradient-to-b from-steel-800 to-steel-900 text-white shadow-panel lg:sticky lg:top-0 lg:max-h-full lg:self-start ${useStyleWidth && side === "right" ? "" : "transition-[width] duration-200"} ${widthClass}`}
       >
         {side === "right" && !collapsed && onResizeStart ? (
           <div

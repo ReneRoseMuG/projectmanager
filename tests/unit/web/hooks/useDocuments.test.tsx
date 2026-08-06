@@ -18,6 +18,7 @@
  * - jsdom ohne Netzwerk; eigener QueryClient pro Test.
  *
  * Abgedeckte Regeln:
+ * - Uploads geben die direkte Sammlung und aktive DMS-Tags gemeinsam an die API-Schicht weiter.
  * - Einsortieren/Verschieben/Entfernen rufen den passenden Endpunkt mit den richtigen Argumenten.
  * - Tag-Änderungen geben die geladene Dokumentversion für den Konfliktschutz weiter.
  * - Sammlungsverwaltung (umbenennen/loeschen) ruft den passenden Endpunkt.
@@ -28,7 +29,8 @@
  * ausloest und die Ansicht aktualisiert - nicht nur, dass Knoepfe existieren.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { Attachment, Paginated } from "@taskmanager/shared-types";
+import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,7 +50,8 @@ vi.mock("../../../../apps/web/src/api/documents", () => ({
   getAttachmentFolders: vi.fn().mockResolvedValue([]),
   createAttachmentFolder: vi.fn().mockResolvedValue({ id: 1 }),
   updateAttachmentFolder: vi.fn().mockResolvedValue({ id: 1 }),
-  deleteAttachmentFolder: vi.fn().mockResolvedValue(undefined)
+  deleteAttachmentFolder: vi.fn().mockResolvedValue(undefined),
+  addDocumentTagsBulk: vi.fn().mockResolvedValue([])
 }));
 
 let client: QueryClient;
@@ -66,6 +69,80 @@ afterEach(() => {
 });
 
 describe("useDocumentActions", () => {
+  it("ergänzt Tags für eine versionsgebundene Dokumentauswahl und invalidiert die Ansicht", async () => {
+    const firstDocument: Attachment = {
+      id: 10,
+      owners: [],
+      originalName: "eins.pdf",
+      displayName: null,
+      description: null,
+      filename: "eins.pdf",
+      mimetype: "application/pdf",
+      size: 10,
+      url: "/api/attachments/10/content",
+      contentHash: null,
+      isInDocumentLibrary: true,
+      tags: [],
+      folder: null,
+      folders: [],
+      createdAt: "2026-08-06T08:00:00.000Z",
+      updatedAt: "2026-08-06T08:00:00.000Z",
+      version: 2,
+    };
+    const secondDocument: Attachment = {
+      ...firstDocument,
+      id: 11,
+      originalName: "zwei.pdf",
+      filename: "zwei.pdf",
+      url: "/api/attachments/11/content",
+      version: 4,
+    };
+    const importantTag = {
+      id: 3,
+      name: "Wichtig",
+      color: "#ef4444",
+      isSystem: false,
+      domain: "dms" as const,
+      version: 1,
+    };
+    const updatedDocuments: Attachment[] = [
+      { ...firstDocument, tags: [importantTag], version: 3 },
+      { ...secondDocument, tags: [importantTag], version: 5 },
+    ];
+    vi.mocked(documentsApi.addDocumentTagsBulk).mockResolvedValueOnce(updatedDocuments);
+    const libraryKey = [...queryKeys.documents.library({}), "__progressiveList"] as const;
+    client.setQueryData<InfiniteData<Paginated<Attachment>>>(libraryKey, {
+      pages: [{ data: [firstDocument, secondDocument], total: 2, page: 1, pageSize: 50 }],
+      pageParams: [1],
+    });
+    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.addTagsBulk(
+        [{ id: 10, expectedVersion: 2 }, { id: 11, expectedVersion: 4 }],
+        [3, 4],
+      );
+    });
+
+    expect(documentsApi.addDocumentTagsBulk).toHaveBeenCalledWith(
+      [{ id: 10, expectedVersion: 2 }, { id: 11, expectedVersion: 4 }],
+      [3, 4],
+    );
+    expect(client.getQueryData<InfiniteData<Paginated<Attachment>>>(libraryKey)?.pages[0]?.data).toEqual(updatedDocuments);
+    await waitFor(() => expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(true));
+  });
+
+  it("übergibt Sammlung und DMS-Tags gemeinsam an den Upload", async () => {
+    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
+    const file = new File(["Inhalt"], "beleg.pdf", { type: "application/pdf" });
+
+    await act(async () => {
+      await result.current.uploadDocument(file, 5, [3, 4]);
+    });
+
+    expect(documentsApi.uploadDocument).toHaveBeenCalledWith(file, 5, [3, 4]);
+  });
+
   it("sortiert ein Dokument in eine Sammlung ein und invalidiert die Ansicht", async () => {
     // Ausgangszustand: eine geladene Dokument-Ansicht, die nach der Aktion aktualisiert werden muss.
     const libraryKey = queryKeys.documents.library({});

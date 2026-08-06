@@ -27,6 +27,7 @@
  *   unbekannte Ziele, Mehrfachsammlungen sowie Kategorieparameter vor der Dateianlage ab.
  * - Fachobjekt-gebundenes, aber sammlungsloses Dokument erscheint ebenfalls unter Nicht einsortiert (nur die Sammlung entscheidet).
  * - Geschuetzte System-Labels sind ueber setDocumentTags nicht setzbar (400).
+ * - Bulk-Tag-Ergaenzung bewahrt vorhandene Tags, ist idempotent und rollt bei Versionskonflikten atomar zurueck.
  * - Manueller SHA-256-Duplikat-Check mit sichtbarem Scope, Dateifehlern, stabilen Gruppen und Schreibrecht.
  * - Orphan-Verhalten: Anhaenge werden beim Loeschen des Fachobjekts NICHT geloescht, sondern Nicht einsortiert.
  * - Verwaister Owner-Link (Fachobjekt bereits geloescht) blockiert das Loeschen des Dokuments nicht (204 statt 404).
@@ -532,6 +533,89 @@ describe("DMS API", () => {
     expect(multiFolderResponse.body.message).toContain("Mehrfachsammlungen werden seit MS-80 nicht mehr unterstützt");
     expect((await fs.readdir(uploadDir)).length).toBe(storedFileCount);
     expect((await admin.get("/api/documents").expect(200)).body as Array<unknown>).toHaveLength(storedDocumentCount);
+  });
+
+  it("ergänzt DMS-Tags für mehrere Dokumente gebündelt und idempotent", async () => {
+    const admin = await loginAdmin();
+    const existingTag = await admin.post("/api/tags").send({ name: "Bulk Bestand", domain: "dms" }).expect(201);
+    const addedTag = await admin.post("/api/tags").send({ name: "Bulk Neu", domain: "dms" }).expect(201);
+    const first = await uploadDocument(admin, "bulk-tag-a.txt");
+    const second = await uploadDocument(admin, "bulk-tag-b.txt");
+    const firstTagged = await admin
+      .put(`/api/documents/${first.id}/tags`)
+      .send({ tagIds: [existingTag.body.id], expectedVersion: first.version })
+      .expect(200);
+
+    const bulkResponse = await admin
+      .post("/api/documents/bulk/tags")
+      .send({
+        attachments: [
+          { id: first.id, expectedVersion: firstTagged.body.version },
+          { id: second.id, expectedVersion: second.version },
+        ],
+        tagIds: [addedTag.body.id],
+      })
+      .expect(200);
+    expect(bulkResponse.body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: first.id, tags: expect.arrayContaining([expect.objectContaining({ id: addedTag.body.id })]) }),
+      expect.objectContaining({ id: second.id, tags: expect.arrayContaining([expect.objectContaining({ id: addedTag.body.id })]) }),
+    ]));
+
+    const firstUpdated = await admin.get(`/api/documents/${first.id}`).expect(200);
+    const secondUpdated = await admin.get(`/api/documents/${second.id}`).expect(200);
+    expect(firstUpdated.body.tags.map((tag: { id: number }) => tag.id).sort((left: number, right: number) => left - right)).toEqual(
+      [existingTag.body.id, addedTag.body.id].sort((left: number, right: number) => left - right),
+    );
+    expect(secondUpdated.body.tags).toEqual([expect.objectContaining({ id: addedTag.body.id })]);
+    expect(firstUpdated.body.version).toBe(firstTagged.body.version + 1);
+    expect(secondUpdated.body.version).toBe(second.version + 1);
+
+    await admin
+      .post("/api/documents/bulk/tags")
+      .send({
+        attachments: [
+          { id: first.id, expectedVersion: firstUpdated.body.version },
+          { id: second.id, expectedVersion: secondUpdated.body.version },
+        ],
+        tagIds: [addedTag.body.id],
+      })
+      .expect(200);
+
+    expect((await admin.get(`/api/documents/${first.id}`).expect(200)).body.version).toBe(firstUpdated.body.version);
+    expect((await admin.get(`/api/documents/${second.id}`).expect(200)).body.version).toBe(secondUpdated.body.version);
+  });
+
+  it("schützt die Bulk-Tag-Ergänzung und rollt Versionskonflikte vollständig zurück", async () => {
+    const admin = await loginAdmin();
+    const reader = await loginReader();
+    const tag = await admin.post("/api/tags").send({ name: "Bulk Geschützt", domain: "dms" }).expect(201);
+    const first = await uploadDocument(admin, "bulk-conflict-a.txt");
+    const second = await uploadDocument(admin, "bulk-conflict-b.txt");
+    const body = {
+      attachments: [
+        { id: first.id, expectedVersion: first.version + 1 },
+        { id: second.id, expectedVersion: second.version },
+      ],
+      tagIds: [tag.body.id],
+    };
+
+    await supertest(app.server).post("/api/documents/bulk/tags").send(body).expect(401);
+    await reader.post("/api/documents/bulk/tags").send(body).expect(403);
+    const conflict = await admin.post("/api/documents/bulk/tags").send(body).expect(409);
+    expect(conflict.body).toMatchObject({ error: "CONFLICT", statusCode: 409 });
+
+    for (const document of [first, second]) {
+      expect((await admin.get(`/api/documents/${document.id}`).expect(200)).body).toMatchObject({
+        tags: [],
+        version: document.version,
+      });
+    }
+
+    await testDb.pool.execute("UPDATE tags SET is_system = 1 WHERE id = ?", [tag.body.id]);
+    await admin
+      .post("/api/documents/bulk/tags")
+      .send({ attachments: [{ id: first.id, expectedVersion: first.version }], tagIds: [tag.body.id] })
+      .expect(400);
   });
 
   it("erzwingt beim Owner-Upload die explizite Bibliotheksentscheidung", async () => {

@@ -2,7 +2,7 @@ import type { JsonValue, Tag, TagDomain } from "@taskmanager/shared-types";
 import { inArray, eq, sql } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { firstRow } from "../db/query-utils.js";
-import { milestoneTags, milestones, projectTags, projects, tags, taskTags, tasks, ticketTags, tickets } from "../db/schema.js";
+import { attachmentTags, milestoneTags, milestones, projectTags, projects, tags, taskTags, tasks, ticketTags, tickets } from "../db/schema.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { tagRepository, type TagRecord, type TagUpdateData } from "../repositories/tag.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
@@ -144,7 +144,8 @@ export async function listTags(database: DbClient, domain?: TagDomain): Promise<
       projectCount: sql<number>`(SELECT COUNT(*) FROM ${projectTags} WHERE ${projectTags.tagId} = ${tags.id})`,
       milestoneCount: sql<number>`(SELECT COUNT(*) FROM ${milestoneTags} WHERE ${milestoneTags.tagId} = ${tags.id})`,
       taskCount: sql<number>`(SELECT COUNT(*) FROM ${taskTags} WHERE ${taskTags.tagId} = ${tags.id})`,
-      ticketCount: sql<number>`(SELECT COUNT(*) FROM ${ticketTags} WHERE ${ticketTags.tagId} = ${tags.id})`
+      ticketCount: sql<number>`(SELECT COUNT(*) FROM ${ticketTags} WHERE ${ticketTags.tagId} = ${tags.id})`,
+      documentCount: sql<number>`(SELECT COUNT(*) FROM ${attachmentTags} WHERE ${attachmentTags.tagId} = ${tags.id})`
     })
     .from(tags);
   const rows = await (domain ? base.where(eq(tags.domain, domain)) : base);
@@ -160,7 +161,8 @@ export async function listTags(database: DbClient, domain?: TagDomain): Promise<
       projects: Number(row.projectCount),
       milestones: Number(row.milestoneCount),
       tasks: Number(row.taskCount),
-      tickets: Number(row.ticketCount)
+      tickets: Number(row.ticketCount),
+      documents: Number(row.documentCount)
     }
   }));
 }

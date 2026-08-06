@@ -2,6 +2,13 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 06.08.26 | 12:52:22 | Fix | Admin-Tag-Verwendungsstatus | ✅ |
+| 06.08.26 | 12:43:09 | Fix | Admin-Tag-Bereichsfilter | ✅ |
+| 06.08.26 | 11:30:50 | Fix | Dokument-Kachel-Scrollcontainer | ⚠️ |
+| 06.08.26 | 11:24:11 | Feature | Dokument-Mehrfachauswahl und Tags | ⚠️ |
+| 05.08.26 | 16:29:47 | Abschluss | TKT-176 | ✅ |
+| 05.08.26 | 16:28:10 | Fix | TKT-176 Upload-Tag-Zuordnung | ✅ |
+| 05.08.26 | 10:16:08 | Aufgabe | MCP-Referenzauflösung härten | ✅ |
 | 29.07.26 | 16:19:09 | Abschluss | Tickets 164 bis 167 | ✅ |
 | 29.07.26 | 15:42:03 | Feature | Lokale Attachment-Ordnerquelle | ✅ |
 | 29.07.26 | 15:42:02 | Feature | TKT-167 Attachment-Bulk-Operationen | ✅ |

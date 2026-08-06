@@ -7,8 +7,8 @@ import { describeAttachmentType, type AttachmentFamily } from "./attachmentTypes
 
 // Kachel der Dokumente-Grid-Ansicht (MS-75). Quadratischer Thumbnail-Bereich (bei Bildern das
 // skalierte Bild, sonst ein großes Typ-Icon + Badge) mit Dateinamen darunter. Einfachklick
-// togglet die Auswahl, Doppelklick öffnet die Datei groß (Lightbox). Die volle Detail- und
-// Metadatenpflege liegt in der Großansicht; hier bleiben nur schnelle Datei-Aktionen.
+// öffnet die Details. Die Checkbox steuert davon getrennt die Mehrfachauswahl. Die volle
+// Detail- und Metadatenpflege liegt in der Großansicht; hier bleiben nur schnelle Datei-Aktionen.
 
 // Dokumente, aus denen der Server die erste Seite als Vorschaubild rendern kann (PDF direkt,
 // Office/ODF über die PDF-Fassung). Das Typ-Icon bleibt darunter liegen: Es ist der Platzhalter,
@@ -45,6 +45,7 @@ export function fileExtension(name: string): string {
 
 interface DocumentTileProps {
   document: Attachment;
+  isActive: boolean;
   isSelected: boolean;
   onToggleSelect: () => void;
   onOpen: () => void;
@@ -58,6 +59,7 @@ interface DocumentTileProps {
 
 export function DocumentTile({
   document,
+  isActive,
   isSelected,
   onToggleSelect,
   onOpen,
@@ -76,13 +78,15 @@ export function DocumentTile({
 
   return (
     <article
-      onClick={onToggleSelect}
+      onClick={onOpen}
       onDoubleClick={onOpen}
       title={document.displayName ?? document.originalName}
       className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-lg border bg-white transition ${
         isSelected
           ? "border-steel-400 shadow-panel ring-2 ring-steel-300"
-          : "border-line shadow-sm hover:border-steel-300 hover:shadow-panel"
+          : isActive
+            ? "border-steel-400 shadow-panel"
+            : "border-line shadow-sm hover:border-steel-300 hover:shadow-panel"
       }`}
     >
       <div className="relative aspect-square w-full overflow-hidden bg-shell">

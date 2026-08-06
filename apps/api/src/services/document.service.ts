@@ -1,7 +1,7 @@
-import type { Attachment, AttachmentFolder, AttachmentOwner, Paginated, Tag, TagDomain } from "@taskmanager/shared-types";
+import type { Attachment, AttachmentFolder, AttachmentOwner, AttachmentVersionInput, Paginated, Tag, TagDomain } from "@taskmanager/shared-types";
 import { and, desc, eq, exists, inArray, like, notExists, or, sql, type SQL } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { firstRow } from "../db/query-utils.js";
+import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
 import {
   attachmentFolders,
   attachmentTags,
@@ -18,6 +18,7 @@ import { listFolderAndDescendantIds } from "./attachment-folder.service.js";
 import {
   buildJournalChanges,
   buildUpdateSummary,
+  makeJournalContext,
   makeJournalObject,
   recordJournalEntry,
   type JournalActor
@@ -386,4 +387,139 @@ export async function setDocumentTags(
   });
 
   return mapDocument(database, updated);
+}
+
+function normalizeDocumentVersionSelection(items: AttachmentVersionInput[]): AttachmentVersionInput[] {
+  if (items.length === 0) {
+    throw badRequest("Es wurden keine Dokumente ausgewählt.");
+  }
+  if (items.length > 100) {
+    throw badRequest("Höchstens 100 Dokumente können gleichzeitig bearbeitet werden.");
+  }
+  const byId = new Map<number, AttachmentVersionInput>();
+  for (const item of items) {
+    const existing = byId.get(item.id);
+    if (existing && existing.expectedVersion !== item.expectedVersion) {
+      throw badRequest(`Dokument ${item.id} wurde mit widersprüchlichen Versionen ausgewählt.`);
+    }
+    byId.set(item.id, item);
+  }
+  return [...byId.values()];
+}
+
+function documentVersionSelectionCondition(items: AttachmentVersionInput[]) {
+  const condition = or(
+    ...items.map((item) =>
+      and(eq(attachments.id, item.id), eq(attachments.version, item.expectedVersion))
+    )
+  );
+  if (!condition) {
+    throw badRequest("Es wurden keine Dokumente ausgewählt.");
+  }
+  return condition;
+}
+
+export async function addDocumentTagsBulk(
+  database: DbClient,
+  items: AttachmentVersionInput[],
+  tagIds: number[],
+  actor?: JournalActor | null
+): Promise<Attachment[]> {
+  const selections = normalizeDocumentVersionSelection(items);
+  const uniqueTagIds = [...new Set(tagIds)];
+  if (uniqueTagIds.length === 0) {
+    throw badRequest("Es wurden keine Tags ausgewählt.");
+  }
+  if (uniqueTagIds.length > 20) {
+    throw badRequest("Höchstens 20 DMS-Tags können gleichzeitig hinzugefügt werden.");
+  }
+
+  const requestedTags = await tagRepository.findByIds(database, uniqueTagIds);
+  if (requestedTags.length !== uniqueTagIds.length) {
+    throw badRequest("Ein oder mehrere Tag-IDs sind ungültig.");
+  }
+  if (requestedTags.some((tag) => tag.isSystem)) {
+    throw badRequest("Geschützte System-Labels können nicht über die Label-Funktion gesetzt werden.");
+  }
+  if (requestedTags.some((tag) => tag.domain !== "dms")) {
+    throw badRequest("Dokumenten können ausschließlich Tags der Domäne 'dms' zugeordnet werden.");
+  }
+
+  const records = await database
+    .select()
+    .from(attachments)
+    .where(and(
+      inArray(attachments.id, selections.map((item) => item.id)),
+      eq(attachments.isInDocumentLibrary, true)
+    ));
+  if (records.length !== selections.length) {
+    throw notFound("Mindestens ein ausgewähltes Dokument ist nicht mehr in der Dokumentenbibliothek vorhanden.");
+  }
+  const recordById = new Map(records.map((record) => [record.id, record]));
+  for (const selection of selections) {
+    const record = recordById.get(selection.id);
+    if (!record) {
+      throw notFound(`Attachment with id ${selection.id} not found in document library`);
+    }
+    assertVersion(record.version, selection.expectedVersion);
+  }
+
+  await database.transaction(async (tx) => {
+    const existingLinks = await tx
+      .select({ attachmentId: attachmentTags.attachmentId, tagId: attachmentTags.tagId })
+      .from(attachmentTags)
+      .where(and(
+        inArray(attachmentTags.attachmentId, selections.map((item) => item.id)),
+        inArray(attachmentTags.tagId, uniqueTagIds)
+      ));
+    const existingKeys = new Set(existingLinks.map((link) => `${link.attachmentId}:${link.tagId}`));
+    const missingLinks = selections.flatMap((selection) =>
+      uniqueTagIds
+        .filter((tagId) => !existingKeys.has(`${selection.id}:${tagId}`))
+        .map((tagId) => ({ attachmentId: selection.id, tagId }))
+    );
+    if (missingLinks.length === 0) {
+      return;
+    }
+
+    const changedIds = new Set(missingLinks.map((link) => link.attachmentId));
+    const changedSelections = selections.filter((selection) => changedIds.has(selection.id));
+    await tx.insert(attachmentTags).ignore().values(missingLinks);
+    const updated = mutationAffectedRows(
+      await tx
+        .update(attachments)
+        .set({
+          version: sql`${attachments.version} + 1`,
+          updatedBy: actor?.actorUserId ?? null,
+          updatedAt: new Date().toISOString()
+        })
+        .where(documentVersionSelectionCondition(changedSelections))
+    );
+    if (updated !== changedSelections.length) {
+      throw conflict("Mindestens ein Dokument wurde zwischenzeitlich geändert.");
+    }
+
+    const changedRecords = changedSelections.map((selection) => recordById.get(selection.id)!);
+    const journalObject = makeJournalObject("attachment", changedRecords[0]!.id, changedRecords[0]!.originalName);
+    const tagNames = requestedTags.map((tag) => tag.name).sort((left, right) => left.localeCompare(right, "de"));
+    await recordJournalEntry(tx, {
+      operation: "update",
+      object: journalObject,
+      summary: `${changedRecords.length} Dokument(e) erhielten die Tags ${tagNames.join(", ")}.`,
+      actor,
+      contexts: changedRecords.slice(1).map((record) =>
+        makeJournalContext(makeJournalObject("attachment", record.id, record.originalName), "related")
+      )
+    });
+  });
+
+  const updatedRecords = await database
+    .select()
+    .from(attachments)
+    .where(inArray(attachments.id, selections.map((item) => item.id)));
+  const updatedById = new Map(updatedRecords.map((record) => [record.id, record]));
+  return enrichDocuments(
+    database,
+    selections.map((selection) => updatedById.get(selection.id)!).filter(Boolean)
+  );
 }

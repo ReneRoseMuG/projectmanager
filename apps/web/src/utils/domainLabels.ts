@@ -119,3 +119,13 @@ export const attachmentActionLabels = {
   removeLocalFolder: "Ordner-Verknüpfung lösen",
   moveToFolder: "In Ordner verschieben",
 } as const;
+
+export const documentBulkActionLabels = {
+    addTags: "Tags hinzufügen",
+    addingTags: "Tags werden hinzugefügt…",
+    addTagsSuccess: "Tags hinzugefügt",
+  clearSelection: "Auswahl aufheben",
+  limitReached: "Es können höchstens 100 Dokumente gleichzeitig ausgewählt werden.",
+  selectionLabel: "Dokument-Mehrfachauswahl",
+  selectedCount: (count: number) => `${count} ${count === 1 ? "Dokument" : "Dokumente"} ausgewählt`,
+} as const;

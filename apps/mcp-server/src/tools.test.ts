@@ -242,7 +242,7 @@ describe("MCP tool definitions", () => {
 
   it("lists all available tags", async () => {
     const client = createMappedClient({
-      tags: [{ id: 1, name: "Bug", color: "#ef4444", version: 1, usageCounts: { projects: 0, milestones: 0, tasks: 1, tickets: 0 } }]
+      tags: [{ id: 1, name: "Bug", color: "#ef4444", version: 1, usageCounts: { projects: 0, milestones: 0, tasks: 1, tickets: 0, documents: 0 } }]
     });
 
     const result = (await tool("list_tags", client).execute({})) as Array<{ name: string }>;

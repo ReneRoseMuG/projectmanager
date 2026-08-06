@@ -1,5 +1,12 @@
-import type { AttachmentFolder, DocumentDuplicateCheck } from "@taskmanager/shared-types";
+import type {
+  Attachment,
+  AttachmentFolder,
+  AttachmentVersionInput,
+  DocumentDuplicateCheck,
+  Paginated,
+} from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { InfiniteData } from "@tanstack/react-query";
 import { useCallback } from "react";
 import * as documentsApi from "../api/documents";
 import type { DocumentLibraryFilter } from "../api/documents";
@@ -64,7 +71,8 @@ export function useDocumentActions() {
   const invalidate = useCallback(() => invalidateDocuments(queryClient), [queryClient]);
 
   const uploadMutation = useMutation({
-    mutationFn: ({ file, folderId }: { file: File; folderId?: number }) => documentsApi.uploadDocument(file, folderId),
+    mutationFn: ({ file, folderId, tagIds }: { file: File; folderId?: number; tagIds: number[] }) =>
+      documentsApi.uploadDocument(file, folderId, tagIds),
     onSuccess: invalidate
   });
   const metadataMutation = useMutation({
@@ -76,6 +84,29 @@ export function useDocumentActions() {
     mutationFn: ({ id, tagIds, expectedVersion }: { id: number; tagIds: number[]; expectedVersion: number }) =>
       documentsApi.setDocumentTags(id, tagIds, expectedVersion),
     onSuccess: invalidate
+  });
+  const bulkTagsMutation = useMutation({
+    mutationFn: ({ attachments, tagIds }: { attachments: AttachmentVersionInput[]; tagIds: number[] }) =>
+      documentsApi.addDocumentTagsBulk(attachments, tagIds),
+    onSuccess: async (updatedDocuments) => {
+      const updatedById = new Map(updatedDocuments.map((document) => [document.id, document]));
+      queryClient.setQueriesData<InfiniteData<Paginated<Attachment>>>(
+        { queryKey: [...queryKeys.documents.root, "library"] },
+        (current) => {
+          if (!current || !Array.isArray(current.pages)) {
+            return current;
+          }
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              data: page.data.map((document) => updatedById.get(document.id) ?? document),
+            })),
+          };
+        },
+      );
+      await invalidate();
+    }
   });
   const removeFromLibraryMutation = useMutation({
     mutationFn: ({ id, expectedVersion }: { id: number; expectedVersion: number }) => documentsApi.removeDocumentFromLibrary(id, expectedVersion),
@@ -91,10 +122,13 @@ export function useDocumentActions() {
     onSuccess: invalidate
   });
   return {
-    uploadDocument: (file: File, folderId?: number) => uploadMutation.mutateAsync({ file, folderId }),
+    uploadDocument: (file: File, folderId?: number, tagIds: number[] = []) => uploadMutation.mutateAsync({ file, folderId, tagIds }),
     updateMetadata: (id: number, input: { displayName?: string | null; description?: string | null; expectedVersion: number }) =>
       metadataMutation.mutateAsync({ id, input }),
     setTags: (id: number, tagIds: number[], expectedVersion: number) => tagsMutation.mutateAsync({ id, tagIds, expectedVersion }),
+    addTagsBulk: (attachments: AttachmentVersionInput[], tagIds: number[]) =>
+      bulkTagsMutation.mutateAsync({ attachments, tagIds }),
+    addingTagsBulk: bulkTagsMutation.isPending,
     removeFromLibrary: (id: number, expectedVersion: number) => removeFromLibraryMutation.mutateAsync({ id, expectedVersion }),
     deleteDocumentPermanently: (id: number, expectedVersion: number) => deleteMutation.mutateAsync({ id, expectedVersion }),
     setDocumentFolder: (id: number, folderId: number | null, expectedVersion: number) =>

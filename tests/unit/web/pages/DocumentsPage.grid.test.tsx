@@ -20,17 +20,18 @@
  * Abgedeckte Regeln:
  * - Bilder erscheinen direkt, PDF/Office/ODF fordern ein geschütztes Thumbnail an.
  * - MS-80-Tags bleiben auf der Kachel sichtbar und die Kachelgröße wird lokal persistiert.
- * - Uploads übernehmen höchstens die ausgewählte direkte Sammlung und keine Kategorien.
+ * - Uploads übernehmen höchstens die ausgewählte direkte Sammlung und alle aktiven DMS-Tagfilter.
+ * - Der Kachelbereich ist auf Desktop direkt unterhalb der nicht scrollenden Steuerung begrenzt.
  *
  * Fehlerfälle:
- * - Ohne ausgewählte Sammlung wird kein folderId an den Upload übergeben.
+ * - Ohne ausgewählte Sammlung oder Tagfilter werden keine Zuordnungen an den Upload übergeben.
  *
  * Ziel:
  * Die durch die falsche Branch-Basis verlorene Kachelansicht mit dem MS-80-Vertrag absichern.
  */
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, screen } from "@testing-library/dom";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, waitFor } from "@testing-library/react";
 import type { Attachment } from "@taskmanager/shared-types";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -42,6 +43,8 @@ const actions = vi.hoisted(() => ({
   setTags: vi.fn(async () => undefined),
   updateMetadata: vi.fn(async () => undefined),
   setDocumentFolder: vi.fn(async () => undefined),
+  addTagsBulk: vi.fn(async () => undefined),
+  addingTagsBulk: false,
 }));
 
 const imageDocument: Attachment = {
@@ -155,6 +158,16 @@ afterEach(() => {
 });
 
 describe("DocumentsPage — Thumbnail-Grid", () => {
+  it("begrenzt den scrollenden Kachelcontainer direkt unterhalb der festen Dokumentsteuerung", () => {
+    renderPage();
+
+    const controls = screen.getByRole("region", { name: "Dokumentsteuerung" });
+    const thumbnails = screen.getByRole("region", { name: "Dokumentkacheln" });
+    expect(controls).toHaveClass("shrink-0");
+    expect(thumbnails).toHaveClass("lg:min-h-0", "lg:flex-1", "lg:overflow-y-auto");
+    expect(controls.nextElementSibling).toBe(thumbnails);
+  });
+
   it("zeigt Bilder direkt sowie PDF-Thumbnails und MS-80-Tags", () => {
     renderPage();
 
@@ -179,20 +192,41 @@ describe("DocumentsPage — Thumbnail-Grid", () => {
 });
 
 describe("DocumentsPage — Uploadvertrag", () => {
-  it("übergibt genau die ausgewählte direkte Sammlung", () => {
+  it("übergibt die ausgewählte direkte Sammlung und den aktiven DMS-Tag", () => {
     renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Rechnungen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dokumente mit Tag Wichtig filtern" }));
     fireEvent.click(screen.getByRole("button", { name: "Datei hochladen" }));
 
-    expect(actions.uploadDocument).toHaveBeenCalledWith(expect.any(File), 7);
+    expect(actions.uploadDocument).toHaveBeenCalledWith(expect.any(File), 7, [9]);
   });
 
-  it("übergibt ohne Sammlung keine folderId", () => {
+  it("übergibt ohne Sammlung oder Tagfilter keine Zuordnungen", () => {
     renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Datei hochladen" }));
 
-    expect(actions.uploadDocument).toHaveBeenCalledWith(expect.any(File), undefined);
+    expect(actions.uploadDocument).toHaveBeenCalledWith(expect.any(File), undefined, []);
+  });
+});
+
+describe("DocumentsPage — Mehrfachauswahl", () => {
+  it("ergänzt den gewählten Tag für mehrere markierte Dokumente", async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Foto.*auswählen/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Bericht.*auswählen/ }));
+    expect(screen.getByText("2 Dokumente ausgewählt")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tag hinzufügen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Wichtig" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tags hinzufügen" }));
+
+    await waitFor(() => expect(actions.addTagsBulk).toHaveBeenCalledWith(
+      [{ id: 1, expectedVersion: 2 }, { id: 2, expectedVersion: 2 }],
+      [9],
+    ));
+    expect(screen.queryByText("2 Dokumente ausgewählt")).not.toBeInTheDocument();
   });
 });

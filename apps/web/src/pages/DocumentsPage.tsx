@@ -35,6 +35,7 @@ import {
   type ThumbnailSize,
 } from "../components/attachments/documentThumbnailSize";
 import { DocumentDuplicateCheck } from "../components/documents/DocumentDuplicateCheck";
+import { DocumentBulkTagBar } from "../components/documents/DocumentBulkTagBar";
 import { DocumentTagPills } from "../components/documents/DocumentTagPills";
 import {
   documentFolderDescendantIds,
@@ -59,6 +60,7 @@ import { useTags } from "../hooks/useTags";
 import { toQueryError } from "../queries/queryErrors";
 import type { DocumentLibraryFilter } from "../api/documents";
 import { assetUrl } from "../api/client";
+import { documentBulkActionLabels } from "../utils/domainLabels";
 
 // Detail-Panel-Breite (MS-75): Pre-Render-Kalkulation beim Öffnen eines Dokuments. Die
 // Breite ergibt sich aus der verfügbaren Zeilenbreite minus Mindestbreite der Dateiliste,
@@ -104,6 +106,8 @@ export function DocumentsPage() {
   const setTagFilters = (tagIds: number[]) =>
     setFilterParam("tags", tagIds.length > 0 ? [...new Set(tagIds)].sort((left, right) => left - right).join(",") : null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<Set<number>>(() => new Set());
+  const [bulkTags, setBulkTags] = useState<Tag[]>([]);
   const [thumbnailSize, setThumbnailSize] = useState<ThumbnailSize>(() => loadThumbnailSize());
   const [newFolderName, setNewFolderName] = useState("");
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
@@ -139,6 +143,8 @@ export function DocumentsPage() {
     removeFromLibrary,
     deleteDocumentPermanently,
     setTags,
+    addTagsBulk,
+    addingTagsBulk,
     updateMetadata,
     setDocumentFolder,
   } = useDocumentActions();
@@ -156,12 +162,14 @@ export function DocumentsPage() {
         if (successTitle) {
           showToast({ tone: "success", title: successTitle });
         }
+        return true;
       } catch (mutationError) {
         showToast({
           tone: "error",
           title: "Aktion fehlgeschlagen",
           message: toQueryError(mutationError) ?? "Unbekannter Fehler",
         });
+        return false;
       }
     },
     [showToast],
@@ -169,6 +177,46 @@ export function DocumentsPage() {
 
   const selected =
     documents.find((document) => document.id === selectedId) ?? null;
+  const selectedDocuments = documents.filter((document) => selectedDocumentIds.has(document.id));
+
+  useEffect(() => {
+    setSelectedDocumentIds(new Set());
+    setBulkTags([]);
+  }, [folderScope, tagFilters, typeFilter, search]);
+
+  const toggleDocumentSelection = (documentId: number) => {
+    if (!selectedDocumentIds.has(documentId) && selectedDocumentIds.size >= 100) {
+      showToast({ tone: "warn", title: documentBulkActionLabels.limitReached });
+      return;
+    }
+    setSelectedDocumentIds((current) => {
+      const next = new Set(current);
+      if (next.has(documentId)) {
+        next.delete(documentId);
+      } else {
+        next.add(documentId);
+      }
+      return next;
+    });
+  };
+
+  const clearDocumentSelection = () => {
+    setSelectedDocumentIds(new Set());
+    setBulkTags([]);
+  };
+
+  const applyBulkTags = async () => {
+    const applied = await run(
+      () => addTagsBulk(
+        selectedDocuments.map((document) => ({ id: document.id, expectedVersion: document.version })),
+        bulkTags.map((tag) => tag.id),
+      ),
+      documentBulkActionLabels.addTagsSuccess,
+    );
+    if (applied) {
+      clearDocumentSelection();
+    }
+  };
 
   const removeDocumentLibraryVisibility = async (document: Attachment) => {
     if (document.owners.length === 0) {
@@ -442,7 +490,7 @@ export function DocumentsPage() {
   };
 
   return (
-    <div className="flex min-h-0 flex-col gap-6">
+    <div className="flex min-h-0 flex-col gap-6 lg:h-full lg:overflow-hidden">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-ink">Dokumente</h1>
         <p className="text-sm text-steel-500">
@@ -450,7 +498,7 @@ export function DocumentsPage() {
         </p>
       </header>
 
-      <div ref={rowRef} className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div ref={rowRef} className="flex flex-col gap-6 lg:min-h-0 lg:flex-1 lg:flex-row lg:items-start lg:overflow-hidden">
         {/* Hauptnavigation: Sammlungen und Tags */}
         <DocumentSidePanel
           ref={leftPanelRef}
@@ -613,7 +661,7 @@ export function DocumentsPage() {
             <AttachmentUploader
               onUpload={(file) =>
                 run(
-                  () => uploadDocument(file, uploadFolder),
+                  () => uploadDocument(file, uploadFolder, tagFilters),
                   "Dokument hochgeladen",
                 )
               }
@@ -624,7 +672,12 @@ export function DocumentsPage() {
         </DocumentSidePanel>
 
         {/* Bibliothek */}
-        <section className="flex min-w-0 flex-1 flex-col gap-4">
+        <section className="flex min-w-0 flex-1 flex-col gap-4 lg:h-full lg:min-h-0 lg:self-stretch">
+          <div
+            className="flex shrink-0 flex-col gap-3"
+            role="region"
+            aria-label="Dokumentsteuerung"
+          >
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="search"
@@ -670,6 +723,17 @@ export function DocumentsPage() {
             {canWrite ? <DocumentDuplicateCheck /> : null}
           </div>
 
+          {canWrite && selectedDocuments.length > 0 ? (
+            <DocumentBulkTagBar
+              count={selectedDocuments.length}
+              selectedTags={bulkTags}
+              onSelectedTagsChange={setBulkTags}
+              onApply={() => void applyBulkTags()}
+              onClear={clearDocumentSelection}
+              pending={addingTagsBulk}
+            />
+          ) : null}
+
           {hasActiveFilters ? (
             <div className="flex flex-wrap items-center gap-2" aria-label="Aktive Dokumentfilter">
               <span className="text-xs font-semibold uppercase tracking-wide text-steel-500">Aktiv</span>
@@ -702,7 +766,13 @@ export function DocumentsPage() {
               </button>
             </div>
           ) : null}
+          </div>
 
+          <div
+            className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
+            role="region"
+            aria-label="Dokumentkacheln"
+          >
           {error ? (
             <EmptyState
               icon={<FileText size={28} />}
@@ -735,9 +805,10 @@ export function DocumentsPage() {
                 <DocumentTile
                   key={document.id}
                   document={document}
-                  isSelected={document.id === selectedId}
-                  onToggleSelect={() => setSelectedId((current) => current === document.id ? null : document.id)}
-                  onOpen={() => setSelectedId(document.id)}
+                  isActive={document.id === selectedId}
+                  isSelected={selectedDocumentIds.has(document.id)}
+                  onToggleSelect={() => toggleDocumentSelection(document.id)}
+                  onOpen={() => setSelectedId((current) => current === document.id ? null : document.id)}
                   onDownload={() => {
                     window.open(assetUrl(`${document.url}?download=true`), "_blank", "noopener,noreferrer");
                   }}
@@ -758,6 +829,7 @@ export function DocumentsPage() {
               loadingMore={loadingMore}
             />
           ) : null}
+          </div>
         </section>
 
         {selected ? (

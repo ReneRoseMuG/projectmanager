@@ -30,6 +30,8 @@ import {
  * - Karten zeigen höchstens drei Tags und lösen weitere Namen zugänglich auf.
  * - Karte öffnet die Detailansicht; schmale Ansichten behalten Sammlung, Tags, Suche und Typfilter.
  * - Eine Custom Role mit attachments:read kann Dokumente lesen, aber keine schreibenden oder löschenden Aktionen bedienen.
+ * - Die Mehrfachauswahl ergänzt Tags auf mehreren Kacheln und aktualisiert die Ansicht ohne Reload.
+ * - Der intern scrollende Kachelbereich beginnt unterhalb der festen Dokumentsteuerung.
  *
  * Fehlerfälle:
  * - Kategorien dürfen in Navigation, Filter und Karte nicht mehr erscheinen.
@@ -37,6 +39,69 @@ import {
  * Ziel:
  * Den freigegebenen DMS-Kernweg aus Benutzersicht vollständig absichern.
  */
+
+test("DMS ergänzt einen Tag auf mehreren Kacheln und aktualisiert die Ansicht sofort", async ({ page, request }) => {
+  const suffix = safeFilename(uniqueTitle("dms bulk tags"));
+  const tagName = uniqueTitle("DMS Mehrfach");
+  const attachments: Array<{ id: number; version: number }> = [];
+  let tagId: number | null = null;
+
+  try {
+    const tagResponse = await request.post(`${apiBaseUrl}/tags`, {
+      data: { name: tagName, domain: "dms", color: "#64748b" },
+    });
+    expect(tagResponse.ok()).toBeTruthy();
+    tagId = ((await tagResponse.json()) as { id: number }).id;
+
+    for (const index of [1, 2]) {
+      const uploadResponse = await request.post(`${apiBaseUrl}/documents`, {
+        multipart: {
+          file: {
+            name: `${suffix}-${index}.txt`,
+            mimeType: "text/plain",
+            buffer: Buffer.from(`DMS bulk tag acceptance ${index}`),
+          },
+        },
+      });
+      expect(uploadResponse.ok()).toBeTruthy();
+      attachments.push(await uploadResponse.json() as { id: number; version: number });
+    }
+
+    await authenticatedGoto(page, `/documents?q=${encodeURIComponent(suffix)}`);
+    const controlRegion = page.getByRole("region", { name: "Dokumentsteuerung" });
+    const thumbnailRegion = page.getByRole("region", { name: "Dokumentkacheln" });
+    await expect(controlRegion).toBeVisible();
+    await expect(thumbnailRegion).toBeVisible();
+    await expect.poll(() => thumbnailRegion.evaluate((element) => getComputedStyle(element).overflowY)).toBe("auto");
+    const controlBox = await controlRegion.boundingBox();
+    const thumbnailBox = await thumbnailRegion.boundingBox();
+    expect(controlBox).not.toBeNull();
+    expect(thumbnailBox).not.toBeNull();
+    expect(thumbnailBox!.y).toBeGreaterThanOrEqual(controlBox!.y + controlBox!.height - 1);
+
+    await page.getByRole("checkbox", { name: new RegExp(`${suffix}-1.*ausw`) }).check({ force: true });
+    await page.getByRole("checkbox", { name: new RegExp(`${suffix}-2.*ausw`) }).check({ force: true });
+    await expect(page.getByText("2 Dokumente ausgewählt")).toBeVisible();
+
+    await page.getByRole("button", { name: "Tag hinzufügen" }).click();
+    await page.getByRole("button", { name: tagName, exact: true }).click();
+    await page.getByRole("button", { name: "Tags hinzufügen" }).click();
+
+    await expect(page.getByText(tagName, { exact: true })).toHaveCount(2);
+    await expect(page.getByText("2 Dokumente ausgewählt")).toHaveCount(0);
+  } finally {
+    for (const attachment of attachments) {
+      const currentResponse = await request.get(`${apiBaseUrl}/documents/${attachment.id}`);
+      if (currentResponse.ok()) {
+        const current = await currentResponse.json() as { version: number };
+        await request.delete(`${apiBaseUrl}/attachments/${attachment.id}?expectedVersion=${current.version}`);
+      }
+    }
+    if (tagId !== null) {
+      await request.delete(`${apiBaseUrl}/tags/${tagId}`);
+    }
+  }
+});
 
 test("DMS kombiniert Sammlung und Tags URL-stabil und öffnet die Dokumentdetails", async ({ page, request }) => {
   const suffix = safeFilename(uniqueTitle("dms browser"));

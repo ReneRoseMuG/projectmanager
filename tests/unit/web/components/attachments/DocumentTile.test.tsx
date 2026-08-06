@@ -7,7 +7,7 @@
  * - PDF, Office und ODF fordern zusätzlich ein serverseitig gerendertes Vorschaubild an; das
  *   Typ-Icon bleibt darunter liegen und ist damit Platzhalter wie Rückfall.
  * - Die Auswahl-Checkbox togglet die Mehrfachauswahl.
- * - Einfachklick auf die Kachel togglet die Auswahl, Doppelklick öffnet die Datei.
+ * - Einfach- und Doppelklick auf die Kachel öffnen die Datei, ohne die Mehrfachauswahl zu verändern.
  * - Der Löschen-Button löscht, ohne zu öffnen oder auszuwählen (stopPropagation).
  *
  * Fehlerfälle:
@@ -63,6 +63,7 @@ function doc(overrides: Partial<Attachment> = {}): Attachment {
 function renderTile(props: Partial<ComponentProps<typeof DocumentTile>> = {}) {
   const merged: ComponentProps<typeof DocumentTile> = {
     document: doc(),
+    isActive: false,
     isSelected: false,
     onToggleSelect: vi.fn(),
     onOpen: vi.fn(),
@@ -134,12 +135,14 @@ describe("DocumentTile", () => {
     const props = renderTile();
     fireEvent.click(screen.getByRole("checkbox"));
     expect(props.onToggleSelect).toHaveBeenCalledTimes(1);
+    expect(props.onOpen).not.toHaveBeenCalled();
   });
 
-  it("togglet die Auswahl bei Einfachklick auf die Kachel", () => {
+  it("öffnet bei Einfachklick die Details ohne die Mehrfachauswahl zu ändern", () => {
     const props = renderTile();
     fireEvent.click(screen.getByText("Rechnung"));
-    expect(props.onToggleSelect).toHaveBeenCalledTimes(1);
+    expect(props.onOpen).toHaveBeenCalledTimes(1);
+    expect(props.onToggleSelect).not.toHaveBeenCalled();
   });
 
   it("öffnet die Datei bei Doppelklick", () => {

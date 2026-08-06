@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { AttachmentVersionInput } from "@taskmanager/shared-types";
 import { createReadStream } from "node:fs";
 import { removeAttachmentFromDocumentLibrary } from "../services/attachments.service.js";
 import {
@@ -8,7 +9,7 @@ import {
   setAttachmentFolder,
   updateAttachmentFolder
 } from "../services/attachment-folder.service.js";
-import { getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
+import { addDocumentTagsBulk, getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
 import { importDocument } from "../services/document-import.service.js";
 import { getDocumentDuplicateCheck, startDocumentDuplicateCheck } from "../services/document-duplicate-check.service.js";
 import { getAttachmentThumbnail } from "../services/attachment-preview.service.js";
@@ -136,6 +137,29 @@ const documentTagsBodySchema = {
   }
 } as const;
 
+const bulkDocumentTagsBodySchema = {
+  type: "object",
+  required: ["attachments", "tagIds"],
+  additionalProperties: false,
+  properties: {
+    attachments: {
+      type: "array",
+      minItems: 1,
+      maxItems: 100,
+      items: {
+        type: "object",
+        required: ["id", "expectedVersion"],
+        additionalProperties: false,
+        properties: {
+          id: { type: "integer", minimum: 1 },
+          expectedVersion: { type: "integer", minimum: 1 }
+        }
+      }
+    },
+    tagIds: { type: "array", minItems: 1, maxItems: 20, uniqueItems: true, items: { type: "integer", minimum: 1 } }
+  }
+} as const;
+
 async function readUpload(request: FastifyRequest) {
   const file = (request.body as UploadBody | undefined)?.file;
   if (!file || Array.isArray(file) || typeof file.toBuffer !== "function") {
@@ -252,6 +276,22 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     "/documents/duplicate-check",
     { config: attachmentsAuth("write"), schema: { response: { 202: objectResponseSchema } } },
     async (_request, reply) => reply.status(202).send(await startDocumentDuplicateCheck(app.db))
+  );
+
+  app.post<{ Body: { attachments: AttachmentVersionInput[]; tagIds: number[] } }>(
+    "/documents/bulk/tags",
+    {
+      config: attachmentsAuth("write"),
+      schema: { body: bulkDocumentTagsBodySchema, response: { 200: arrayResponseSchema } }
+    },
+    async (request) => {
+      return addDocumentTagsBulk(
+        app.db,
+        request.body.attachments,
+        request.body.tagIds,
+        createJournalActor(request.currentUser)
+      );
+    }
   );
 
   app.get<{ Params: { id: number } }>(

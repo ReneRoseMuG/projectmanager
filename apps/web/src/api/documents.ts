@@ -1,6 +1,7 @@
 import type {
   Attachment,
   AttachmentFolder,
+  AttachmentVersionInput,
   DocumentDuplicateCheck,
   Paginated
 } from "@taskmanager/shared-types";
@@ -65,10 +66,18 @@ export async function getDocument(id: number): Promise<Attachment> {
   return api.get(`documents/${id}`).json<Attachment>();
 }
 
-export async function uploadDocument(file: File, folderId?: number): Promise<Attachment> {
+export async function uploadDocument(file: File, folderId?: number, tagIds: number[] = []): Promise<Attachment> {
   const formData = new FormData();
   formData.append("file", file);
-  const path = folderId !== undefined ? `documents?folder=${folderId}` : "documents";
+  const params = new URLSearchParams();
+  if (folderId !== undefined) {
+    params.set("folder", String(folderId));
+  }
+  if (tagIds.length > 0) {
+    params.set("tags", [...new Set(tagIds)].sort((left, right) => left - right).join(","));
+  }
+  const queryString = params.toString();
+  const path = queryString ? `documents?${queryString}` : "documents";
   return api.post(path, { body: formData }).json<Attachment>();
 }
 
@@ -81,6 +90,10 @@ export async function updateDocumentMetadata(
 
 export async function setDocumentTags(id: number, tagIds: number[], expectedVersion: number): Promise<Attachment> {
   return api.put(`documents/${id}/tags`, { json: { tagIds, expectedVersion } }).json<Attachment>();
+}
+
+export async function addDocumentTagsBulk(attachments: AttachmentVersionInput[], tagIds: number[]): Promise<Attachment[]> {
+  return api.post("documents/bulk/tags", { json: { attachments, tagIds } }).json<Attachment[]>();
 }
 
 export async function setDocumentFolder(id: number, folderId: number | null, expectedVersion: number): Promise<Attachment> {

@@ -58,9 +58,9 @@ function TagRow({ tag, onReload }: { tag: Tag; onReload: () => Promise<void> }) 
   };
 
   const counts = tag.usageCounts;
-  const totalUsage = counts ? counts.projects + counts.milestones + counts.tasks + counts.tickets : 0;
+  const totalUsage = counts ? counts.projects + counts.milestones + counts.tasks + counts.tickets + counts.documents : 0;
   const usageLabel = counts
-    ? `${counts.projects} Projekte · ${counts.milestones} Meilensteine · ${counts.tasks} Aufgaben · ${counts.tickets} Tickets`
+    ? `${counts.projects} Projekte · ${counts.milestones} Meilensteine · ${counts.tasks} Aufgaben · ${counts.tickets} Tickets · ${counts.documents} Dokumente`
     : "–";
 
   return (
@@ -111,7 +111,11 @@ export function TagManager() {
   const [sort, setSort] = useState<SortMode>("usage");
 
   const filteredTags = useMemo(() => {
-    const next = tags.tags.filter((tag) => tag.name.toLowerCase().includes(query.trim().toLowerCase()));
+    const next = tags.tags.filter(
+      (tag) =>
+        (domainFilter === "all" || tag.domain === domainFilter) &&
+        tag.name.toLowerCase().includes(query.trim().toLowerCase())
+    );
     if (sort === "name") {
       return [...next].sort((left, right) => left.name.localeCompare(right.name));
     }
@@ -119,7 +123,7 @@ export function TagManager() {
       return [...next].reverse();
     }
     return next;
-  }, [query, sort, tags.tags]);
+  }, [domainFilter, query, sort, tags.tags]);
 
   const create = async () => {
     const trimmed = name.trim();

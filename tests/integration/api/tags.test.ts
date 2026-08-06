@@ -1,15 +1,35 @@
 ﻿/**
- * Test Scope: Tags API
+ * Test Scope:
  *
- * Covers global tag CRUD, project/task/milestone/ticket assignments, replacement semantics,
- * uniqueness, cascades, usageCounts, tag domains (pm/dms visibility filter + default backfill),
- * and error cases (404, 409 version conflict, 400 invalid domain).
+ * Test-Ebene:
+ * - Integration
+ *
+ * Realitätsgrad:
+ * - Echte Fastify-App, echte Services und Repositories sowie eine isolierte MySQL-Testdatenbank.
+ *
+ * Mock-Entscheidung:
+ * - Keine Mocks.
+ *
+ * Isolation:
+ * - Eigene Testdatenbank über createTestDb; vollständiges truncateAll vor jedem Test.
+ *
+ * Abgedeckte Regeln:
+ * - Globales Tag-CRUD, Zuweisungen, Ersetzungssemantik, Kaskaden und PM-/DMS-Domänen.
+ * - usageCounts umfasst Projekte, Meilensteine, Aufgaben, Tickets und Dokumente.
+ *
+ * Fehlerfälle:
+ * - Ungültige Domäne, unbekannte IDs, Duplikate und Versionskonflikte.
+ *
+ * Ziel:
+ * Den vollständigen Tags-API-Vertrag einschließlich realer Nutzungszahlen absichern.
  */
 
 import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { config } from "../../../apps/api/src/config.js";
+import { attachmentRepository } from "../../../apps/api/src/repositories/attachment.repository.js";
+import { setDocumentTags } from "../../../apps/api/src/services/document.service.js";
 import { buildTestApp, createMilestone, createProject, createTag, createTask, createTicket, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 describe("Tags API", () => {
@@ -124,13 +144,13 @@ describe("Tags API", () => {
 
     const before = await supertest(app.server).get("/api/tags").expect(200);
     const tagBefore = before.body.find((t: { id: number }) => t.id === tag.id);
-    expect(tagBefore.usageCounts).toEqual({ projects: 0, milestones: 0, tasks: 0, tickets: 0 });
+    expect(tagBefore.usageCounts).toEqual({ projects: 0, milestones: 0, tasks: 0, tickets: 0, documents: 0 });
 
     await supertest(app.server).put(`/api/projects/${project.id}/tags`).send({ tagIds: [tag.id] }).expect(200);
 
     const after = await supertest(app.server).get("/api/tags").expect(200);
     const tagAfter = after.body.find((t: { id: number }) => t.id === tag.id);
-    expect(tagAfter.usageCounts).toMatchObject({ projects: 1, tasks: 0, milestones: 0, tickets: 0 });
+    expect(tagAfter.usageCounts).toMatchObject({ projects: 1, tasks: 0, milestones: 0, tickets: 0, documents: 0 });
   });
 
   it("PUT /api/tasks/:id/tags weist Tags zu und ersetzt vollstaendig", async () => {
@@ -257,7 +277,7 @@ describe("Tags API", () => {
     const res = await supertest(app.server).get("/api/tags").expect(200);
     const found = res.body.find((t: { id: number }) => t.id === tag.id);
 
-    expect(found.usageCounts).toEqual({ projects: 1, milestones: 1, tasks: 1, tickets: 1 });
+    expect(found.usageCounts).toEqual({ projects: 1, milestones: 1, tasks: 1, tickets: 1, documents: 0 });
   });
 
   it("PATCH /api/tags/:id mit unbekannter ID gibt 404 zurueck", async () => {
@@ -298,6 +318,26 @@ describe("Tags API", () => {
       const all = await supertest(app.server).get("/api/tags").expect(200);
       const persisted = (all.body as Array<{ id: number; domain: string }>).find((tag) => tag.id === res.body.id);
       expect(persisted?.domain).toBe("dms");
+    });
+
+    it("GET /api/tags zählt reale DMS-Dokumentzuordnungen in usageCounts", async () => {
+      const activeTag = (await supertest(app.server).post("/api/tags").send({ name: "dms-aktiv", domain: "dms" }).expect(201)).body as { id: number };
+      const orphanTag = (await supertest(app.server).post("/api/tags").send({ name: "dms-verwaist", domain: "dms" }).expect(201)).body as { id: number };
+      const document = await attachmentRepository.create(testDb.db, {
+        originalName: "tag-nutzung.txt",
+        filename: "tag-nutzung.txt",
+        mimetype: "text/plain",
+        size: 1,
+        isInDocumentLibrary: true
+      });
+
+      await setDocumentTags(testDb.db, document.id, [activeTag.id], document.version);
+
+      const response = await supertest(app.server).get("/api/tags?domain=dms").expect(200);
+      const rows = response.body as Array<{ id: number; usageCounts: { projects: number; milestones: number; tasks: number; tickets: number; documents: number } }>;
+
+      expect(rows.find((tag) => tag.id === activeTag.id)?.usageCounts).toEqual({ projects: 0, milestones: 0, tasks: 0, tickets: 0, documents: 1 });
+      expect(rows.find((tag) => tag.id === orphanTag.id)?.usageCounts).toEqual({ projects: 0, milestones: 0, tasks: 0, tickets: 0, documents: 0 });
     });
 
     it("POST /api/tags mit ungültiger domain gibt 400 zurueck", async () => {

@@ -684,6 +684,7 @@ export interface TagUsageCounts {
   milestones: number;
   tasks: number;
   tickets: number;
+  documents: number;
 }
 
 export type TagDomain = "pm" | "dms";
