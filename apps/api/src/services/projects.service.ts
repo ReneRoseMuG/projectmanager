@@ -17,6 +17,7 @@ import {
   type JournalFieldDefinition
 } from "./journal.service.js";
 import { deleteMilestoneOwnedSupportForProjectIds } from "./milestones.service.js";
+import { deleteParentAttachmentsForOwners } from "./attachments.service.js";
 import { deleteBacklogItemCommentsForIds, deleteProjectCommentsForIds } from "./comments.service.js";
 import { deleteProjectNotesForIds } from "./notes.service.js";
 import { getProjectTags, getProjectTagsMap } from "./tags.service.js";
@@ -313,6 +314,7 @@ export async function deleteProject(database: DbClient, id: number, actor?: Jour
     throw notFound(`Project with id ${id} not found`);
   }
 
+  await deleteParentAttachmentsForOwners(database, [{ type: "project", id }]);
   await deleteMilestoneOwnedSupportForProjectIds(database, [id]);
 
   await deleteProjectNotesForIds(database, [id]);

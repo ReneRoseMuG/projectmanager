@@ -2,7 +2,7 @@ import type { AttachmentFolder } from "@taskmanager/shared-types";
 import { eq, inArray, sql } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
 import { firstRow } from "../db/query-utils.js";
-import { attachmentFolders, folderAttachments, projects } from "../db/schema.js";
+import { attachmentFolders, folderAttachments } from "../db/schema.js";
 import { attachmentFolderRepository, type AttachmentFolderRecord } from "../repositories/attachment-folder.repository.js";
 import { attachmentRepository } from "../repositories/attachment.repository.js";
 import { assertVersion } from "../repositories/base.repository.js";
@@ -18,7 +18,6 @@ function mapFolder(record: AttachmentFolderRecord, usage?: FolderUsage): Attachm
   return {
     id: record.id,
     parentId: record.parentId,
-    projectId: record.projectId,
     name: record.name,
     childCount: usage?.childCount ?? 0,
     directDocumentCount: usage?.directDocumentCount ?? 0,
@@ -48,13 +47,6 @@ async function ensureFolderExists(database: DbSession, id: number): Promise<Atta
     throw notFound(`Attachment folder with id ${id} not found`);
   }
   return folder;
-}
-
-async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {
-  const project = firstRow(await database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)));
-  if (!project) {
-    throw notFound(`Project with id ${projectId} not found`);
-  }
 }
 
 async function assertNameUniquePerLevel(
@@ -171,7 +163,7 @@ export async function listFolderAndDescendantIds(database: DbClient, folderId: n
 
 export async function createAttachmentFolder(
   database: DbClient,
-  input: { name?: string; parentId?: number | null; projectId?: number | null },
+  input: { name?: string; parentId?: number | null },
   userId?: number
 ): Promise<AttachmentFolder> {
   const name = cleanName(input.name);
@@ -179,13 +171,10 @@ export async function createAttachmentFolder(
   if (parentId !== null) {
     await ensureFolderExists(database, parentId);
   }
-  if (input.projectId != null) {
-    await ensureProjectExists(database, input.projectId);
-  }
   await assertNameUniquePerLevel(database, parentId, name);
   const created = await attachmentFolderRepository.create(
     database,
-    { name, parentId, projectId: input.projectId ?? null },
+    { name, parentId },
     userId
   );
   return mapFolder(created);
@@ -194,12 +183,12 @@ export async function createAttachmentFolder(
 export async function updateAttachmentFolder(
   database: DbClient,
   id: number,
-  input: { name?: string; parentId?: number | null; projectId?: number | null; expectedVersion: number },
+  input: { name?: string; parentId?: number | null; expectedVersion: number },
   userId?: number
 ): Promise<AttachmentFolder> {
   const current = await ensureFolderExists(database, id);
   assertVersion(current.version, input.expectedVersion);
-  const data: { name?: string; parentId?: number | null; projectId?: number | null } = {};
+  const data: { name?: string; parentId?: number | null } = {};
 
   const nextParentId = input.parentId !== undefined ? input.parentId : current.parentId;
   if (input.parentId !== undefined && input.parentId !== current.parentId) {
@@ -209,12 +198,6 @@ export async function updateAttachmentFolder(
   }
   if (input.name !== undefined) {
     data.name = cleanName(input.name);
-  }
-  if (input.projectId !== undefined) {
-    if (input.projectId !== null) {
-      await ensureProjectExists(database, input.projectId);
-    }
-    data.projectId = input.projectId;
   }
   if (Object.keys(data).length === 0) {
     throw badRequest("Es wurden keine Änderungen übergeben.");

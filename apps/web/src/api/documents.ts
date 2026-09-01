@@ -100,12 +100,12 @@ export async function setDocumentFolder(id: number, folderId: number | null, exp
   return api.put(`documents/${id}/folder`, { json: { folderId, expectedVersion } }).json<Attachment>();
 }
 
-export async function removeDocumentFromLibrary(id: number, expectedVersion: number): Promise<void> {
-  await api.delete(`documents/${id}/library?expectedVersion=${expectedVersion}`);
+export async function deleteDocumentPermanently(id: number, expectedVersion: number): Promise<void> {
+  await api.delete(`documents/${id}?expectedVersion=${expectedVersion}`);
 }
 
-export async function deleteDocumentPermanently(id: number, expectedVersion: number): Promise<void> {
-  await api.delete(`attachments/${id}?expectedVersion=${expectedVersion}`);
+export async function openDocument(id: number): Promise<void> {
+  await api.post(`documents/${id}/open`);
 }
 
 export async function getDocumentDuplicateCheck(): Promise<DocumentDuplicateCheck> {
@@ -124,14 +124,13 @@ export async function getAttachmentFolders(): Promise<AttachmentFolder[]> {
 export async function createAttachmentFolder(input: {
   name: string;
   parentId?: number | null;
-  projectId?: number | null;
 }): Promise<AttachmentFolder> {
   return api.post("attachment-folders", { json: input }).json<AttachmentFolder>();
 }
 
 export async function updateAttachmentFolder(
   id: number,
-  input: { name?: string; parentId?: number | null; projectId?: number | null; expectedVersion: number }
+  input: { name?: string; parentId?: number | null; expectedVersion: number }
 ): Promise<AttachmentFolder> {
   return api.patch(`attachment-folders/${id}`, { json: input }).json<AttachmentFolder>();
 }

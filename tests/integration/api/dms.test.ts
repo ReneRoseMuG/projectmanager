@@ -1,6 +1,6 @@
 /**
  * Test Scope:
- * Document Management System (MS-75) - API, Berechtigungen und geaendertes Orphan-Verhalten.
+ * Globales Document Management System - API, Berechtigungen, Sammlungen, Tags und explizite Parent-Links.
  *
  * Test-Ebene:
  * - Integration
@@ -18,19 +18,17 @@
  * - Temp-DB pro Lauf (createTestDb), truncateAll in beforeEach, Temp-UPLOAD_DIR unter os.tmpdir().
  *
  * Abgedeckte Regeln:
- * - Alle DMS-Routen laufen unter der Ressource attachments (401 ohne Session, 403 ohne Recht).
- * - Kategorie-CRUD mit Namens-Eindeutigkeit (409) und Versionskonflikt (409).
+ * - Alle DMS-Routen laufen unter der eigenständigen Ressource documents (401 ohne Session, 403 ohne Recht).
  * - Sammlung-CRUD mit Zyklusschutz (400) und Loeschschutz bei Unter-Sammlungen (409 -> recursive).
  * - Dokument in Sammlung einsortieren/entfernen + gefilterte Bibliotheks-Abfrage (mit Gegenbeispiel).
  * - Owner-loser Direktupload landet unter Nicht einsortiert.
  * - Importvertrag akzeptiert ohne Sammlung oder genau eine Sammlung plus DMS-Tags und lehnt
  *   unbekannte Ziele, Mehrfachsammlungen sowie Kategorieparameter vor der Dateianlage ab.
- * - Fachobjekt-gebundenes, aber sammlungsloses Dokument erscheint ebenfalls unter Nicht einsortiert (nur die Sammlung entscheidet).
+ * - Ein explizit mit einem Fachobjekt verknüpftes, sammlungsloses Dokument erscheint weiterhin unter Nicht einsortiert.
  * - Geschuetzte System-Labels sind ueber setDocumentTags nicht setzbar (400).
  * - Bulk-Tag-Ergaenzung bewahrt vorhandene Tags, ist idempotent und rollt bei Versionskonflikten atomar zurueck.
  * - Manueller SHA-256-Duplikat-Check mit sichtbarem Scope, Dateifehlern, stabilen Gruppen und Schreibrecht.
- * - Orphan-Verhalten: Anhaenge werden beim Loeschen des Fachobjekts NICHT geloescht, sondern Nicht einsortiert.
- * - Verwaister Owner-Link (Fachobjekt bereits geloescht) blockiert das Loeschen des Dokuments nicht (204 statt 404).
+ * - Das Löschen eines Fachobjekts entfernt nur dessen DMS-Link; das globale Dokument bleibt bestehen.
  *
  * Fehlerfaelle:
  * - 401 ohne Session, 403 Reader-Negativfall, 409 Dublette/Versionskonflikt/Loeschschutz, 400 Zyklus/System-Label.
@@ -155,7 +153,7 @@ describe("DMS API", () => {
     const tag = await admin.post("/api/tags").send({ name: "Custom Role Tag", domain: "dms" }).expect(201);
     const role = await admin
       .post("/api/admin/roles")
-      .send({ key: "dms_read_only", label: "DMS nur lesen", permissions: [{ resource: "attachments", action: "read" }] })
+      .send({ key: "dms_read_only", label: "DMS nur lesen", permissions: [{ resource: "documents", action: "read" }] })
       .expect(201);
     await admin
       .post("/api/admin/users")
@@ -166,13 +164,12 @@ describe("DMS API", () => {
 
     await custom.get("/api/documents").expect(200);
     await custom.get(`/api/documents/${document.id}`).expect(200);
-    await custom.get(`/api/attachments/${document.id}/content`).expect(200);
+    await custom.get(`/api/documents/${document.id}/content`).expect(200);
     const scan = await custom.post("/api/documents/duplicate-check").expect(403);
     const move = await custom.put(`/api/documents/${document.id}/folder`).send({ folderId: folder.body.id, expectedVersion: document.version }).expect(403);
     const tags = await custom.put(`/api/documents/${document.id}/tags`).send({ tagIds: [tag.body.id], expectedVersion: document.version }).expect(403);
-    const library = await custom.delete(`/api/documents/${document.id}/library?expectedVersion=${document.version}`).expect(403);
-    const permanent = await custom.delete(`/api/attachments/${document.id}?expectedVersion=${document.version}`).expect(403);
-    for (const response of [scan, move, tags, library, permanent]) {
+    const permanent = await custom.delete(`/api/documents/${document.id}?expectedVersion=${document.version}`).expect(403);
+    for (const response of [scan, move, tags, permanent]) {
       expect(response.body).toMatchObject({ error: "FORBIDDEN", statusCode: 403 });
     }
     expect((await admin.get(`/api/documents/${document.id}`).expect(200)).body).toMatchObject({ version: document.version, folders: [], tags: [] });
@@ -261,13 +258,12 @@ describe("DMS API", () => {
 
   it("schützt Sammlung und Tags gegen veraltete Versionen und journalisiert die DMS-Lebenszyklen unterscheidbar", async () => {
     const admin = await loginAdmin();
-    const project = await admin.post("/api/projects").send({ name: "Journal Owner", status: "active", color: "#6366f1" }).expect(201);
     const folder = await admin.post("/api/attachment-folders").send({ name: "Journal Sammlung" }).expect(201);
     const otherFolder = await admin.post("/api/attachment-folders").send({ name: "Andere Sammlung" }).expect(201);
     const tag = await admin.post("/api/tags").send({ name: "Journal Tag", domain: "dms" }).expect(201);
     const otherTag = await admin.post("/api/tags").send({ name: "Anderer Tag", domain: "dms" }).expect(201);
     const upload = await admin
-      .post(`/api/projects/${project.body.id}/attachments?libraryVisibility=document-library`)
+      .post("/api/documents")
       .attach("file", Buffer.from("Journal"), { filename: "journal.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -296,36 +292,22 @@ describe("DMS API", () => {
       version: tagged.body.version
     });
 
-    await admin
-      .delete(`/api/projects/${project.body.id}/attachments/${upload.body.id}?expectedVersion=${tagged.body.version}`)
-      .expect(204);
-    const unlinked = await admin.get(`/api/documents/${upload.body.id}`).expect(200);
-    await admin.delete(`/api/attachments/${upload.body.id}?expectedVersion=${unlinked.body.version}`).expect(204);
+    await admin.delete(`/api/documents/${upload.body.id}?expectedVersion=${tagged.body.version}`).expect(204);
 
     const firstJournal = await admin.get(`/api/journal/objects/attachment/${upload.body.id}`).expect(200);
     const summaries = firstJournal.body.entries.map((entry: { summary: string }) => entry.summary);
     expect(summaries).toEqual(expect.arrayContaining([
       expect.stringContaining("wurde von Nicht einsortiert nach Journal Sammlung verschoben"),
       expect.stringContaining("erhielt eine neue Tag-Zuordnung"),
-      expect.stringContaining("wurde von Projekt"),
       expect.stringContaining("wurde gelöscht")
     ]));
     expect(firstJournal.body.entries).toEqual(expect.arrayContaining([
       expect.objectContaining({ operation: "update", changes: [expect.objectContaining({ fieldKey: "folderId" })] }),
       expect.objectContaining({ operation: "update", changes: [expect.objectContaining({ fieldKey: "tags" })] }),
-      expect.objectContaining({ operation: "unlink" }),
       expect.objectContaining({ operation: "delete" })
     ]));
 
-    const removable = await admin
-      .post(`/api/projects/${project.body.id}/attachments?libraryVisibility=document-library`)
-      .attach("file", Buffer.from("Bibliothek"), { filename: "bibliothek-entfernen.txt", contentType: "text/plain" })
-      .expect(201);
-    await admin.delete(`/api/documents/${removable.body.id}/library?expectedVersion=${removable.body.version}`).expect(204);
-    const secondJournal = await admin.get(`/api/journal/objects/attachment/${removable.body.id}`).expect(200);
-    expect(secondJournal.body.entries).toEqual(expect.arrayContaining([
-      expect.objectContaining({ operation: "update", summary: expect.stringContaining("aus der Dokumentenbibliothek entfernt") })
-    ]));
+    await admin.delete(`/api/documents/${upload.body.id}/library?expectedVersion=${tagged.body.version}`).expect(404);
   });
 
   it("filtert und paginiert vollständig in SQL mit UND-Semantik für mehrere Tags", async () => {
@@ -391,14 +373,14 @@ describe("DMS API", () => {
       while (inserted < target) {
         const batchSize = Math.min(500, target - inserted);
         const now = new Date().toISOString();
-        const placeholders = Array.from({ length: batchSize }, () => "(?, ?, 'text/plain', 1, true, ?, ?)").join(", ");
-        const values: Array<string | number | boolean> = [];
+        const placeholders = Array.from({ length: batchSize }, () => "(?, ?, 'text/plain', 1, 'document', ?, ?)").join(", ");
+        const values: Array<string | number> = [];
         for (let offset = 0; offset < batchSize; offset += 1) {
           const index = inserted + offset;
           values.push(`last-${index}.txt`, `last-${index}.txt`, now, now);
         }
         await testDb.pool.query(
-          `INSERT INTO attachments (original_name, filename, mimetype, size, is_in_document_library, created_at, updated_at) VALUES ${placeholders}`,
+          `INSERT INTO attachments (original_name, filename, mimetype, size, kind, created_at, updated_at) VALUES ${placeholders}`,
           values
         );
         inserted += batchSize;
@@ -429,7 +411,7 @@ describe("DMS API", () => {
     const sameNameDifferentContent = await uploadDocument(admin, "inhalt-a.txt", undefined, "abweichender Inhalt");
     const hiddenProject = await admin.post("/api/projects").send({ name: "Verstecktes Duplikat", status: "active", color: "#6366f1" }).expect(201);
     const hiddenUpload = await admin
-      .post(`/api/projects/${hiddenProject.body.id}/attachments?libraryVisibility=attachment-only`)
+      .post(`/api/projects/${hiddenProject.body.id}/attachments`)
       .attach("file", Buffer.from("identischer Inhalt"), { filename: "versteckt.txt", contentType: "text/plain" })
       .expect(201);
     const hidden = hiddenUpload.body as { id: number };
@@ -458,26 +440,27 @@ describe("DMS API", () => {
     expect(repeated.groups[0]?.documents.map((document) => document.id)).toEqual([first.id, second.id]);
     await admin.get(`/api/documents/${hidden.id}`).expect(404);
     const hiddenOwnerAttachments = await admin.get(`/api/projects/${hiddenProject.body.id}/attachments`).expect(200);
-    expect(hiddenOwnerAttachments.body).toContainEqual(expect.objectContaining({ id: hidden.id, isInDocumentLibrary: false }));
+    expect(hiddenOwnerAttachments.body).toContainEqual(expect.objectContaining({ id: hidden.id, kind: "parent_attachment", isInDocumentLibrary: false }));
   });
 
-  it("fuehrt ein an ein Fachobjekt gebundenes, sammlungsloses Dokument als Nicht einsortiert", async () => {
+  it("führt ein explizit verknüpftes, sammlungsloses DMS-Dokument weiterhin als Nicht einsortiert", async () => {
     const admin = await loginAdmin();
     const project = await admin.post("/api/projects").send({ name: "DMS-Projekt", status: "active", color: "#6366f1" }).expect(201);
-    const upload = await admin
-      .post(`/api/projects/${project.body.id}/attachments?libraryVisibility=document-library`)
-      .attach("file", Buffer.from("gebunden, aber ohne Sammlung"), { filename: "gebunden.txt", contentType: "text/plain" })
+    const upload = await uploadDocument(admin, "gebunden.txt", undefined, "verknüpft, aber ohne Sammlung");
+    await admin
+      .post(`/api/projects/${project.body.id}/document-links`)
+      .send({ documentId: upload.id })
       .expect(201);
 
-    // Owner-gebunden, aber in keiner Sammlung -> erscheint unter Nicht einsortiert.
+    // Parent-verknüpft, aber in keiner globalen Sammlung -> erscheint unter Nicht einsortiert.
     const unsorted = await admin.get("/api/documents?folder=unsorted").expect(200);
-    expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(upload.body.id);
+    expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(upload.id);
 
-    // Sobald es in eine Sammlung einsortiert wird, verschwindet es dort -> die Sammlung entscheidet, nicht der Owner.
+    // Sobald es in eine Sammlung einsortiert wird, verschwindet es dort -> die Sammlung entscheidet, nicht der Parent-Link.
     const folder = await admin.post("/api/attachment-folders").send({ name: "Vertraege" }).expect(201);
-    await setDocumentFolder(admin, upload.body, folder.body.id);
+    await setDocumentFolder(admin, upload, folder.body.id);
     const afterSort = await admin.get("/api/documents?folder=unsorted").expect(200);
-    expect((afterSort.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(upload.body.id);
+    expect((afterSort.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(upload.id);
   });
 
   it("wendet für Web, Windows-Importer und MCP denselben singulären DMS-Importvertrag an", async () => {
@@ -618,109 +601,72 @@ describe("DMS API", () => {
       .expect(400);
   });
 
-  it("erzwingt beim Owner-Upload die explizite Bibliotheksentscheidung", async () => {
+  it("speichert Owner-Uploads immer exklusiv und importiert DMS-Dokumente nur über /documents", async () => {
     const admin = await loginAdmin();
     const project = await admin.post("/api/projects").send({ name: "Upload-Sichtbarkeit", status: "active", color: "#6366f1" }).expect(201);
 
-    await admin
+    const parentAttachment = await admin
       .post(`/api/projects/${project.body.id}/attachments`)
-      .attach("file", Buffer.from("ohne Auswahl"), { filename: "ohne-auswahl.txt", contentType: "text/plain" })
-      .expect(400);
-
-    const attachmentOnly = await admin
-      .post(`/api/projects/${project.body.id}/attachments?libraryVisibility=attachment-only`)
-      .attach("file", Buffer.from("nur Anhang"), { filename: "nur-anhang.txt", contentType: "text/plain" })
+      .attach("file", Buffer.from("exklusiver Anhang"), { filename: "nur-anhang.txt", contentType: "text/plain" })
       .expect(201);
-    expect(attachmentOnly.body).toMatchObject({ isInDocumentLibrary: false });
-    expect(attachmentOnly.body.contentHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(parentAttachment.body).toMatchObject({ kind: "parent_attachment", isInDocumentLibrary: false });
+    expect(parentAttachment.body.contentHash).toMatch(/^[a-f0-9]{64}$/);
 
     const ownerAttachments = await admin.get(`/api/projects/${project.body.id}/attachments`).expect(200);
-    expect((ownerAttachments.body as Array<{ id: number }>).map((item) => item.id)).toContain(attachmentOnly.body.id);
-    const libraryAfterAttachmentOnly = await admin.get("/api/documents").expect(200);
-    expect((libraryAfterAttachmentOnly.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(attachmentOnly.body.id);
-    await admin.get(`/api/documents/${attachmentOnly.body.id}`).expect(404);
+    expect((ownerAttachments.body as Array<{ id: number }>).map((item) => item.id)).toContain(parentAttachment.body.id);
+    const libraryAfterParentUpload = await admin.get("/api/documents").expect(200);
+    expect((libraryAfterParentUpload.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(parentAttachment.body.id);
+    await admin.get(`/api/documents/${parentAttachment.body.id}`).expect(404);
 
-    const libraryAttachment = await admin
+    const legacyQueryUpload = await admin
       .post(`/api/projects/${project.body.id}/attachments?libraryVisibility=document-library`)
-      .attach("file", Buffer.from("auch Bibliothek"), { filename: "bibliothek.txt", contentType: "text/plain" })
+      .attach("file", Buffer.from("bleibt Parent"), { filename: "legacy-query.txt", contentType: "text/plain" })
       .expect(201);
-    expect(libraryAttachment.body).toMatchObject({ isInDocumentLibrary: true });
-    expect(libraryAttachment.body.url).toBe(`/api/attachments/${libraryAttachment.body.id}/content`);
-
-    const library = await admin.get("/api/documents").expect(200);
-    expect((library.body as Array<{ id: number }>).map((item) => item.id)).toContain(libraryAttachment.body.id);
+    expect(legacyQueryUpload.body).toMatchObject({ kind: "parent_attachment", isInDocumentLibrary: false });
+    expect((await admin.get("/api/documents").expect(200)).body).not.toContainEqual(expect.objectContaining({ id: legacyQueryUpload.body.id }));
 
     const direct = await uploadDocument(admin, "direkt.txt");
     const directDetail = await admin.get(`/api/documents/${direct.id}`).expect(200);
-    expect(directDetail.body).toMatchObject({ isInDocumentLibrary: true });
-    await admin.delete(`/api/documents/${direct.id}/library?expectedVersion=${directDetail.body.version}`).expect(409);
+    expect(directDetail.body).toMatchObject({ kind: "document", isInDocumentLibrary: true, url: `/api/documents/${direct.id}/content` });
+    await admin.delete(`/api/documents/${direct.id}/library?expectedVersion=${directDetail.body.version}`).expect(404);
     await admin.get(`/api/documents/${direct.id}`).expect(200);
   });
 
-  it("trennt Owner-Unlink, Bibliotheksentfernung und endgültiges Löschen versionsgesichert", async () => {
+  it("trennt DMS-Link-Lösen und endgültiges Dokumentlöschen versionsgesichert", async () => {
     const admin = await loginAdmin();
     const reader = await loginReader();
-    const firstProject = await admin.post("/api/projects").send({ name: "Owner A", status: "active", color: "#6366f1" }).expect(201);
-    const secondProject = await admin.post("/api/projects").send({ name: "Owner B", status: "active", color: "#6366f1" }).expect(201);
-    const hidden = await admin
-      .post(`/api/projects/${firstProject.body.id}/attachments?libraryVisibility=attachment-only`)
-      .attach("file", Buffer.from("mehrere Owner"), { filename: "mehrere-owner.txt", contentType: "text/plain" })
+    const project = await admin.post("/api/projects").send({ name: "Link Owner", status: "active", color: "#6366f1" }).expect(201);
+    const document = await uploadDocument(admin, "verknuepft.txt", undefined, "DMS bleibt erhalten");
+    const linked = await admin
+      .post(`/api/projects/${project.body.id}/document-links`)
+      .send({ documentId: document.id })
       .expect(201);
-    await testDb.pool.execute("INSERT INTO project_attachments (project_id, attachment_id) VALUES (?, ?)", [
-      secondProject.body.id,
-      hidden.body.id
-    ]);
 
     await reader
-      .delete(`/api/projects/${firstProject.body.id}/attachments/${hidden.body.id}?expectedVersion=${hidden.body.version}`)
+      .delete(`/api/projects/${project.body.id}/document-links/${linked.body.id}?expectedVersion=${linked.body.version}`)
       .expect(403);
     await admin
-      .delete(`/api/projects/${firstProject.body.id}/attachments/${hidden.body.id}?expectedVersion=${hidden.body.version}`)
-      .expect(204);
-
-    const firstOwnerList = await admin.get(`/api/projects/${firstProject.body.id}/attachments`).expect(200);
-    const secondOwnerList = await admin.get(`/api/projects/${secondProject.body.id}/attachments`).expect(200);
-    expect((firstOwnerList.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(hidden.body.id);
-    const afterFirstUnlink = (secondOwnerList.body as Array<{ id: number; version: number; isInDocumentLibrary: boolean }>).find(
-      (item) => item.id === hidden.body.id
-    );
-    expect(afterFirstUnlink).toMatchObject({ version: hidden.body.version + 1, isInDocumentLibrary: false });
-
-    await admin
-      .delete(`/api/projects/${secondProject.body.id}/attachments/${hidden.body.id}?expectedVersion=${afterFirstUnlink?.version}`)
+      .delete(`/api/projects/${project.body.id}/document-links/${linked.body.id}?expectedVersion=${linked.body.version + 1}`)
       .expect(409);
     await admin
-      .delete(`/api/projects/${secondProject.body.id}/attachments/${hidden.body.id}?expectedVersion=${afterFirstUnlink?.version}&orphanAction=add-to-library`)
+      .delete(`/api/projects/${project.body.id}/document-links/${linked.body.id}?expectedVersion=${linked.body.version}`)
       .expect(204);
-    const promoted = await admin.get(`/api/documents/${hidden.body.id}`).expect(200);
-    expect(promoted.body).toMatchObject({ owners: [], isInDocumentLibrary: true, version: hidden.body.version + 2 });
+    await admin.get(`/api/projects/${project.body.id}/document-links`).expect(200, []);
+    const surviving = await admin.get(`/api/documents/${document.id}`).expect(200);
+    expect(surviving.body).toMatchObject({ id: document.id, kind: "document", version: document.version });
+    await admin.get(`/api/documents/${document.id}/content`).expect(200, "DMS bleibt erhalten");
+    await fs.access(path.join(uploadDir, document.filename));
 
     await reader
-      .delete(`/api/attachments/${hidden.body.id}?expectedVersion=${promoted.body.version}`)
+      .delete(`/api/documents/${document.id}?expectedVersion=${surviving.body.version}`)
       .expect(403);
     await admin
-      .delete(`/api/attachments/${hidden.body.id}?expectedVersion=${promoted.body.version - 1}`)
+      .delete(`/api/documents/${document.id}?expectedVersion=${surviving.body.version + 1}`)
       .expect(409);
-    await fs.access(path.join(uploadDir, hidden.body.filename));
     await admin
-      .delete(`/api/attachments/${hidden.body.id}?expectedVersion=${promoted.body.version}`)
+      .delete(`/api/documents/${document.id}?expectedVersion=${surviving.body.version}`)
       .expect(204);
-    await expect(fs.access(path.join(uploadDir, hidden.body.filename))).rejects.toThrow();
-
-    const visible = await admin
-      .post(`/api/projects/${firstProject.body.id}/attachments?libraryVisibility=document-library`)
-      .attach("file", Buffer.from("nur Sichtbarkeit ändern"), { filename: "sichtbar.txt", contentType: "text/plain" })
-      .expect(201);
-    await reader
-      .delete(`/api/documents/${visible.body.id}/library?expectedVersion=${visible.body.version}`)
-      .expect(403);
-    await admin
-      .delete(`/api/documents/${visible.body.id}/library?expectedVersion=${visible.body.version}`)
-      .expect(204);
-    await admin.get(`/api/documents/${visible.body.id}`).expect(404);
-    const stillOwned = await admin.get(`/api/projects/${firstProject.body.id}/attachments`).expect(200);
-    expect(stillOwned.body).toContainEqual(expect.objectContaining({ id: visible.body.id, isInDocumentLibrary: false }));
-    await fs.access(path.join(uploadDir, visible.body.filename));
+    await expect(fs.access(path.join(uploadDir, document.filename))).rejects.toThrow();
   });
 
   // --- System-Label-Schutz ---
@@ -734,47 +680,42 @@ describe("DMS API", () => {
     await admin.put(`/api/documents/${doc.id}/tags`).send({ tagIds: [tag.body.id], expectedVersion: doc.version }).expect(400);
   });
 
-  // --- Orphan-Verhalten (Kernnachweis der Verhaltensaenderung) ---
+  // --- Parent-Link-Lebenszyklus ---
 
-  it("behaelt Anhaenge beim Loeschen des Fachobjekts und fuehrt sie als Nicht einsortiert", async () => {
+  it("behält ein DMS-Dokument beim Löschen des verknüpften Fachobjekts als Nicht einsortiert", async () => {
     const admin = await loginAdmin();
     const project = await admin.post("/api/projects").send({ name: "DMS-Projekt", status: "active", color: "#6366f1" }).expect(201);
-    const upload = await admin
-      .post(`/api/projects/${project.body.id}/attachments?libraryVisibility=document-library`)
-      .attach("file", Buffer.from("bleibt erhalten"), { filename: "anhang.txt", contentType: "text/plain" })
-      .expect(201);
+    const upload = await uploadDocument(admin, "dms-link.txt", undefined, "bleibt erhalten");
+    await admin.post(`/api/projects/${project.body.id}/document-links`).send({ documentId: upload.id }).expect(201);
 
-    // Projekt loeschen
     await admin.delete(`/api/projects/${project.body.id}`).expect(204);
 
-    // Anhang existiert weiterhin (frueher waere er hier geloescht worden)
-    const stillThere = await admin.get(`/api/documents/${upload.body.id}`).expect(200);
-    expect(stillThere.body.id).toBe(upload.body.id);
+    const stillThere = await admin.get(`/api/documents/${upload.id}`).expect(200);
+    expect(stillThere.body.id).toBe(upload.id);
     expect(stillThere.body.owners).toEqual([]);
 
-    // und er erscheint als Nicht einsortiert
     const unsorted = await admin.get("/api/documents?folder=unsorted").expect(200);
-    expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(upload.body.id);
+    expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(upload.id);
   });
 
-  it("loescht ein Dokument trotz verwaistem Owner-Link (kein 404)", async () => {
-    // Reproduziert den Produktionsfehler: Wird das Fachobjekt eines Owner-Links geloescht, ohne
-    // dass die Junction-Zeile mitentfernt wird (in der Prod-DB mangels FK-Cascade beobachtet),
-    // darf das Loeschen des Dokuments NICHT mit 404 abbrechen. Der verwaiste Link wird technisch
-    // injiziert (FK-Checks kurz aus), da die Test-DB die Cascade korrekt anwendet.
+  it("löscht ein Dokument trotz technisch verwaistem Parent-Dokumentlink", async () => {
     const admin = await loginAdmin();
     const doc = await uploadDocument(admin, "verwaist.txt");
 
     const conn = await testDb.pool.getConnection();
     try {
       await conn.query("SET FOREIGN_KEY_CHECKS=0");
-      await conn.execute("INSERT INTO wiki_page_attachments (wiki_page_id, attachment_id) VALUES (?, ?)", [999999, doc.id]);
-      await conn.query("SET FOREIGN_KEY_CHECKS=1");
+      const now = new Date().toISOString();
+      await conn.execute(
+        "INSERT INTO project_document_links (owner_id, document_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+        [999999, doc.id, now, now]
+      );
     } finally {
+      await conn.query("SET FOREIGN_KEY_CHECKS=1");
       conn.release();
     }
 
-    await admin.delete(`/api/attachments/${doc.id}?expectedVersion=${doc.version}`).expect(204);
+    await admin.delete(`/api/documents/${doc.id}?expectedVersion=${doc.version}`).expect(204);
     await admin.get(`/api/documents/${doc.id}`).expect(404);
   });
 });

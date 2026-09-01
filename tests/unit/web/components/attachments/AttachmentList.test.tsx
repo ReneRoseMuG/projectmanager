@@ -35,7 +35,12 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
-import type { Attachment, AttachmentLocalFolder } from "@taskmanager/shared-types";
+import type {
+  Attachment,
+  AttachmentLocalFolder,
+  ParentAttachmentFolder,
+  ParentDocumentLink
+} from "@taskmanager/shared-types";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttachmentList } from "../../../../../apps/web/src/components/attachments/AttachmentList";
@@ -43,8 +48,8 @@ import { AttachmentList } from "../../../../../apps/web/src/components/attachmen
 const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   showToast: vi.fn(),
-  createFolder: vi.fn(),
-  localEntries: vi.fn()
+  localEntries: vi.fn(),
+  documents: [] as unknown[]
 }));
 
 vi.mock("../../../../../apps/web/src/api/client", () => ({
@@ -57,19 +62,9 @@ vi.mock("../../../../../apps/web/src/hooks/useAttachments", () => ({
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/useDocuments", () => ({
-  useFolders: () => ({
-    folders: [
-      {
-        id: 11,
-        name: "Freigaben",
-        parentId: null,
-        sortOrder: 0,
-        version: 1,
-        createdAt: "2026-07-29T10:00:00.000Z",
-        updatedAt: "2026-07-29T10:00:00.000Z"
-      }
-    ],
-    createFolder: mocks.createFolder
+  useDocumentLibrary: () => ({
+    documents: mocks.documents,
+    loading: false
   })
 }));
 
@@ -91,17 +86,55 @@ vi.mock("../../../../../apps/web/src/components/attachments/AttachmentPreview", 
 
 const attachment: Attachment = {
   id: 42,
+  kind: "parent_attachment",
   owners: [{ type: "project", id: 7 }],
   originalName: "planung.pdf",
+  displayName: null,
+  description: null,
   filename: "generated-planung.pdf",
   mimetype: "application/pdf",
   size: 2048,
   url: "/api/attachments/42/content",
   contentHash: null,
   isInDocumentLibrary: false,
+  parentFolderId: null,
   createdAt: "2026-07-29T10:00:00.000Z",
   updatedAt: "2026-07-29T10:00:00.000Z",
   version: 3
+};
+
+const parentFolder: ParentAttachmentFolder = {
+  id: 11,
+  owner: { type: "project", id: 7 },
+  name: "Freigaben",
+  parentId: null,
+  childCount: 0,
+  directEntryCount: 0,
+  version: 1,
+  createdAt: "2026-07-29T10:00:00.000Z",
+  updatedAt: "2026-07-29T10:00:00.000Z"
+};
+
+const document: Attachment = {
+  ...attachment,
+  id: 84,
+  kind: "document",
+  owners: [],
+  originalName: "dms-vertrag.pdf",
+  filename: "generated-dms-vertrag.pdf",
+  url: "/api/documents/84/content",
+  isInDocumentLibrary: true,
+  parentFolderId: undefined
+};
+
+const documentLink: ParentDocumentLink = {
+  id: 91,
+  owner: { type: "project", id: 7 },
+  document,
+  folder: null,
+  version: 2,
+  createdAt: "2026-07-29T10:00:00.000Z",
+  updatedAt: "2026-07-29T10:00:00.000Z"
 };
 
 const localFolder: AttachmentLocalFolder = {
@@ -119,17 +152,25 @@ function buildManager(
 ): ComponentProps<typeof AttachmentList>["manager"] {
   return {
     attachments: [attachment],
+    parentFolders: [parentFolder],
+    documentLinks: [documentLink],
+    canReadDocuments: true,
     localFolders: [localFolder],
     downloadArchive: vi.fn().mockResolvedValue(new Blob()),
-    bulkUnlinkAttachments: vi.fn().mockResolvedValue(undefined),
     bulkDeleteAttachments: vi.fn().mockResolvedValue(undefined),
-    bulkSetAttachmentFolder: vi.fn().mockResolvedValue(undefined),
+    createParentFolder: vi.fn().mockResolvedValue(parentFolder),
+    updateParentFolder: vi.fn().mockResolvedValue(parentFolder),
+    deleteParentFolder: vi.fn().mockResolvedValue(undefined),
+    moveAttachment: vi.fn().mockResolvedValue(attachment),
+    linkDocument: vi.fn().mockResolvedValue(documentLink),
+    moveDocumentLink: vi.fn().mockResolvedValue(documentLink),
+    unlinkDocument: vi.fn().mockResolvedValue(undefined),
+    openDocument: vi.fn().mockResolvedValue(undefined),
     pickLocalFolderPath: vi.fn().mockResolvedValue("C:\\Projekte\\Beta"),
     createLocalFolder: vi.fn().mockResolvedValue({ ...localFolder, id: 10 }),
     deleteLocalFolder: vi.fn().mockResolvedValue(undefined),
     openAttachment: vi.fn().mockResolvedValue(undefined),
     openingAttachmentId: null,
-    unlinkAttachment: vi.fn().mockResolvedValue(undefined),
     deleteAttachmentPermanently: vi.fn().mockResolvedValue(undefined),
     ...overrides
   } as unknown as ComponentProps<typeof AttachmentList>["manager"];
@@ -138,15 +179,7 @@ function buildManager(
 beforeEach(() => {
   localStorage.clear();
   mocks.confirm.mockResolvedValue(true);
-  mocks.createFolder.mockResolvedValue({
-    id: 12,
-    name: "Neu",
-    parentId: null,
-    sortOrder: 0,
-    version: 1,
-    createdAt: "2026-07-29T10:00:00.000Z",
-    updatedAt: "2026-07-29T10:00:00.000Z"
-  });
+  mocks.documents.splice(0, mocks.documents.length, document);
   mocks.localEntries.mockReturnValue({
     entries: [
       {
@@ -189,10 +222,10 @@ describe("AttachmentList", () => {
     expect(localStorage.getItem("ui.attachments.viewMode")).toBe("details");
   });
 
-  it("zeigt für ausgewählte PM-Dateien die gebündelten Aktionen", async () => {
-    const bulkUnlinkAttachments = vi.fn().mockResolvedValue(undefined);
+  it("bietet für ausgewählte Parent-Anhänge Verschieben und endgültiges Löschen, aber kein Entkoppeln", async () => {
     const bulkDeleteAttachments = vi.fn().mockResolvedValue(undefined);
-    const manager = buildManager({ bulkUnlinkAttachments, bulkDeleteAttachments });
+    const moveAttachment = vi.fn().mockResolvedValue(attachment);
+    const manager = buildManager({ bulkDeleteAttachments, moveAttachment });
     render(<AttachmentList manager={manager} />);
 
     fireEvent.click(screen.getByRole("checkbox", { name: "planung.pdf auswählen" }));
@@ -201,12 +234,12 @@ describe("AttachmentList", () => {
     expect(screen.getByRole("button", { name: "Als ZIP herunterladen" })).toBeInTheDocument();
     expect(screen.getByLabelText("In Ordner verschieben")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Verknüpfungen lösen" }));
-    await waitFor(() =>
-      expect(bulkUnlinkAttachments).toHaveBeenCalledWith([
-        { id: attachment.id, expectedVersion: attachment.version }
-      ])
-    );
+    expect(screen.queryByRole("button", { name: "Verknüpfungen lösen" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("In Ordner verschieben"), { target: { value: "11" } });
+    await waitFor(() => expect(moveAttachment).toHaveBeenCalledWith(attachment.id, {
+      folderId: 11,
+      expectedVersion: attachment.version
+    }));
 
     fireEvent.click(screen.getByRole("checkbox", { name: "planung.pdf auswählen" }));
     fireEvent.click(screen.getByRole("button", { name: "Endgültig löschen" }));
@@ -218,7 +251,8 @@ describe("AttachmentList", () => {
   });
 
   it("legt virtuelle Ordner und Unterordner aus der aktuellen Ablage heraus an", async () => {
-    render(<AttachmentList manager={buildManager()} />);
+    const createParentFolder = vi.fn().mockResolvedValue(parentFolder);
+    render(<AttachmentList manager={buildManager({ createParentFolder })} />);
     fireEvent.change(screen.getByLabelText("Ablage"), { target: { value: "folder:11" } });
     fireEvent.click(screen.getByRole("button", { name: "Virtuellen Ordner anlegen" }));
     fireEvent.change(screen.getByLabelText("Name des virtuellen Ordners"), {
@@ -227,11 +261,36 @@ describe("AttachmentList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Anlegen" }));
 
     await waitFor(() =>
-      expect(mocks.createFolder).toHaveBeenCalledWith({
+      expect(createParentFolder).toHaveBeenCalledWith({
         name: "Verträge",
         parentId: 11
       })
     );
+  });
+
+  it("zeigt DMS-Dokumente als Links und löst nur die versionierte Relation", async () => {
+    const unlinkDocument = vi.fn().mockResolvedValue(undefined);
+    render(<AttachmentList manager={buildManager({ unlinkDocument })} />);
+
+    expect(screen.getByText("DMS")).toBeInTheDocument();
+    expect(screen.getByText("dms-vertrag.pdf")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Verknüpfung lösen" }));
+
+    await waitFor(() => expect(unlinkDocument).toHaveBeenCalledWith(documentLink.id, documentLink.version));
+    expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: "DMS-Verknüpfung lösen?",
+      body: expect.stringContaining("bleiben im Dokumentenmanagement bestehen")
+    }));
+  });
+
+  it("verknüpft ein vorhandenes DMS-Dokument explizit ohne Upload", async () => {
+    const linkDocument = vi.fn().mockResolvedValue(documentLink);
+    render(<AttachmentList manager={buildManager({ documentLinks: [], linkDocument })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "DMS-Dokument verknüpfen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Verknüpfen" }));
+
+    await waitFor(() => expect(linkDocument).toHaveBeenCalledWith({ documentId: document.id, folderId: null }));
   });
 
   it("zeigt eine lokale Festplattenquelle und verknüpft einen gewählten Windows-Ordner", async () => {

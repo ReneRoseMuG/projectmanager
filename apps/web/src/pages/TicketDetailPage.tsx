@@ -122,7 +122,7 @@ export function TicketDetailPage() {
         if (!file) {
           continue;
         }
-        await uploadTicketAttachment(created.id, file.file, file.librarySelection);
+        await uploadTicketAttachment(created.id, file.file);
       }
       await tickets.reload();
       showToast({ tone: "success", title: "Ticket erstellt" });

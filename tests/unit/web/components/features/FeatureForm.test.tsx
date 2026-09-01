@@ -229,7 +229,7 @@ describe("FeatureForm", () => {
         tickets: [{ kind: "existing", ticket }],
         projectIds: [project.id],
         comments: [{ text: "Feature-Kommentar" }],
-        files: [{ file, previewUrl: undefined, librarySelection: "document-library" }]
+        files: [{ file, previewUrl: undefined }]
       })
     );
     expect(onClose).toHaveBeenCalledTimes(1);

@@ -176,7 +176,7 @@ export function MilestoneDetailPage() {
         await createMilestoneNote(milestoneId, note);
       }
       for (const file of pending.files) {
-        await uploadMilestoneAttachment(milestoneId, file.file, file.librarySelection);
+        await uploadMilestoneAttachment(milestoneId, file.file);
       }
     } catch (postCreateError) {
       showToast({

@@ -487,14 +487,23 @@ Seiten mit einer Steuerspalte und/oder einem Detailbereich neben einer scrollend
 
 Die Dokumente-Bibliothek zeigt Dateien als **Kachel-Grid** statt als reine Dateinamenliste — `DocumentTile` (`apps/web/src/components/attachments/DocumentTile.tsx`) im CSS-Grid `repeat(auto-fill, minmax(<size>, 1fr))`. Links bleibt die Verwaltungs-Navigation als `DocumentSidePanel` (§8.25); Auswahl und Detailvorschau erscheinen im rechten `DocumentSidePanel`.
 
-- **Kachel:** quadratischer Thumbnail-Bereich (`aspect-square`) — bei Bildern das geschützte Asset (`object-cover`, `loading="lazy"`), bei PDF, Office und ODF ein serverseitig erzeugtes und gecachtes Vorschaubild. Während des Ladens und bei Fehlern bleibt das Typ-Icon aus `describeAttachmentType` mit Kürzel-Badge sichtbar. Darunter stehen Dateiname und bis zu drei DMS-Tags. Radii/Schatten/Selektion folgen §5/§6/§10.4 (`rounded-lg`, `shadow-sm`/`shadow-panel`, Auswahl `ring-2 ring-steel-300`).
+- **Kachel:** quadratischer Thumbnail-Bereich (`aspect-square`) — bei Bildern das geschützte Asset (`object-cover`, `loading="lazy"`), bei PDF, Office und ODF ein serverseitig erzeugtes und gecachtes Vorschaubild. Ausschließlich Dateien mit der aktuellen Affinity-Endung `.af` beziehen ihr Vorschaubild aus dem lokal registrierten Windows-Thumbnail-Handler; alte Affinity-Endungen sind nicht einbezogen. Während des Ladens und bei Fehlern bleibt das Typ-Icon aus `describeAttachmentType` mit Kürzel-Badge sichtbar. Darunter stehen Dateiname und bis zu drei DMS-Tags. Radii/Schatten/Selektion folgen §5/§6/§10.4 (`rounded-lg`, `shadow-sm`/`shadow-panel`, Auswahl `ring-2 ring-steel-300`).
 - **Kachelgröße:** S/M/L über einen Segmented-Wähler in der Toolbar; steuert die minimale Spaltenbreite und bleibt in `localStorage` (`ui.documents.thumbnailSize`) erhalten.
-- **Interaktion:** Einfachklick öffnet die Details eines Dokuments im rechten Panel. Die Checkbox jeder Kachel steuert davon getrennt eine Mehrfachauswahl für gemeinsame Aktionen. Download, Entfernen aus der Bibliothek und endgültiges Löschen bleiben getrennte Aktionen; Entfernen aus der Bibliothek wird nur angeboten, wenn Owner-Verknüpfungen bestehen.
+- **Interaktion:** Einfachklick öffnet die Details eines Dokuments im rechten Panel. Die Checkbox jeder Kachel steuert davon getrennt eine Mehrfachauswahl für gemeinsame Aktionen. Ein DMS-Dokument bleibt bis zum ausdrücklichen endgültigen Löschen Bestandteil der Bibliothek; Parent-Bezüge werden ausschließlich als eigene Verknüpfungen angelegt oder gelöst.
 - **Toolbar:** Suche, serverseitige Typfilter, aktive Filter, der Kachelgrößen-Wähler und kontextuelle Mehrfachaktionen bilden einen gemeinsamen, nicht scrollenden Steuerbereich. Ab `lg` scrollen ausschließlich die Kacheln im direkt darunter liegenden, höhenbegrenzten Container (`min-h-0 flex-1 overflow-y-auto`); Kacheln dürfen nicht hinter oder oberhalb der Steuerung erscheinen. Sammlung und mehrere DMS-Tags werden serverseitig gefiltert; Kategorien existieren seit MS-80 nicht mehr.
 - **Upload-Kontext:** Die geöffnete direkte Sammlung ist das optionale Ziel des Uploads (`?folder=`). Mehrfachsammlungen und Kategorien sind unzulässig. DMS-Tags werden über den MS-80-Vertrag gesetzt.
-- **Dateischutz:** Originale, generierte PDF-Vorschauen und Kachel-Thumbnails werden ausschließlich über authentifizierte Routen mit `attachments:read` ausgeliefert. Für Thumbnail-Erzeugung gelten eine kleine Prozessobergrenze und der gemeinsame Preview-Cache.
+- **Dateischutz:** Originale, generierte PDF-Vorschauen und Kachel-Thumbnails werden ausschließlich über authentifizierte `/documents`-Routen mit `documents:read` ausgeliefert. Für Thumbnail-Erzeugung gelten eine kleine Prozessobergrenze und der gemeinsame Preview-Cache.
 
 **Detailansicht:** Das rechte `DocumentSidePanel` zeigt `DocumentPreviewBody`, Metadaten, genau eine direkte Sammlung und DMS-Tags. Es ersetzt den früheren kategoriegebundenen `DocumentViewer`; ein separates Modal-Overlay ist nicht Bestandteil des MS-80-Vertrags.
+
+### 8.27 Parent-Dateiansicht
+
+Dateiansichten an Projekten, Meilensteinen, Aufgaben, Features, Wiki-Seiten und Tickets kombinieren drei klar getrennte Quellen: exklusive Parent-Anhänge, explizit verknüpfte DMS-Dokumente und lokale Windows-Ordner.
+
+- **Parent-Anhänge:** Uploads in dieser Ansicht gehören genau einem Parent. Es gibt keine Upload-Auswahl zur DMS-Veröffentlichung und keine automatische Überführung ins Dokumentenmanagement.
+- **Parent-Ordner:** Virtuelle Unterordner gehören ausschließlich zum jeweiligen Parent. Das Anlegen, Verschieben oder Löschen eines Parent-Ordners darf keine DMS-Sammlung verändern oder erzeugen.
+- **DMS-Verknüpfungen:** Vorhandene Dokumente werden über eine explizite Suche verknüpft und sichtbar als `DMS` gekennzeichnet. Beim Lösen verschwindet nur die Relation; Dokument, Sammlung und Tags bleiben bestehen.
+- **Lokale Ordner:** Ein eingebundener Windows-Ordner bleibt eine eigene Festplattenquelle und zeigt seine reale Unterordnerstruktur. Das Lösen der Einbindung verändert keine lokale Datei.
 
 ---
 

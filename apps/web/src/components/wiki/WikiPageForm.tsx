@@ -1,4 +1,4 @@
-import type { AttachmentLibrarySelection, DraftComment, Note, Project, WikiPage, WikiPageInput, WikiPageRelationSummary } from "@taskmanager/shared-types";
+import type { DraftComment, Note, Project, WikiPage, WikiPageInput, WikiPageRelationSummary } from "@taskmanager/shared-types";
 import { Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -208,9 +208,9 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
     }
   };
 
-  const uploadAttachment = async (file: File, librarySelection: AttachmentLibrarySelection) => {
+  const uploadAttachment = async (file: File) => {
     try {
-      const uploaded = await attachments.uploadAttachment(file, librarySelection);
+      const uploaded = await attachments.uploadAttachment(file);
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {

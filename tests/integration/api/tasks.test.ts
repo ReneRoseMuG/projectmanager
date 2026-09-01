@@ -149,7 +149,7 @@ describe("Tasks API", () => {
     await createNoteForTask(app, countedTask.id);
     await createComment(app, countedTask.id);
     await supertest(app.server)
-      .post(`/api/tasks/${countedTask.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/tasks/${countedTask.id}/attachments`)
       .attach("file", Buffer.from("Task-Datei"), { filename: "task.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -171,11 +171,11 @@ describe("Tasks API", () => {
     const taskId = Number(taskResponse.body.id);
 
     const firstUpload = await supertest(app.server)
-      .post(`/api/tasks/${taskId}/attachments?libraryVisibility=document-library`)
+      .post(`/api/tasks/${taskId}/attachments`)
       .attach("file", Buffer.from("Erste Datei"), { filename: "erste-datei.txt", contentType: "text/plain" })
       .expect(201);
     const secondUpload = await supertest(app.server)
-      .post(`/api/tasks/${taskId}/attachments?libraryVisibility=document-library`)
+      .post(`/api/tasks/${taskId}/attachments`)
       .attach("file", Buffer.from("Zweite Datei"), { filename: "zweite-datei.txt", contentType: "text/plain" })
       .expect(201);
 

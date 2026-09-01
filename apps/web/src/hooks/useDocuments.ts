@@ -46,7 +46,7 @@ export function useFolders() {
 
   const createMutation = useMutation({ mutationFn: documentsApi.createAttachmentFolder, onSuccess: invalidate });
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: number; input: { name?: string; parentId?: number | null; projectId?: number | null; expectedVersion: number } }) =>
+    mutationFn: ({ id, input }: { id: number; input: { name?: string; parentId?: number | null; expectedVersion: number } }) =>
       documentsApi.updateAttachmentFolder(id, input),
     onSuccess: invalidate
   });
@@ -59,8 +59,8 @@ export function useFolders() {
     folders: query.data ?? ([] as AttachmentFolder[]),
     loading: query.isLoading,
     error: toQueryError(query.error),
-    createFolder: (input: { name: string; parentId?: number | null; projectId?: number | null }) => createMutation.mutateAsync(input),
-    updateFolder: (id: number, input: { name?: string; parentId?: number | null; projectId?: number | null; expectedVersion: number }) =>
+    createFolder: (input: { name: string; parentId?: number | null }) => createMutation.mutateAsync(input),
+    updateFolder: (id: number, input: { name?: string; parentId?: number | null; expectedVersion: number }) =>
       updateMutation.mutateAsync({ id, input }),
     deleteFolder: (id: number, expectedVersion: number) => deleteMutation.mutateAsync({ id, expectedVersion })
   };
@@ -108,10 +108,6 @@ export function useDocumentActions() {
       await invalidate();
     }
   });
-  const removeFromLibraryMutation = useMutation({
-    mutationFn: ({ id, expectedVersion }: { id: number; expectedVersion: number }) => documentsApi.removeDocumentFromLibrary(id, expectedVersion),
-    onSuccess: invalidate
-  });
   const deleteMutation = useMutation({
     mutationFn: ({ id, expectedVersion }: { id: number; expectedVersion: number }) => documentsApi.deleteDocumentPermanently(id, expectedVersion),
     onSuccess: invalidate
@@ -129,7 +125,6 @@ export function useDocumentActions() {
     addTagsBulk: (attachments: AttachmentVersionInput[], tagIds: number[]) =>
       bulkTagsMutation.mutateAsync({ attachments, tagIds }),
     addingTagsBulk: bulkTagsMutation.isPending,
-    removeFromLibrary: (id: number, expectedVersion: number) => removeFromLibraryMutation.mutateAsync({ id, expectedVersion }),
     deleteDocumentPermanently: (id: number, expectedVersion: number) => deleteMutation.mutateAsync({ id, expectedVersion }),
     setDocumentFolder: (id: number, folderId: number | null, expectedVersion: number) =>
       folderMutation.mutateAsync({ id, folderId, expectedVersion })

@@ -1,5 +1,4 @@
 import type {
-  AttachmentLibrarySelection,
   DraftComment,
   DraftTask,
   DraftTicket,
@@ -60,7 +59,6 @@ import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { UseCaseListBoardView } from "../usecases/UseCaseListBoardView";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
-import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { FormSidebar } from "../ui/FormSidebar";
@@ -230,7 +228,6 @@ export function FeatureForm({
       ? { type: "project", id: stableInitialProjectId }
       : null;
   const { showToast } = useToast();
-  const { confirm } = useConfirm();
   const auth = useAuth();
   const canReadJournal = useHasPermission("journal", "read");
   const canWriteProjectRelations = useHasPermission("projects", "write");
@@ -390,9 +387,9 @@ export function FeatureForm({
     }
   };
 
-  const uploadAttachment = async (file: File, librarySelection: AttachmentLibrarySelection) => {
+  const uploadAttachment = async (file: File) => {
     try {
-      const uploaded = await attachments.uploadAttachment(file, librarySelection);
+      const uploaded = await attachments.uploadAttachment(file);
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {

@@ -19,7 +19,7 @@
  *
  * Abgedeckte Regeln:
  * - Uploads geben die direkte Sammlung und aktive DMS-Tags gemeinsam an die API-Schicht weiter.
- * - Einsortieren/Verschieben/Entfernen rufen den passenden Endpunkt mit den richtigen Argumenten.
+ * - Einsortieren/Verschieben und endgültiges Löschen rufen den passenden Endpunkt mit den richtigen Argumenten.
  * - Tag-Änderungen geben die geladene Dokumentversion für den Konfliktschutz weiter.
  * - Sammlungsverwaltung (umbenennen/loeschen) ruft den passenden Endpunkt.
  * - Nach jeder Mutation wird die Dokument-Ansicht invalidiert (beobachtbar am QueryClient).
@@ -45,7 +45,6 @@ vi.mock("../../../../apps/web/src/api/documents", () => ({
   updateDocumentMetadata: vi.fn().mockResolvedValue({}),
   setDocumentTags: vi.fn().mockResolvedValue({}),
   setDocumentFolder: vi.fn().mockResolvedValue({ id: 10 }),
-  removeDocumentFromLibrary: vi.fn().mockResolvedValue(undefined),
   deleteDocumentPermanently: vi.fn().mockResolvedValue(undefined),
   getAttachmentFolders: vi.fn().mockResolvedValue([]),
   createAttachmentFolder: vi.fn().mockResolvedValue({ id: 1 }),
@@ -72,6 +71,7 @@ describe("useDocumentActions", () => {
   it("ergänzt Tags für eine versionsgebundene Dokumentauswahl und invalidiert die Ansicht", async () => {
     const firstDocument: Attachment = {
       id: 10,
+      kind: "document",
       owners: [],
       originalName: "eins.pdf",
       displayName: null,
@@ -79,7 +79,7 @@ describe("useDocumentActions", () => {
       filename: "eins.pdf",
       mimetype: "application/pdf",
       size: 10,
-      url: "/api/attachments/10/content",
+      url: "/api/documents/10/content",
       contentHash: null,
       isInDocumentLibrary: true,
       tags: [],
@@ -94,7 +94,7 @@ describe("useDocumentActions", () => {
       id: 11,
       originalName: "zwei.pdf",
       filename: "zwei.pdf",
-      url: "/api/attachments/11/content",
+      url: "/api/documents/11/content",
       version: 4,
     };
     const importantTag = {

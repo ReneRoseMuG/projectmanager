@@ -1,8 +1,8 @@
 ﻿import type { FastifyInstance, FastifyRequest } from "fastify";
-import type { AttachmentLibrarySelection, CommentInput, NoteInput, TicketInput, TicketPositionInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
+import type { CommentInput, NoteInput, TicketInput, TicketPositionInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
 import type { TicketMoveInput } from "@taskmanager/shared-types";
 import { TICKET_RELATION_TYPES, TICKET_RESOLUTIONS } from "../db/schema.js";
-import { createTicketAttachment, listTicketAttachments, unlinkAttachment } from "../services/attachments.service.js";
+import { createTicketAttachment, deleteParentAttachment, listTicketAttachments } from "../services/attachments.service.js";
 import { createEntityComment, deleteEntityComment, listEntityComments } from "../services/comments.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { createTicketNote, deleteTicketNote, listTicketNotes } from "../services/notes.service.js";
@@ -212,26 +212,16 @@ const uploadBodySchema = {
   }
 } as const;
 
-const ownerUploadQuerySchema = {
-  type: "object",
-  required: ["libraryVisibility"],
-  additionalProperties: false,
-  properties: {
-    libraryVisibility: { type: "string", enum: ["attachment-only", "document-library"] }
-  }
-} as const;
-
 const attachmentLifecycleQuerySchema = {
   type: "object",
   required: ["expectedVersion"],
   additionalProperties: false,
   properties: {
-    expectedVersion: { type: "integer", minimum: 1 },
-    orphanAction: { type: "string", enum: ["add-to-library"] }
+    expectedVersion: { type: "integer", minimum: 1 }
   }
 } as const;
 
-async function readUpload(request: FastifyRequest, librarySelection: AttachmentLibrarySelection) {
+async function readUpload(request: FastifyRequest) {
   const file = (request.body as UploadBody | undefined)?.file;
   if (!file || Array.isArray(file) || typeof file.toBuffer !== "function") {
     throw badRequest("A file upload is required");
@@ -240,8 +230,7 @@ async function readUpload(request: FastifyRequest, librarySelection: AttachmentL
   return {
     originalName: file.filename ?? "upload",
     mimetype: file.mimetype ?? "application/octet-stream",
-    buffer: await file.toBuffer(),
-    librarySelection
+    buffer: await file.toBuffer()
   };
 }
 
@@ -518,26 +507,26 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     async (request) => listTicketAttachments(app.db, request.params.id)
   );
 
-  app.post<{ Params: { id: number }; Querystring: { libraryVisibility: AttachmentLibrarySelection } }>(
+  app.post<{ Params: { id: number } }>(
     "/tickets/:id/attachments",
-    { schema: { params: idParamSchema, querystring: ownerUploadQuerySchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
+    { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const attachment = await createTicketAttachment(app.db, request.params.id, await readUpload(request, request.query.libraryVisibility), createJournalActor(request.currentUser));
+      const attachment = await createTicketAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(attachment);
     }
   );
 
   app.delete<{
     Params: { id: number; childId: number };
-    Querystring: { expectedVersion: number; orphanAction?: "add-to-library" };
+    Querystring: { expectedVersion: number };
   }>(
     "/tickets/:id/attachments/:childId",
     {
-      config: { auth: { resource: "attachments", action: "write" } },
+      config: { auth: { resource: "attachments", action: "delete" } },
       schema: { params: idAndChildIdParamSchema, querystring: attachmentLifecycleQuerySchema, response: { 204: { type: "null" } } }
     },
     async (request, reply) => {
-      await unlinkAttachment(
+      await deleteParentAttachment(
         app.db,
         { type: "ticket", id: request.params.id },
         request.params.childId,

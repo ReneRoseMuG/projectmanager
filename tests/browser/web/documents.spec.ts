@@ -29,7 +29,7 @@ import {
  * - Reload sowie Browser-Zurück stellen Auswahl und Treffer wieder her.
  * - Karten zeigen höchstens drei Tags und lösen weitere Namen zugänglich auf.
  * - Karte öffnet die Detailansicht; schmale Ansichten behalten Sammlung, Tags, Suche und Typfilter.
- * - Eine Custom Role mit attachments:read kann Dokumente lesen, aber keine schreibenden oder löschenden Aktionen bedienen.
+ * - Eine Custom Role mit documents:read kann Dokumente lesen, aber keine schreibenden oder löschenden Aktionen bedienen.
  * - Die Mehrfachauswahl ergänzt Tags auf mehreren Kacheln und aktualisiert die Ansicht ohne Reload.
  * - Der intern scrollende Kachelbereich beginnt unterhalb der festen Dokumentsteuerung.
  *
@@ -94,7 +94,7 @@ test("DMS ergänzt einen Tag auf mehreren Kacheln und aktualisiert die Ansicht s
       const currentResponse = await request.get(`${apiBaseUrl}/documents/${attachment.id}`);
       if (currentResponse.ok()) {
         const current = await currentResponse.json() as { version: number };
-        await request.delete(`${apiBaseUrl}/attachments/${attachment.id}?expectedVersion=${current.version}`);
+        await request.delete(`${apiBaseUrl}/documents/${attachment.id}?expectedVersion=${current.version}`);
       }
     }
     if (tagId !== null) {
@@ -172,7 +172,7 @@ test("DMS kombiniert Sammlung und Tags URL-stabil und öffnet die Dokumentdetail
     await expect(page.getByText(`Originaldatei: ${filename}`)).toBeVisible();
   } finally {
     if (attachment) {
-      await request.delete(`${apiBaseUrl}/attachments/${attachment.id}?expectedVersion=${attachment.version}`);
+      await request.delete(`${apiBaseUrl}/documents/${attachment.id}?expectedVersion=${attachment.version}`);
     }
     for (const tagId of tagIds) {
       await request.delete(`${apiBaseUrl}/tags/${tagId}`);
@@ -198,7 +198,7 @@ test("DMS-Leser sieht Dokumente, aber keine Scan-, Schreib- oder Löschaktionen"
       data: {
         key: suffix.replace(/-/g, "_"),
         label: uniqueTitle("DMS Leser"),
-        permissions: [{ resource: "attachments", action: "read" }],
+        permissions: [{ resource: "documents", action: "read" }],
       },
     });
     expect(roleResponse.ok()).toBeTruthy();
@@ -235,7 +235,6 @@ test("DMS-Leser sieht Dokumente, aber keine Scan-, Schreib- oder Löschaktionen"
     await expect(page.getByText(suffix, { exact: true })).toBeVisible();
     await expect(page.getByPlaceholder("Neue Sammlung…")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Duplikate suchen" })).toHaveCount(0);
-    await expect(page.getByLabel("Aus der Dokumentenbibliothek entfernen")).toHaveCount(0);
     await expect(page.getByTitle("Endgültig löschen")).toHaveCount(0);
     await expect(page.getByTitle("Herunterladen")).toBeVisible();
   } finally {
@@ -243,7 +242,7 @@ test("DMS-Leser sieht Dokumente, aber keine Scan-, Schreib- oder Löschaktionen"
       await request.delete(`${apiBaseUrl}/admin/users/${user.id}`);
     }
     if (attachment) {
-      await request.delete(`${apiBaseUrl}/attachments/${attachment.id}?expectedVersion=${attachment.version}`);
+      await request.delete(`${apiBaseUrl}/documents/${attachment.id}?expectedVersion=${attachment.version}`);
     }
     if (role) {
       await request.delete(`${apiBaseUrl}/admin/roles/${role.id}`);

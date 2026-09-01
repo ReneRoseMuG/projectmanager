@@ -276,7 +276,7 @@ describe("Projekt Manager API integration", () => {
     await api.get(`/api/projects/${createdProject.id}/attachments`).expect(200, []);
     const projectAttachment = (
       await api
-        .post(`/api/projects/${createdProject.id}/attachments?libraryVisibility=document-library`)
+        .post(`/api/projects/${createdProject.id}/attachments`)
         .attach("file", Buffer.from("project file"), "project.txt")
         .expect(201)
     ).body as Attachment;
@@ -285,7 +285,7 @@ describe("Projekt Manager API integration", () => {
 
     const taskAttachment = (
       await api
-        .post(`/api/tasks/${createdTask.id}/attachments?libraryVisibility=document-library`)
+        .post(`/api/tasks/${createdTask.id}/attachments`)
         .attach("file", Buffer.from("task file"), "task.txt")
         .expect(201)
     ).body as Attachment;
@@ -293,7 +293,7 @@ describe("Projekt Manager API integration", () => {
 
     const projectAttachments = (await api.get(`/api/projects/${createdProject.id}/attachments`).expect(200)).body as Attachment[];
     expect(projectAttachments.map((attachment) => attachment.id)).toContain(projectAttachment.id);
-    await api.post(`/api/projects/${createdProject.id}/attachments?libraryVisibility=document-library`).expect(400);
+    await api.post(`/api/projects/${createdProject.id}/attachments`).expect(400);
     await api.delete(`/api/attachments/${projectAttachment.id}?expectedVersion=${projectAttachment.version}`).expect(204);
     await api.delete(`/api/attachments/${taskAttachment.id}?expectedVersion=${taskAttachment.version}`).expect(204);
 

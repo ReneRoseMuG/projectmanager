@@ -1,6 +1,6 @@
 import type { CalendarJournalEntry } from "@taskmanager/shared-types";
 import type { DbClient } from "../db/client.js";
-import { CALENDAR_JOURNAL_EVENT_TYPES } from "../db/schema.js";
+import type { CALENDAR_JOURNAL_EVENT_TYPES } from "../db/schema.js";
 import { calendarSyncJournalRepository, type CalendarConnectionRecord, type CalendarJournalRecord } from "../repositories/calendar.repository.js";
 
 /**

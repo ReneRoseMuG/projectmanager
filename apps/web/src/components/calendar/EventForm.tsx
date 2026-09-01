@@ -46,7 +46,67 @@ function preservedOwners(event: CalendarEvent | null, initialOwners: EventOwner[
   return event?.owners ?? initialOwners ?? [];
 }
 
-export function EventForm({ open, event, initialDate, initialOwners, onSubmit, onDelete, canDelete = true, onClose }: EventFormProps) {
+function ownerKey(owner: EventOwner): string {
+  return `${owner.type}:${owner.id}`;
+}
+
+function hasOwner(owners: EventOwner[], owner: EventOwner): boolean {
+  return owners.some((candidate) => ownerKey(candidate) === ownerKey(owner));
+}
+
+function ownerLabel(owner: EventOwner, projects: Project[], milestones: Milestone[], tasks: Task[]): string {
+  if (owner.type === "project") {
+    return projects.find((project) => project.id === owner.id)?.name ?? `Projekt #${owner.id}`;
+  }
+  if (owner.type === "milestone") {
+    return milestones.find((milestone) => milestone.id === owner.id)?.name ?? `Meilenstein #${owner.id}`;
+  }
+  if (owner.type === "task") {
+    return tasks.find((task) => task.id === owner.id)?.title ?? `Aufgabe #${owner.id}`;
+  }
+  return `Tagesplan #${owner.id}`;
+}
+
+function OwnerCheckboxGroup({
+  title,
+  owners,
+  selectedOwners,
+  projects,
+  milestones,
+  tasks,
+  onToggle,
+}: {
+  title: string;
+  owners: EventOwner[];
+  selectedOwners: EventOwner[];
+  projects: Project[];
+  milestones: Milestone[];
+  tasks: Task[];
+  onToggle: (owner: EventOwner) => void;
+}) {
+  if (owners.length === 0) {
+    return null;
+  }
+
+  return (
+    <fieldset className="grid gap-2">
+      <legend className="text-xs font-bold uppercase tracking-wide text-steel-500">{title}</legend>
+      <div className="grid max-h-36 gap-1 overflow-auto pr-1">
+        {owners.map((owner) => {
+          const label = ownerLabel(owner, projects, milestones, tasks);
+          return (
+            <label key={ownerKey(owner)} className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-ink hover:bg-steel-50">
+              <input type="checkbox" checked={hasOwner(selectedOwners, owner)} onChange={() => onToggle(owner)} />
+              <span className="min-w-0 truncate">{label}</span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+export function EventForm({ open, event, initialDate, initialOwners, projects, milestones = [], tasks, onSubmit, onDelete, canDelete = true, onClose }: EventFormProps) {
   const auth = useAuth();
   const canReadJournal = useHasPermission("journal", "read");
   const [title, setTitle] = useState("");
@@ -56,6 +116,7 @@ export function EventForm({ open, event, initialDate, initialOwners, onSubmit, o
   const [isAllDay, setIsAllDay] = useState(false);
   const [reminderMinutes, setReminderMinutes] = useState(60);
   const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
+  const [owners, setOwners] = useState<EventOwner[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -70,7 +131,16 @@ export function EventForm({ open, event, initialDate, initialOwners, onSubmit, o
     setIsAllDay(event?.isAllDay ?? false);
     setReminderMinutes(event?.reminderMinutes ?? 60);
     setResponsibleUserId(event ? event.responsibleUserId : (auth.user?.id ?? null));
+    setOwners(preservedOwners(event, initialOwners));
   }, [auth.user?.id, event, initialDate, initialOwners, open]);
+
+  const toggleOwner = (owner: EventOwner) => {
+    setOwners((current) =>
+      hasOwner(current, owner)
+        ? current.filter((candidate) => ownerKey(candidate) !== ownerKey(owner))
+        : [...current, owner]
+    );
+  };
 
   const handleStartChange = (value: string) => {
     if (!value) {
@@ -112,7 +182,7 @@ export function EventForm({ open, event, initialDate, initialOwners, onSubmit, o
           color: event?.color ?? defaultEventColor,
           reminderMinutes,
           responsibleUserId,
-          owners: preservedOwners(event, initialOwners)
+          owners
         },
         event?.id
       );
@@ -170,6 +240,37 @@ export function EventForm({ open, event, initialDate, initialOwners, onSubmit, o
             </select>
           </FormField>
           <UserSelectField label="Verantwortlich" icon={<Users size={14} />} variant="panel" value={responsibleUserId} selectedUser={event?.responsibleUser ?? null} onChange={setResponsibleUserId} />
+          <FormField label="Verknüpfungen" icon={<Users size={14} />} variant="panel" hint={projects.length === 0 && milestones.length === 0 && tasks.length === 0 ? "Keine Projekte, Meilensteine oder Aufgaben verfügbar." : undefined}>
+            <div className="grid gap-3">
+              <OwnerCheckboxGroup
+                title="Projekte"
+                owners={projects.map((project) => ({ type: "project", id: project.id }))}
+                selectedOwners={owners}
+                projects={projects}
+                milestones={milestones}
+                tasks={tasks}
+                onToggle={toggleOwner}
+              />
+              <OwnerCheckboxGroup
+                title="Meilensteine"
+                owners={milestones.map((milestone) => ({ type: "milestone", id: milestone.id }))}
+                selectedOwners={owners}
+                projects={projects}
+                milestones={milestones}
+                tasks={tasks}
+                onToggle={toggleOwner}
+              />
+              <OwnerCheckboxGroup
+                title="Aufgaben"
+                owners={tasks.map((task) => ({ type: "task", id: task.id }))}
+                selectedOwners={owners}
+                projects={projects}
+                milestones={milestones}
+                tasks={tasks}
+                onToggle={toggleOwner}
+              />
+            </div>
+          </FormField>
           <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-2.5 py-2.5 shadow-sm text-sm font-medium text-ink cursor-pointer hover:bg-steel-50">
             <input type="checkbox" checked={isAllDay} onChange={(inputEvent) => setIsAllDay(inputEvent.target.checked)} />
             Ganztägig

@@ -443,7 +443,7 @@ export interface CalendarJournalEntry {
   createdAt: string;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "diary", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "settings", "realtime", "users", "roles", "calendarConnections"] as const;
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "diary", "backlog", "tickets", "comments", "notes", "attachments", "documents", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "settings", "realtime", "users", "roles", "calendarConnections"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";
@@ -498,6 +498,7 @@ export const REALTIME_INVALIDATION_SCOPES = [
   "comments",
   "notes",
   "attachments",
+  "documents",
   "tags",
   "catalogs",
   "events",
@@ -631,6 +632,7 @@ export const JOURNAL_OBJECT_TYPES = [
   "tag",
   "note",
   "attachment",
+  "document",
   "comment"
 ] as const;
 
@@ -978,7 +980,6 @@ export interface NoteMoveInput {
 export interface AttachmentFolder {
   id: number;
   parentId: number | null;
-  projectId: number | null;
   name: string;
   childCount: number;
   directDocumentCount: number;
@@ -989,10 +990,35 @@ export const ATTACHMENT_OWNER_TYPES = ["project", "milestone", "task", "feature"
 
 export type AttachmentOwnerType = (typeof ATTACHMENT_OWNER_TYPES)[number];
 
-export type AttachmentLibrarySelection = "attachment-only" | "document-library";
+export const ATTACHMENT_KINDS = ["parent_attachment", "document"] as const;
+
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+
+export interface ParentAttachmentFolder {
+  id: number;
+  owner: AttachmentOwner;
+  parentId: number | null;
+  name: string;
+  childCount: number;
+  directEntryCount: number;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ParentAttachmentFolderInput {
+  name: string;
+  parentId?: number | null;
+}
+
+export type ParentAttachmentFolderUpdate = WithExpectedVersion<{
+  name?: string;
+  parentId?: number | null;
+}>;
 
 export interface Attachment {
   id: number;
+  kind: AttachmentKind;
   owners: AttachmentOwner[];
   originalName: string;
   displayName: string | null;
@@ -1006,10 +1032,34 @@ export interface Attachment {
   tags?: Tag[];
   folder?: AttachmentFolder | null;
   folders?: AttachmentFolder[];
+  parentFolderId?: number | null;
   createdAt: string;
   updatedAt: string;
   version: number;
 }
+
+export interface ParentDocumentLink {
+  id: number;
+  owner: AttachmentOwner;
+  document: Attachment;
+  folder: ParentAttachmentFolder | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ParentDocumentLinkInput {
+  documentId: number;
+  folderId?: number | null;
+}
+
+export type ParentFileMoveInput = WithExpectedVersion<{
+  folderId: number | null;
+}>;
+
+export type ParentFileEntry =
+  | { kind: "attachment"; attachment: Attachment; folder: ParentAttachmentFolder | null }
+  | { kind: "document_link"; link: ParentDocumentLink; folder: ParentAttachmentFolder | null };
 
 export type DocumentDuplicateCheckStatus = "idle" | "running" | "completed" | "failed";
 export type DocumentDuplicateCheckIssueKind = "missing" | "unreadable" | "changed";

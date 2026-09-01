@@ -38,7 +38,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const actions = vi.hoisted(() => ({
   uploadDocument: vi.fn(async () => undefined),
-  removeFromLibrary: vi.fn(async () => undefined),
   deleteDocumentPermanently: vi.fn(async () => undefined),
   setTags: vi.fn(async () => undefined),
   updateMetadata: vi.fn(async () => undefined),
@@ -49,6 +48,7 @@ const actions = vi.hoisted(() => ({
 
 const imageDocument: Attachment = {
   id: 1,
+  kind: "document",
   owners: [{ type: "project", id: 4 }],
   originalName: "Foto.png",
   displayName: null,
@@ -56,7 +56,7 @@ const imageDocument: Attachment = {
   filename: "stored-1.png",
   mimetype: "image/png",
   size: 1024,
-  url: "/api/attachments/1/content",
+  url: "/api/documents/1/content",
   contentHash: null,
   isInDocumentLibrary: true,
   tags: [{ id: 9, name: "Wichtig", color: "#ef4444", domain: "dms", isSystem: false, version: 1 }],
@@ -74,7 +74,7 @@ const pdfDocument: Attachment = {
   originalName: "Bericht.pdf",
   filename: "stored-2.pdf",
   mimetype: "application/pdf",
-  url: "/api/attachments/2/content",
+  url: "/api/documents/2/content",
   tags: [],
 };
 
@@ -173,7 +173,7 @@ describe("DocumentsPage — Thumbnail-Grid", () => {
 
     expect(screen.getByRole("img", { name: "Foto.png" })).toHaveAttribute(
       "src",
-      "http://assets.test/api/attachments/1/content",
+      "http://assets.test/api/documents/1/content",
     );
     expect(screen.getByRole("img", { name: "Vorschau von Bericht" })).toHaveAttribute(
       "src",
@@ -185,7 +185,7 @@ describe("DocumentsPage — Thumbnail-Grid", () => {
   it("persistiert die gewählte Kachelgröße", () => {
     renderPage();
 
-    fireEvent.click(screen.getByTitle("Kachelgröße Groß"));
+    fireEvent.click(screen.getByTitle("Kachelgröße L"));
 
     expect(localStorage.getItem("ui.documents.thumbnailSize")).toBe("l");
   });

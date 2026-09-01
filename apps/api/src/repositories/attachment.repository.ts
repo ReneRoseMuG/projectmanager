@@ -1,3 +1,4 @@
+import type { AttachmentKind } from "@taskmanager/shared-types";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
@@ -86,11 +87,11 @@ export const attachmentRepository = {
     return { ...current, ...data, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
   },
 
-  async updateLibraryVisibility(
+  async updateKind(
     database: DbSession,
     id: number,
     expectedVersion: number,
-    isInDocumentLibrary: boolean,
+    kind: AttachmentKind,
     userId?: number
   ): Promise<AttachmentRecord | undefined> {
     const current = await this.findById(database, id);
@@ -102,7 +103,7 @@ export const attachmentRepository = {
     const result = await database
       .update(attachments)
       .set({
-        isInDocumentLibrary,
+        kind,
         version: current.version + 1,
         updatedBy: userId ?? null,
         updatedAt: now
@@ -113,7 +114,7 @@ export const attachmentRepository = {
     }
     return {
       ...current,
-      isInDocumentLibrary,
+      kind,
       version: current.version + 1,
       updatedBy: userId ?? null,
       updatedAt: now

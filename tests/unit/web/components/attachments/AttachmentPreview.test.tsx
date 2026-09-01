@@ -2,9 +2,22 @@
  * Test Scope:
  * AttachmentPreview
  *
+ * Test-Ebene:
+ * - Unit/Komponente
+ *
+ * Realitätsgrad:
+ * - Reales Rendering eines Parent-Attachments; lokale Dateiöffnung und Bestätigung sind kontrollierte Callbacks.
+ *
+ * Mock-Entscheidung:
+ * - Unit-Mocks für Asset-Basis-URL, Toast und Bestätigungsdialog; keine API- oder Persistenzbehauptung.
+ *
+ * Isolation:
+ * - JSDOM mit Cleanup nach jedem Test.
+ *
  * Abgedeckte Regeln:
  * - Attachment-Karten bieten Download und lokales Öffnen als getrennte Aktionen an.
  * - Die lokale Öffnen-Aktion zeigt Pending-Zustand und Fehler über Toasts.
+ * - Exklusive Parent-Anhänge bieten nur dauerhaftes Löschen, keine DMS-Entkopplung.
  *
  * Fehlerfälle:
  * - Fehlgeschlagene Öffnen-Mutationen werden mit der API-/Error-Message gemeldet.
@@ -42,6 +55,7 @@ vi.mock("../../../../../apps/web/src/components/ui/ConfirmDialogProvider", () =>
 
 const attachment: Attachment = {
   id: 42,
+  kind: "parent_attachment",
   owners: [{ type: "project", id: 7 }],
   originalName: "notiz.txt",
   filename: "generated-notiz.txt",
@@ -49,7 +63,7 @@ const attachment: Attachment = {
   size: 128,
   url: "/api/attachments/1/content",
   contentHash: null,
-  isInDocumentLibrary: true,
+  isInDocumentLibrary: false,
   createdAt: "2026-05-21T08:00:00.000Z",
   updatedAt: "2026-05-21T08:00:00.000Z",
   version: 1
@@ -68,7 +82,7 @@ describe("AttachmentPreview", () => {
   it("rendert Download und lokale Öffnen-Aktion getrennt", async () => {
     const onOpen = vi.fn().mockResolvedValue(undefined);
 
-    render(<AttachmentPreview attachment={attachment} onUnlink={vi.fn()} onOpen={onOpen} />);
+    render(<AttachmentPreview attachment={attachment} onOpen={onOpen} />);
 
     expect(screen.getByRole("link")).toHaveAttribute("href", "http://assets.test/api/attachments/1/content");
     fireEvent.click(screen.getByRole("button", { name: "Lokal öffnen" }));
@@ -77,7 +91,7 @@ describe("AttachmentPreview", () => {
   });
 
   it("deaktiviert die lokale Öffnen-Aktion während der Mutation", () => {
-    render(<AttachmentPreview attachment={attachment} onUnlink={vi.fn()} onOpen={vi.fn()} opening />);
+    render(<AttachmentPreview attachment={attachment} onOpen={vi.fn()} opening />);
 
     expect(screen.getByRole("button", { name: "Lokal öffnen" })).toBeDisabled();
   });
@@ -85,7 +99,7 @@ describe("AttachmentPreview", () => {
   it("meldet Fehler beim lokalen Öffnen als Toast", async () => {
     const onOpen = vi.fn().mockRejectedValue(new Error("Datei fehlt"));
 
-    render(<AttachmentPreview attachment={attachment} onUnlink={vi.fn()} onOpen={onOpen} />);
+    render(<AttachmentPreview attachment={attachment} onOpen={onOpen} />);
     fireEvent.click(screen.getByRole("button", { name: "Lokal öffnen" }));
 
     await waitFor(() =>
@@ -97,24 +111,15 @@ describe("AttachmentPreview", () => {
     );
   });
 
-  it("trennt Verknüpfung lösen und endgültiges Löschen in Wirkung und Bestätigung", async () => {
-    const onUnlink = vi.fn().mockResolvedValue(undefined);
+  it("bestätigt das dauerhafte Löschen eines exklusiven Parent-Anhangs", async () => {
     const onDeletePermanently = vi.fn().mockResolvedValue(undefined);
     render(
       <AttachmentPreview
         attachment={attachment}
-        onUnlink={onUnlink}
         onDeletePermanently={onDeletePermanently}
         onOpen={vi.fn()}
       />
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Verknüpfung lösen" }));
-    await waitFor(() => expect(onUnlink).toHaveBeenCalledWith(attachment));
-    expect(toastMocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
-      title: "Verknüpfung lösen?",
-      confirmLabel: "Verknüpfung lösen"
-    }));
 
     fireEvent.click(screen.getByRole("button", { name: "Endgültig löschen" }));
     await waitFor(() => expect(onDeletePermanently).toHaveBeenCalledWith(attachment));

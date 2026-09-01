@@ -1,7 +1,8 @@
 import type {
   Attachment,
-  AttachmentFolder,
-  AttachmentLocalEntry
+  AttachmentLocalEntry,
+  ParentAttachmentFolder,
+  ParentDocumentLink
 } from "@taskmanager/shared-types";
 import {
   ArrowUp,
@@ -14,19 +15,19 @@ import {
   Grid3X3,
   HardDrive,
   LayoutGrid,
+  Link2,
   List,
   Plus,
   TableProperties,
   Trash2,
   Unlink,
-  X
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { assetUrl } from "../../api/client";
 import type { useAttachments } from "../../hooks/useAttachments";
 import { useAttachmentLocalEntries } from "../../hooks/useAttachments";
 import { errorMessageAsync } from "../../hooks/errors";
-import { useFolders } from "../../hooks/useDocuments";
+import { useDocumentLibrary } from "../../hooks/useDocuments";
 import { useHasPermission } from "../../hooks/usePermissions";
 import {
   attachmentActionLabels,
@@ -80,7 +81,7 @@ function saveViewMode(mode: AttachmentViewMode): void {
   }
 }
 
-function folderLabel(folder: AttachmentFolder, foldersById: Map<number, AttachmentFolder>): string {
+function folderLabel(folder: ParentAttachmentFolder, foldersById: Map<number, ParentAttachmentFolder>): string {
   const labels = [folder.name];
   const seen = new Set([folder.id]);
   let parentId = folder.parentId;
@@ -126,12 +127,85 @@ function checkboxClassName(): string {
   return "h-4 w-4 rounded border-line text-steel-700 focus:ring-steel-500";
 }
 
+function DocumentLinkPicker({
+  manager,
+  folderId,
+  onClose,
+  onError
+}: {
+  manager: AttachmentManager;
+  folderId: number | null;
+  onClose: () => void;
+  onError: (error: unknown) => Promise<void>;
+}) {
+  const [search, setSearch] = useState("");
+  const library = useDocumentLibrary(search.trim() ? { q: search.trim() } : {});
+  const linkedDocumentIds = useMemo(
+    () => new Set(manager.documentLinks.map((link) => link.document.id)),
+    [manager.documentLinks]
+  );
+
+  const linkDocument = async (documentId: number) => {
+    try {
+      await manager.linkDocument({ documentId, folderId });
+      onClose();
+    } catch (error) {
+      await onError(error);
+    }
+  };
+
+  return (
+    <div className="grid gap-3 rounded-lg border border-line bg-shell p-3">
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <label className="mb-1 block text-xs font-semibold text-steel-600" htmlFor="parent-document-search">
+            DMS-Dokument suchen
+          </label>
+          <Input
+            id="parent-document-search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Name oder Beschreibung"
+          />
+        </div>
+        <Button size="sm" variant="ghost" onClick={onClose}>Schließen</Button>
+      </div>
+      {library.loading ? <p className="text-sm text-steel-500">Dokumente werden geladen …</p> : null}
+      {!library.loading && library.documents.length === 0 ? (
+        <p className="text-sm text-steel-500">Keine passenden DMS-Dokumente gefunden.</p>
+      ) : null}
+      <div className="grid max-h-64 gap-2 overflow-y-auto">
+        {library.documents.map((document) => {
+          const linked = linkedDocumentIds.has(document.id);
+          return (
+            <div key={document.id} className="flex items-center justify-between gap-3 rounded-md border border-line bg-white p-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-ink">{document.displayName ?? document.originalName}</p>
+                <p className="truncate text-xs text-steel-500">{document.originalName}</p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<Link2 size={15} />}
+                disabled={linked}
+                onClick={() => void linkDocument(document.id)}
+              >
+                {linked ? "Verknüpft" : "Verknüpfen"}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function AttachmentList({ manager }: AttachmentListProps) {
   const canWrite = useHasPermission("attachments", "write");
   const canDelete = useHasPermission("attachments", "delete");
+  const canWriteDocuments = useHasPermission("documents", "write");
   const { confirm } = useConfirm();
   const { showToast } = useToast();
-  const virtualFolders = useFolders();
   const [viewMode, setViewMode] = useState<AttachmentViewMode>(loadViewMode);
   const [source, setSource] = useState("all");
   const [localPath, setLocalPath] = useState("");
@@ -139,27 +213,41 @@ export function AttachmentList({ manager }: AttachmentListProps) {
   const [selectedLocalPaths, setSelectedLocalPaths] = useState<Set<string>>(new Set());
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showManualPath, setShowManualPath] = useState(false);
+  const [showDocumentPicker, setShowDocumentPicker] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [manualPath, setManualPath] = useState("");
   const selectedFolderId = sourceFolderId(source);
   const selectedLocalFolderId = sourceLocalFolderId(source);
   const localEntries = useAttachmentLocalEntries(selectedLocalFolderId, localPath);
   const foldersById = useMemo(
-    () => new Map(virtualFolders.folders.map((folder) => [folder.id, folder])),
-    [virtualFolders.folders]
+    () => new Map(manager.parentFolders.map((folder) => [folder.id, folder])),
+    [manager.parentFolders]
   );
 
   const displayedAttachments = useMemo(() => {
     if (source === "unfiled") {
-      return manager.attachments.filter((attachment) => !attachment.folder);
+      return manager.attachments.filter((attachment) => attachment.parentFolderId == null);
     }
     if (selectedFolderId !== null) {
       return manager.attachments.filter(
-        (attachment) => attachment.folder?.id === selectedFolderId
+        (attachment) => attachment.parentFolderId === selectedFolderId
       );
     }
     return selectedLocalFolderId === null ? manager.attachments : [];
   }, [manager.attachments, selectedFolderId, selectedLocalFolderId, source]);
+
+  const displayedDocumentLinks = useMemo(() => {
+    if (selectedLocalFolderId !== null) {
+      return [];
+    }
+    if (source === "unfiled") {
+      return manager.documentLinks.filter((link) => link.folder === null);
+    }
+    if (selectedFolderId !== null) {
+      return manager.documentLinks.filter((link) => link.folder?.id === selectedFolderId);
+    }
+    return manager.documentLinks;
+  }, [manager.documentLinks, selectedFolderId, selectedLocalFolderId, source]);
 
   useEffect(() => {
     setSelectedAttachmentIds(new Set());
@@ -226,34 +314,10 @@ export function AttachmentList({ manager }: AttachmentListProps) {
     }
   };
 
-  const bulkUnlink = async (attachments = selectedAttachments) => {
-    const approved = await confirm({
-      title: `${attachments.length} Verknüpfung(en) lösen?`,
-      body: "Die Dateien bleiben erhalten. Ownerlose, bisher bibliotheksunsichtbare Dateien werden automatisch in die Dokumentenbibliothek aufgenommen.",
-      severity: "warn",
-      confirmLabel: attachmentActionLabels.bulkUnlink
-    });
-    if (!approved) {
-      return;
-    }
-    try {
-      await manager.bulkUnlinkAttachments(
-        attachments.map((attachment) => ({
-          id: attachment.id,
-          expectedVersion: attachment.version
-        }))
-      );
-      setSelectedAttachmentIds(new Set());
-      showToast({ tone: "success", title: "Verknüpfungen gelöst" });
-    } catch (error) {
-      await showError("Verknüpfungen konnten nicht gelöst werden", error);
-    }
-  };
-
   const bulkDelete = async (attachments = selectedAttachments) => {
     const approved = await confirm({
       title: `${attachments.length} Datei(en) endgültig löschen?`,
-      body: "Die physischen PM-Dateien, sämtliche Owner-Verknüpfungen und DMS-Zuordnungen werden dauerhaft entfernt. Lokale Ordnerquellen sind davon nie betroffen.",
+      body: "Die exklusiven Parent-Anhänge und ihre physischen Dateien werden dauerhaft entfernt. DMS-Dokumente und lokale Ordnerquellen bleiben unverändert.",
       severity: "danger",
       confirmLabel: attachmentActionLabels.bulkDelete,
       requireCheck: "Ich bestätige das endgültige Löschen."
@@ -277,13 +341,12 @@ export function AttachmentList({ manager }: AttachmentListProps) {
 
   const moveSelected = async (folderId: number | null) => {
     try {
-      await manager.bulkSetAttachmentFolder(
-        selectedAttachments.map((attachment) => ({
-          id: attachment.id,
+      for (const attachment of selectedAttachments) {
+        await manager.moveAttachment(attachment.id, {
+          folderId,
           expectedVersion: attachment.version
-        })),
-        folderId
-      );
+        });
+      }
       setSelectedAttachmentIds(new Set());
       showToast({ tone: "success", title: "Virtueller Ordner aktualisiert" });
     } catch (error) {
@@ -297,7 +360,7 @@ export function AttachmentList({ manager }: AttachmentListProps) {
       return;
     }
     try {
-      const folder = await virtualFolders.createFolder({
+      const folder = await manager.createParentFolder({
         name,
         parentId: selectedFolderId
       });
@@ -306,6 +369,50 @@ export function AttachmentList({ manager }: AttachmentListProps) {
       setSource(`folder:${folder.id}`);
     } catch (error) {
       await showError("Virtueller Ordner konnte nicht angelegt werden", error);
+    }
+  };
+
+  const deleteVirtualFolder = async () => {
+    if (selectedFolderId === null) {
+      return;
+    }
+    const folder = foldersById.get(selectedFolderId);
+    if (!folder) {
+      return;
+    }
+    const approved = await confirm({
+      title: `Ordner „${folder.name}“ löschen?`,
+      body: "Nur leere Parent-Ordner können gelöscht werden. DMS-Sammlungen bleiben unverändert.",
+      severity: "warn",
+      confirmLabel: "Ordner löschen"
+    });
+    if (!approved) {
+      return;
+    }
+    try {
+      await manager.deleteParentFolder(folder.id, folder.version);
+      setSource("all");
+      showToast({ tone: "success", title: "Parent-Ordner gelöscht" });
+    } catch (error) {
+      await showError("Parent-Ordner konnte nicht gelöscht werden", error);
+    }
+  };
+
+  const unlinkDocument = async (link: ParentDocumentLink) => {
+    const approved = await confirm({
+      title: "DMS-Verknüpfung lösen?",
+      body: `Nur die Verknüpfung zu „${link.document.displayName ?? link.document.originalName}“ wird entfernt. Das Dokument, seine Sammlungen und Tags bleiben im Dokumentenmanagement bestehen.`,
+      severity: "warn",
+      confirmLabel: "Verknüpfung lösen"
+    });
+    if (!approved) {
+      return;
+    }
+    try {
+      await manager.unlinkDocument(link.id, link.version);
+      showToast({ tone: "success", title: "DMS-Verknüpfung gelöst" });
+    } catch (error) {
+      await showError("DMS-Verknüpfung konnte nicht gelöst werden", error);
     }
   };
 
@@ -404,16 +511,6 @@ export function AttachmentList({ manager }: AttachmentListProps) {
         loading={manager.openingAttachmentId === attachment.id}
         onClick={() => void openManaged(attachment)}
       />
-      {canWrite ? (
-        <Button
-          size="sm"
-          variant="ghost"
-          icon={<X size={15} />}
-          aria-label={`${attachment.originalName} Verknüpfung lösen`}
-          title="Verknüpfung lösen"
-          onClick={() => void bulkUnlink([attachment])}
-        />
-      ) : null}
       {canDelete ? (
         <Button
           size="sm"
@@ -426,6 +523,94 @@ export function AttachmentList({ manager }: AttachmentListProps) {
       ) : null}
     </div>
   );
+
+  const moveDocumentLink = async (link: ParentDocumentLink, folderId: number | null) => {
+    try {
+      await manager.moveDocumentLink(link.id, { folderId, expectedVersion: link.version });
+      showToast({ tone: "success", title: "Parent-Ordner aktualisiert" });
+    } catch (error) {
+      await showError("Dokumentverknüpfung konnte nicht verschoben werden", error);
+    }
+  };
+
+  const renderDocumentLinkActions = (link: ParentDocumentLink) => (
+    <div className="flex shrink-0 items-center gap-1">
+      <a
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-steel-600 transition hover:bg-steel-100"
+        href={assetUrl(link.document.url)}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${link.document.originalName} herunterladen`}
+        title="Herunterladen"
+      >
+        <Download size={15} />
+      </a>
+      <Button
+        size="sm"
+        variant="ghost"
+        icon={<FolderOpen size={15} />}
+        aria-label={`${link.document.originalName} lokal öffnen`}
+        title="Lokal öffnen"
+        onClick={() => void manager.openDocument(link.document.id)}
+      />
+      {canWrite && canWriteDocuments ? (
+        <>
+          <select
+            className="h-8 max-w-36 rounded-md border border-line bg-white px-2 text-xs text-ink"
+            aria-label={`${link.document.originalName} in Parent-Ordner verschieben`}
+            value={link.folder?.id ?? ""}
+            onChange={(event) => void moveDocumentLink(link, event.target.value ? Number(event.target.value) : null)}
+          >
+            <option value="">Nicht einsortiert</option>
+            {manager.parentFolders.map((folder) => (
+              <option key={folder.id} value={folder.id}>{folderLabel(folder, foldersById)}</option>
+            ))}
+          </select>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Unlink size={15} />}
+            aria-label={`${link.document.originalName} Verknüpfung lösen`}
+            title="Nur DMS-Verknüpfung lösen"
+            onClick={() => void unlinkDocument(link)}
+          />
+        </>
+      ) : null}
+    </div>
+  );
+
+  const renderDocumentLinkRow = (link: ParentDocumentLink, details: boolean) => {
+    const meta = describeAttachmentType(link.document);
+    const Icon = meta.Icon;
+    return (
+      <article
+        key={`document-link-${link.id}`}
+        className={`grid items-center gap-3 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2 shadow-sm ${
+          details
+            ? "grid-cols-[auto_auto_minmax(0,1fr)_8rem_7rem_8rem_auto]"
+            : "grid-cols-[auto_auto_minmax(0,1fr)_auto]"
+        }`}
+      >
+        <span className="inline-flex rounded bg-teal/15 px-1.5 py-0.5 text-[10px] font-bold text-teal">DMS</span>
+        <Icon size={20} className="text-teal" />
+        <button
+          type="button"
+          className="min-w-0 truncate text-left text-sm font-medium text-ink"
+          onDoubleClick={() => void manager.openDocument(link.document.id)}
+        >
+          {link.document.displayName ?? link.document.originalName}
+        </button>
+        {details ? (
+          <>
+            <span className="truncate text-xs text-steel-500">{meta.label}</span>
+            <span className="text-xs text-steel-500">{prettyBytes(link.document.size)}</span>
+            <span className="text-xs text-steel-500">{formatHumanDate(link.document.updatedAt)}</span>
+          </>
+        ) : null}
+        {renderDocumentLinkActions(link)}
+      </article>
+    );
+  };
 
   const renderLocalActions = (entry: AttachmentLocalEntry) =>
     entry.kind === "file" ? (
@@ -582,6 +767,43 @@ export function AttachmentList({ manager }: AttachmentListProps) {
     );
   };
 
+  const renderDocumentLinkTile = (link: ParentDocumentLink) => {
+    const meta = describeAttachmentType(link.document);
+    const Icon = meta.Icon;
+    return (
+      <article
+        key={`document-link-${link.id}`}
+        className="group relative overflow-hidden rounded-lg border border-teal/30 bg-white shadow-sm transition hover:shadow-panel"
+        onDoubleClick={() => void manager.openDocument(link.document.id)}
+      >
+        <div className="relative aspect-square bg-teal/5">
+          {meta.family === "image" ? (
+            <img
+              src={assetUrl(link.document.url)}
+              alt={link.document.originalName}
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-teal">
+              <Icon size={viewMode === "small" ? 28 : viewMode === "large" ? 54 : 40} />
+              <span className="rounded bg-teal/15 px-1.5 py-0.5 text-[10px] font-bold text-teal">DMS</span>
+            </div>
+          )}
+        </div>
+        <div className="grid gap-1 p-2">
+          <p className="truncate text-center text-xs font-medium text-ink">{link.document.displayName ?? link.document.originalName}</p>
+          <p className="text-center text-[10px] text-steel-500">Verknüpftes DMS-Dokument</p>
+          {canWrite && canWriteDocuments ? (
+            <Button size="sm" variant="ghost" icon={<Unlink size={14} />} onClick={() => void unlinkDocument(link)}>
+              Verknüpfung lösen
+            </Button>
+          ) : null}
+        </div>
+      </article>
+    );
+  };
+
   const renderLocalTile = (entry: AttachmentLocalEntry) => {
     const Icon = entry.kind === "directory" ? Folder : File;
     const selected = selectedLocalPaths.has(entry.relativePath);
@@ -638,7 +860,7 @@ export function AttachmentList({ manager }: AttachmentListProps) {
   const currentEntries = selectedLocalFolderId === null ? [] : localEntries.entries;
   const isEmpty =
     selectedLocalFolderId === null
-      ? displayedAttachments.length === 0
+      ? displayedAttachments.length === 0 && displayedDocumentLinks.length === 0
       : currentEntries.length === 0 && !localEntries.loading;
 
   return (
@@ -654,9 +876,9 @@ export function AttachmentList({ manager }: AttachmentListProps) {
                 setLocalPath("");
               }}
             >
-              <option value="all">Alle Attachments</option>
+              <option value="all">Alle Parent-Dateien</option>
               <option value="unfiled">Nicht einsortiert</option>
-              {virtualFolders.folders.map((folder) => (
+              {manager.parentFolders.map((folder) => (
                 <option key={folder.id} value={`folder:${folder.id}`}>
                   {folderLabel(folder, foldersById)}
                 </option>
@@ -701,6 +923,26 @@ export function AttachmentList({ manager }: AttachmentListProps) {
               >
                 {attachmentActionLabels.createFolder}
               </Button>
+              {manager.canReadDocuments && canWriteDocuments ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Link2 size={16} />}
+                  onClick={() => setShowDocumentPicker((current) => !current)}
+                >
+                  DMS-Dokument verknüpfen
+                </Button>
+              ) : null}
+              {selectedFolderId !== null && canDelete ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Trash2 size={16} />}
+                  onClick={() => void deleteVirtualFolder()}
+                >
+                  Ordner löschen
+                </Button>
+              ) : null}
               <Button
                 size="sm"
                 variant="ghost"
@@ -738,6 +980,15 @@ export function AttachmentList({ manager }: AttachmentListProps) {
               Anlegen
             </Button>
           </div>
+        ) : null}
+
+        {showDocumentPicker && manager.canReadDocuments && canWriteDocuments ? (
+          <DocumentLinkPicker
+            manager={manager}
+            folderId={selectedFolderId}
+            onClose={() => setShowDocumentPicker(false)}
+            onError={(error) => showError("DMS-Dokument konnte nicht verknüpft werden", error)}
+          />
         ) : null}
 
         {showManualPath ? (
@@ -815,20 +1066,12 @@ export function AttachmentList({ manager }: AttachmentListProps) {
                 >
                   <option value="">Ziel wählen</option>
                   <option value="none">Nicht einsortiert</option>
-                  {virtualFolders.folders.map((folder) => (
+                  {manager.parentFolders.map((folder) => (
                     <option key={folder.id} value={folder.id}>
                       {folderLabel(folder, foldersById)}
                     </option>
                   ))}
                 </Select>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon={<Unlink size={16} />}
-                  onClick={() => void bulkUnlink()}
-                >
-                  {attachmentActionLabels.bulkUnlink}
-                </Button>
               </>
             ) : null}
             {selectedAttachments.length > 0 && canDelete ? (
@@ -851,7 +1094,7 @@ export function AttachmentList({ manager }: AttachmentListProps) {
           title={selectedLocalFolderId === null ? "Noch keine Dateien" : "Dieser Ordner ist leer"}
           body={
             selectedLocalFolderId === null
-              ? "Hochgeladene oder lokal verknüpfte Dateien erscheinen hier."
+              ? "Exklusive Parent-Anhänge und verknüpfte DMS-Dokumente erscheinen hier; lokale Ordner bleiben eine eigene Quelle."
               : "Wechsle in einen anderen Ordner oder füge Dateien auf der Festplatte hinzu."
           }
           tone="teal"
@@ -862,8 +1105,11 @@ export function AttachmentList({ manager }: AttachmentListProps) {
       {!isEmpty && (viewMode === "list" || viewMode === "details") ? (
         <div className="grid gap-2">
           {selectedLocalFolderId === null
-            ? displayedAttachments.map((attachment) =>
-                renderManagedRow(attachment, viewMode === "details")
+            ? (
+                <>
+                  {displayedAttachments.map((attachment) => renderManagedRow(attachment, viewMode === "details"))}
+                  {displayedDocumentLinks.map((link) => renderDocumentLinkRow(link, viewMode === "details"))}
+                </>
               )
             : currentEntries.map((entry) => renderLocalRow(entry, viewMode === "details"))}
         </div>
@@ -875,7 +1121,12 @@ export function AttachmentList({ manager }: AttachmentListProps) {
           style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${gridMinWidth}px, 1fr))` }}
         >
           {selectedLocalFolderId === null
-            ? displayedAttachments.map(renderManagedTile)
+            ? (
+                <>
+                  {displayedAttachments.map(renderManagedTile)}
+                  {displayedDocumentLinks.map(renderDocumentLinkTile)}
+                </>
+              )
             : currentEntries.map(renderLocalTile)}
         </div>
       ) : null}
@@ -883,7 +1134,6 @@ export function AttachmentList({ manager }: AttachmentListProps) {
       {viewMode === "details" && selectedPreviewAttachment ? (
         <AttachmentPreview
           attachment={selectedPreviewAttachment}
-          onUnlink={manager.unlinkAttachment}
           onDeletePermanently={canDelete ? manager.deleteAttachmentPermanently : undefined}
           onOpen={(attachment) => manager.openAttachment(attachment.id)}
           opening={manager.openingAttachmentId === selectedPreviewAttachment.id}

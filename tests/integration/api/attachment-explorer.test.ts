@@ -17,7 +17,8 @@
  *
  * Abgedeckte Regeln:
  * - Lokale Windows-Ordner werden ownergebunden registriert, paginiert navigiert und sicher gelesen.
- * - Virtuelle Ordnerzuweisung, ZIP-Download, Bulk-Lösen und Bulk-Löschen arbeiten gesammelt und versionsgeschützt.
+ * - Ownerlokale Parent-Ordnerzuweisung, ZIP-Download und Bulk-Löschen arbeiten versionsgeschützt.
+ * - Parent-Ordner erzeugen keine globalen DMS-Sammlungen; Parent-Anhänge besitzen keinen Entkopplungspfad.
  * - Lokale Ursprungsdateien werden beim Lösen einer Ordner-Verknüpfung nicht gelöscht.
  * - Lesen benötigt attachments:read; Verknüpfen und Zuordnen benötigen attachments:write;
  *   endgültiges Löschen benötigt attachments:delete.
@@ -103,12 +104,11 @@ describe("Attachment Explorer API", () => {
     agent: SuperAgentTest,
     projectId: number,
     filename: string,
-    content: string,
-    visibility: "attachment-only" | "document-library" = "attachment-only"
+    content: string
   ) {
     return (
       await agent
-        .post(`/api/projects/${projectId}/attachments?libraryVisibility=${visibility}`)
+        .post(`/api/projects/${projectId}/attachments`)
         .attach("file", Buffer.from(content), {
           filename,
           contentType: "text/plain"
@@ -179,13 +179,13 @@ describe("Attachment Explorer API", () => {
     expect(await fs.readFile(path.join(localRoot, "lokal.txt"), "utf8")).toBe("Lokaler Inhalt");
   });
 
-  it("ordnet Attachments gesammelt zu, lädt PM- und lokale Dateien als ZIP und löst Verknüpfungen gebündelt", async () => {
+  it("ordnet Parent-Anhänge ownerlokal zu und lädt Parent- und lokale Dateien als ZIP", async () => {
     const admin = await login();
     const project = await createProject(admin);
     const first = await uploadAttachment(admin, project.id, "eins.txt", "Eins");
     const second = await uploadAttachment(admin, project.id, "zwei.txt", "Zwei");
     const folder = await admin
-      .post("/api/attachment-folders")
+      .post(`/api/projects/${project.id}/attachment-folders`)
       .send({ name: "Virtuell" })
       .expect(201);
     const localFolder = await admin
@@ -194,26 +194,23 @@ describe("Attachment Explorer API", () => {
       .expect(201);
 
     await admin
-      .post("/api/attachments/bulk-folder")
-      .send({
-        ownerType: "project",
-        ownerId: project.id,
-        folderId: folder.body.id,
-        attachments: [
-          { id: first.id, expectedVersion: first.version },
-          { id: second.id, expectedVersion: second.version }
-        ]
-      })
-      .expect(204);
+      .patch(`/api/projects/${project.id}/attachments/${first.id}/folder`)
+      .send({ folderId: folder.body.id, expectedVersion: first.version })
+      .expect(200);
+    await admin
+      .patch(`/api/projects/${project.id}/attachments/${second.id}/folder`)
+      .send({ folderId: folder.body.id, expectedVersion: second.version })
+      .expect(200);
 
     const listed = await admin.get(`/api/projects/${project.id}/attachments`).expect(200);
     expect(listed.body).toHaveLength(2);
     expect(listed.body).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ folder: expect.objectContaining({ id: folder.body.id }), version: 2 }),
-        expect.objectContaining({ folder: expect.objectContaining({ id: folder.body.id }), version: 2 })
+        expect.objectContaining({ id: first.id, parentFolderId: folder.body.id, version: 2, kind: "parent_attachment" }),
+        expect.objectContaining({ id: second.id, parentFolderId: folder.body.id, version: 2, kind: "parent_attachment" })
       ])
     );
+    await admin.get("/api/attachment-folders").expect(200, []);
 
     const archiveResponse = await admin
       .post("/api/attachments/archive")
@@ -234,26 +231,13 @@ describe("Attachment Explorer API", () => {
     const archivedNames = archive.files.map((file) => file.path).sort();
     expect(archivedNames).toEqual(["eins.txt", `${path.basename(localRoot)}/lokal.txt`].sort());
 
-    await admin
-      .post("/api/attachments/bulk-unlink")
-      .send({
-        ownerType: "project",
-        ownerId: project.id,
-        attachments: listed.body.map((attachment: { id: number; version: number }) => ({
-          id: attachment.id,
-          expectedVersion: attachment.version
-        }))
-      })
-      .expect(204);
-
-    await admin.get(`/api/projects/${project.id}/attachments`).expect(200, []);
     const [rows] = await testDb.pool.execute(
-      "SELECT is_in_document_library AS isInDocumentLibrary FROM attachments WHERE id IN (?, ?)",
+      "SELECT id, kind FROM attachments WHERE id IN (?, ?) ORDER BY id",
       [first.id, second.id]
     );
     expect(rows).toEqual([
-      expect.objectContaining({ isInDocumentLibrary: 1 }),
-      expect.objectContaining({ isInDocumentLibrary: 1 })
+      expect.objectContaining({ id: first.id, kind: "parent_attachment" }),
+      expect.objectContaining({ id: second.id, kind: "parent_attachment" })
     ]);
   });
 
@@ -332,13 +316,8 @@ describe("Attachment Explorer API", () => {
       .expect(403);
 
     const stale = await admin
-      .post("/api/attachments/bulk-folder")
-      .send({
-        ownerType: "project",
-        ownerId: project.id,
-        folderId: null,
-        attachments: [{ id: attachment.id, expectedVersion: attachment.version + 1 }]
-      })
+      .patch(`/api/projects/${project.id}/attachments/${attachment.id}/folder`)
+      .send({ folderId: null, expectedVersion: attachment.version + 1 })
       .expect(409);
     expect(stale.body).toMatchObject({ error: "CONFLICT", statusCode: 409 });
   });

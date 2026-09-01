@@ -1,19 +1,18 @@
 # MS-80 – Dokumentenmanagement: Nutzung und Betrieb
 
-**Stand:** 19.07.26  
-**Gültiges Modell:** Sammlungen + DMS-Tags  
+**Stand:** 28.08.26  
+**Gültiges Modell:** Globale DMS-Dokumente mit Sammlungen und Tags; davon getrennte exklusive Parent-Anhänge und lokale Windows-Ordner  
 **Entfallenes Modell:** Kategorien
 
 ## Nutzung aus Anwendersicht
 
-### Upload und Bibliothekssichtbarkeit
+### Upload und getrennte Dateiquellen
 
-Ein Attachment wird weiterhin genau einmal im bestehenden Attachment-Speicher abgelegt. Beim Upload an einem Projekt, Meilenstein, einer Aufgabe, einem Feature, Ticket oder Wiki-Eintrag muss ausdrücklich gewählt werden:
+Ein Upload an einem Projekt, Meilenstein, einer Aufgabe, einem Feature, Ticket oder Wiki-Eintrag erzeugt immer einen exklusiven Parent-Anhang. Er erscheint nicht im globalen DMS und wird zusammen mit seinem Parent endgültig gelöscht. Unterordner in einer Parent-Dateiansicht sind ownerlokale Ordner und keine DMS-Sammlungen.
 
-- **Nur als Attachment:** Die Datei bleibt am Fachobjekt verfügbar, erscheint aber nicht in der Dokumentenbibliothek.
-- **Auch in der Dokumentenbibliothek:** Dieselbe Datei erscheint zusätzlich im DMS. Es entsteht weder eine zweite Datei noch ein zweiter Uploadpfad.
+Ein Direktupload auf der Seite **Dokumente** ist dagegen immer ein globaler DMS-Import. Er kann optional genau einer direkten Sammlung und bis zu 20 DMS-Tags zugeordnet werden. Ein vorhandenes DMS-Dokument lässt sich anschließend bewusst und ohne Dateikopie mit einem Parent verknüpfen und dort in ownerlokalen Ordnern einsortieren.
 
-Ein Direktupload auf der Seite **Dokumente** ist immer ein Bibliotheksimport. Er kann optional genau einer direkten Sammlung und bis zu 20 DMS-Tags zugeordnet werden.
+Lokale Windows-Ordner bilden die dritte Dateiquelle. Das Lösen ihrer Einbindung entfernt nur die Konfiguration im Projekt Manager; Ordner und Dateien im Windows-Dateisystem bleiben unverändert.
 
 ### Sammlungen und Untersammlungen
 
@@ -33,23 +32,23 @@ Alte Kategorie-Endpunkte und Kategorie-Zuordnungen existieren nicht mehr. Window
 
 ### Manueller Duplikat-Check
 
-Der Duplikat-Check wird in der Dokumentenbibliothek bewusst manuell gestartet. Er liest ausschließlich bibliothekssichtbare Dokumente, berechnet SHA-256-Inhaltshashes und gruppiert identische Inhalte. Fehlende, nicht lesbare oder während des Scans geänderte Dateien erscheinen getrennt als Probleme.
+Der Duplikat-Check wird in der Dokumentenbibliothek bewusst manuell gestartet. Er liest ausschließlich Datensätze des Typs `document`, berechnet SHA-256-Inhaltshashes und gruppiert identische Inhalte. Fehlende, nicht lesbare oder während des Scans geänderte Dateien erscheinen getrennt als Probleme.
 
-Der Check führt keine automatische Zusammenführung, Löschung oder Umbenennung aus. Lesen des letzten Ergebnisses benötigt `attachments:read`, das Starten eines neuen Scans `attachments:write`.
+Der Check führt keine automatische Zusammenführung, Löschung oder Umbenennung aus. Lesen des letzten Ergebnisses benötigt `documents:read`, das Starten eines neuen Scans `documents:write`.
 
 ### Entfernen und Löschen
 
-- **Owner-Verknüpfung lösen:** Nur die Verbindung zum gewählten Fachobjekt wird entfernt.
-- **Aus Dokumentenbibliothek entfernen:** Die Datei bleibt an ihren Fachobjekten erhalten, wird im DMS aber unsichtbar.
-- **Endgültig löschen:** Datensatz, Relationen, Vorschauen und physische Datei werden entfernt; dafür ist `attachments:delete` und eine ausdrückliche Bestätigung erforderlich.
+- **Exklusiven Parent-Anhang löschen:** Datensatz, Parent-Zuordnung, Vorschauen und physische Datei werden entfernt; ein bloßes Entknüpfen ist nicht vorgesehen.
+- **DMS-Link lösen:** Nur die Verbindung zum gewählten Fachobjekt wird entfernt. DMS-Dokument, Sammlung, Tags, Vorschauen und Datei bleiben erhalten.
+- **DMS-Dokument endgültig löschen:** Dokument, sämtliche Parent-Links, Vorschauen und physische Datei werden entfernt; dafür ist `documents:delete` und eine ausdrückliche Bestätigung erforderlich.
 
-Alle drei Abläufe sind versionsgesichert und werden im Journal unterschiedlich protokolliert. Originaldateien und generierte Vorschauen werden nur über authentifizierte API-Routen ausgeliefert; erratbare `/uploads`- oder `/previews`-URLs sind nicht verfügbar.
+Die Abläufe sind versionsgesichert und werden im Journal unterscheidbar protokolliert. Originaldateien und generierte Vorschauen werden nur über authentifizierte API-Routen ausgeliefert; erratbare `/uploads`- oder `/previews`-URLs sind nicht verfügbar.
 
 ## Clients und Verträge
 
 - Web, Windows-Importer und MCP verwenden für Direktimporte denselben Endpunkt `POST /api/documents` und denselben physischen Speicherpfad.
 - Der Windows-Importer bietet Kopieren/Verschieben sowie genau eine optionale Sammlung und DMS-Tags an.
-- MCP stellt `list_document_library_options` und `add_document_to_library` bereit. Owner-bezogene MCP-Uploads verlangen die explizite Auswahl `attachment-only` oder `document-library`.
+- MCP stellt `list_document_library_options` und `add_document_to_library` sowie eigene Werkzeuge zum Auflisten, Verknüpfen und Lösen von Parent-Dokumentlinks bereit. Owner-bezogene MCP-Uploads erzeugen ausschließlich Parent-Anhänge und akzeptieren keine Bibliotheksauswahl.
 - Der detaillierte technische Importvertrag steht in [dms-ms-80-importvertrag.md](./dms-ms-80-importvertrag.md).
 
 ## Backup vor dem Kategorie-Cleanup
@@ -76,7 +75,7 @@ node scripts/ms80-backup.mjs verify backups/ms80-2026-07-19T17-09-17-317Z
 2. **Datenbankbetrieb:** Unmittelbar vor dem Rollout ein neues gekoppeltes Backup erzeugen und mit `verify` in der lokalen Testdatenbank rückspielen.
 3. **Datenbankbetrieb:** Nullverlust-Gate bestätigen. Die Cleanup-Migration bricht selbstständig ab, wenn eine Kategorie oder Kategorie-Relation keinen kompatiblen DMS-Tag beziehungsweise keine Zielrelation besitzt.
 4. **Release-Verantwortung:** API, Web, MCP und Importer als zusammengehörigen Vertrag ausrollen; keine alte API gegen neue Clients oder umgekehrt betreiben.
-5. **Anwendungsverantwortung:** Smoke-Tests für Bibliotheksliste, Sammlungsunterbaum, Mehrfach-Tags, Direktupload, beide Owner-Uploadvarianten, manuellen Duplikat-Check, geschützten Download und die drei Lebenszyklusaktionen durchführen.
+5. **Anwendungsverantwortung:** Smoke-Tests für Bibliotheksliste, Sammlungsunterbaum, Mehrfach-Tags, DMS-Direktupload, exklusiven Parent-Upload, Parent-Ordner, Dokumentlink, lokale Windows-Ordner, manuellen Duplikat-Check und geschützten Download durchführen.
 6. **Fachliche Abnahme:** Stichproben der zwölf migrierten Tags, der bekannten Sammlungen und der bibliothekssichtbaren Attachments prüfen.
 7. **Release-Verantwortung:** Erst nach dokumentierten Testergebnissen und erledigten Blockern den Meilenstein schließen. Umgesetzte, aber noch nicht abgenommene Aufgaben bleiben gemäß Projektregel `Wartend`.
 
@@ -84,10 +83,10 @@ node scripts/ms80-backup.mjs verify backups/ms80-2026-07-19T17-09-17-317Z
 
 Für die ersten 60 Minuten und erneut nach 24 Stunden werden protokolliert:
 
-- HTTP-Fehlerquote und gruppierte `401`, `403`, `404`, `409` und `500` für `/api/documents`, `/api/attachment-folders`, `/api/tags` und `/api/attachments/:id/content`;
+- HTTP-Fehlerquote und gruppierte `401`, `403`, `404`, `409` und `500` für `/api/documents`, `/api/attachment-folders`, `/api/tags` und `/api/documents/:id/content`;
 - p50/p95/p99 der Bibliotheksliste, Suche, Unterbaumfilterung und Mehrfach-Tag-Filterung;
 - Laufzeit, Zahl verarbeiteter Dateien und getrennte Datei-Probleme des manuellen Duplikat-Checks;
-- Anzahl Attachments gesamt, bibliothekssichtbar und bibliotheksunsichtbar sowie unerwartete Sichtbarkeitsänderungen;
+- Anzahl Datensätze je `kind` (`document` und `parent_attachment`), Parent-Dokumentlinks sowie unerwartete Typänderungen;
 - fehlende physische Dateien gegenüber den Attachment-Datensätzen;
 - Konfliktrate bei Metadaten-, Tag-, Sammlungs- und Lebenszyklusänderungen;
 - Importfehler getrennt nach Web, Windows-Importer und MCP.

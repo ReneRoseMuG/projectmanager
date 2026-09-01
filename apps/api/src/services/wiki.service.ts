@@ -29,6 +29,7 @@ import {
   type JournalFieldDefinition,
   type JournalObjectRef
 } from "./journal.service.js";
+import { deleteParentAttachmentsForOwners } from "./attachments.service.js";
 
 export interface WikiPageInput {
   parentId?: number | null;
@@ -529,6 +530,7 @@ export async function deleteWikiPage(database: DbClient, id: number, actor?: Jou
     throw conflict("Wiki page has child pages");
   }
 
+  await deleteParentAttachmentsForOwners(database, [{ type: "wikiPage", id }]);
   await deleteWikiPageNotesForIds(database, [id]);
   await deleteWikiPageCommentsForIds(database, [id]);
 

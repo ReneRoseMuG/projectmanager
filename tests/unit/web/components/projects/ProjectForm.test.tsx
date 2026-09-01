@@ -313,7 +313,7 @@ describe("ProjectForm", () => {
         tickets: [{ kind: "new", draft: { title: "Projekt-Ticket Pending", type: "bug", status: "open", priority: "medium" } }],
         comments: [{ text: "Projekt-Kommentar" }],
         notes: [{ title: "Projekt-Notiz", contentJson: { html: "" } }],
-        files: [{ file, previewUrl: undefined, librarySelection: "document-library" }]
+        files: [{ file, previewUrl: undefined }]
       })
     );
     expect(onClose).toHaveBeenCalledTimes(1);

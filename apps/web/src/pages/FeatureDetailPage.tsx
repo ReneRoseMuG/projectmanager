@@ -145,7 +145,7 @@ export function FeatureDetailPage() {
         setSavingLabel(
           `Speichern… (Datei ${index + 1} von ${pending.files.length})`,
         );
-        await uploadFeatureAttachment(featureId, file.file, file.librarySelection);
+        await uploadFeatureAttachment(featureId, file.file);
       }
       await features.reload();
       showToast({ tone: "success", title: "Feature-Zuordnungen gespeichert" });

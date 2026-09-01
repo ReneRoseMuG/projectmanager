@@ -74,7 +74,7 @@ function importedDocument(id: number, folderId: number | null = null) {
     filename: `${id}.txt`,
     mimetype: "text/plain",
     size: 7,
-    url: `/api/attachments/${id}/content`,
+    url: `/api/documents/${id}/content`,
     displayName: null,
     description: null,
     contentHash: "a".repeat(64),

@@ -2,7 +2,7 @@
 
 /**
  * Test Scope:
- * AttachmentUploader mit expliziter Bibliothekssichtbarkeit für Owner-Uploads.
+ * AttachmentUploader mit strikt getrennten Parent- und DMS-Uploads.
  *
  * Test-Ebene:
  * - Unit/Komponente
@@ -17,15 +17,15 @@
  * - JSDOM und vollständige Bereinigung nach jedem Test.
  *
  * Abgedeckte Regeln:
- * - Owner-Uploads sind ohne bewusste Auswahl nicht möglich.
- * - Eine Auswahl gilt unverändert für alle Dateien eines Batches und bleibt nach einem Fehler erhalten.
- * - Direkte Bibliotheksuploads benötigen keine zusätzliche Auswahl.
+ * - Owner-Uploads werden ohne Bibliotheksauswahl exklusiv an den Parent gesendet.
+ * - Alle Dateien eines Batches werden einzeln mit derselben exklusiven Semantik hochgeladen.
+ * - Direkte DMS-Uploads verwenden denselben Datei-Callback, aber keinen Parent-Hinweis.
  *
  * Fehlerfälle:
- * - Ein abgelehnter Upload setzt den gewählten Bedeutungszustand nicht zurück.
+ * - Ein abgelehnter Upload beendet den Batch-Zustand, ohne eine zweite Ablageart anzubieten.
  *
  * Ziel:
- * Verständliche und verbindliche Upload-Entscheidung ohne stillen Standardwert.
+ * Die UI kann keinen Parent-Upload mehr versehentlich in das DMS umleiten.
  */
 
 import "@testing-library/jest-dom/vitest";
@@ -48,39 +48,36 @@ afterEach(() => {
 });
 
 describe("AttachmentUploader", () => {
-  it("verlangt für Owner-Uploads eine explizite Auswahl", () => {
+  it("kennzeichnet Owner-Uploads als exklusive Parent-Anhänge", () => {
     render(<AttachmentUploader visibilityMode="owner" onUpload={vi.fn()} />);
 
-    expect(screen.getByRole("button", { name: "Auswählen" })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: /Nur als Anhang/ })).not.toBeChecked();
-    expect(screen.getByRole("radio", { name: /Zusätzlich in der Dokumentenbibliothek/ })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Auswählen" })).toBeEnabled();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getByText(/ausschließlich als Anhänge dieses Elements/)).toBeInTheDocument();
   });
 
-  it("wendet die Auswahl auf den gesamten Batch an", async () => {
+  it("lädt alle Dateien eines Owner-Batches ohne DMS-Parameter hoch", async () => {
     const onUpload = vi.fn().mockResolvedValue(undefined);
     const first = new File(["a"], "a.txt", { type: "text/plain" });
     const second = new File(["b"], "b.txt", { type: "text/plain" });
     const { container } = render(<AttachmentUploader visibilityMode="owner" onUpload={onUpload} />);
 
-    fireEvent.click(screen.getByRole("radio", { name: /Zusätzlich in der Dokumentenbibliothek/ }));
     fireEvent.change(fileInput(container), { target: { files: [first, second] } });
 
     await waitFor(() => expect(onUpload).toHaveBeenCalledTimes(2));
-    expect(onUpload).toHaveBeenNthCalledWith(1, first, "document-library");
-    expect(onUpload).toHaveBeenNthCalledWith(2, second, "document-library");
+    expect(onUpload).toHaveBeenNthCalledWith(1, first);
+    expect(onUpload).toHaveBeenNthCalledWith(2, second);
   });
 
-  it("behält die Auswahl nach einem fehlgeschlagenen Upload bei", async () => {
+  it("bietet auch nach einem fehlgeschlagenen Owner-Upload keine zweite Ablageart an", async () => {
     const onUpload = vi.fn().mockRejectedValue(new Error("Upload fehlgeschlagen"));
     const file = new File(["a"], "a.txt", { type: "text/plain" });
     const { container } = render(<AttachmentUploader visibilityMode="owner" onUpload={onUpload} />);
 
-    const attachmentOnly = screen.getByRole("radio", { name: /Nur als Anhang/ });
-    fireEvent.click(attachmentOnly);
     fireEvent.change(fileInput(container), { target: { files: [file] } });
 
-    await waitFor(() => expect(onUpload).toHaveBeenCalledWith(file, "attachment-only"));
-    expect(attachmentOnly).toBeChecked();
+    await waitFor(() => expect(onUpload).toHaveBeenCalledWith(file));
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
   });
 
   it("lädt aus der Dokumentenbibliothek ohne zusätzliche Auswahl hoch", async () => {

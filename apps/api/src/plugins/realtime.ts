@@ -28,6 +28,9 @@ function scopeForPath(path: string): RealtimeInvalidationScope {
   if (apiPath.startsWith("/admin/roles") || apiPath.startsWith("/admin/permissions")) {
     return "adminRoles";
   }
+  if (apiPath.startsWith("/documents") || apiPath.startsWith("/attachment-folders") || apiPathSegments.includes("document-links")) {
+    return "documents";
+  }
   if (apiPath.startsWith("/projects")) {
     return "projects";
   }

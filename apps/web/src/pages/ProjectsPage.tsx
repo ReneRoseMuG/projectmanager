@@ -169,7 +169,7 @@ export function ProjectsPage() {
         await createMilestoneNote(milestoneId, note);
       }
       for (const file of pending.files) {
-        await uploadMilestoneAttachment(milestoneId, file.file, file.librarySelection);
+        await uploadMilestoneAttachment(milestoneId, file.file);
       }
     } catch (createError) {
       showToast({
@@ -220,7 +220,7 @@ export function ProjectsPage() {
         await createTaskNote(created.id, note);
       }
       for (const file of pendingFiles) {
-        await uploadTaskAttachment(created.id, file.file, file.librarySelection);
+        await uploadTaskAttachment(created.id, file.file);
       }
       showToast({ tone: "success", title: "Aufgabe angelegt" });
       return created;
@@ -275,7 +275,7 @@ export function ProjectsPage() {
         await createTicketNote(created.id, note);
       }
       for (const file of pendingFiles) {
-        await uploadTicketAttachment(created.id, file.file, file.librarySelection);
+        await uploadTicketAttachment(created.id, file.file);
       }
       showToast({ tone: "success", title: "Ticket angelegt" });
       return created;

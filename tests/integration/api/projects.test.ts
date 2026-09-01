@@ -168,7 +168,7 @@ describe("Projects API", () => {
     await createNoteForProject(app, project.id, { title: "Projekt-Notiz" });
     await supertest(app.server).post(`/api/projects/${project.id}/comments`).send({ body: "Projekt-Kommentar" }).expect(201);
     await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("Projekt-Datei"), { filename: "project.txt", contentType: "text/plain" })
       .expect(201);
 

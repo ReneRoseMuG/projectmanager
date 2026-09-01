@@ -1,5 +1,5 @@
-import type { Attachment, AttachmentFolder, AttachmentLibrarySelection, AttachmentOwner, JournalObjectType, RecentAttachment } from "@taskmanager/shared-types";
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import type { Attachment, AttachmentFolder, AttachmentOwner, JournalObjectType, RecentAttachment } from "@taskmanager/shared-types";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
@@ -12,24 +12,31 @@ import {
   featureAttachments,
   features,
   milestoneAttachments,
+  milestoneDocumentLinks,
   milestoneTasks,
   milestoneTickets,
   milestones,
   projectAttachments,
+  projectDocumentLinks,
   projectTasks,
   projectTickets,
   projects,
   folderAttachments,
   taskAttachments,
+  taskDocumentLinks,
   tasks,
   ticketAttachments,
+  ticketDocumentLinks,
   tickets,
   users,
   wikiPageAttachments,
+  wikiPageDocumentLinks,
+  featureDocumentLinks,
   wikiPages
 } from "../db/schema.js";
 import { attachmentRepository, type AttachmentRecord } from "../repositories/attachment.repository.js";
 import { assertVersion } from "../repositories/base.repository.js";
+import { parentFileRepository } from "../repositories/parent-file.repository.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { AppError, badRequest, conflict, internalError, notFound } from "../utils/errors.js";
 import { removeAttachmentPreviews } from "./attachment-preview.service.js";
@@ -37,8 +44,6 @@ import { watchAttachmentForChanges } from "./attachment-watcher.service.js";
 import type { FileOpener } from "./file-opener.service.js";
 import {
   buildDeleteSummary,
-  buildLinkSummary,
-  buildUnlinkSummary,
   makeJournalContext,
   makeJournalObject,
   objectTypeLabel,
@@ -62,9 +67,7 @@ export interface AttachmentUpload {
   buffer: Buffer;
 }
 
-export interface OwnerAttachmentUpload extends AttachmentUpload {
-  librarySelection: AttachmentLibrarySelection;
-}
+export type OwnerAttachmentUpload = AttachmentUpload;
 
 const attachmentSelect = {
   id: attachments.id,
@@ -75,7 +78,7 @@ const attachmentSelect = {
   displayName: attachments.displayName,
   description: attachments.description,
   contentHash: attachments.contentHash,
-  isInDocumentLibrary: attachments.isInDocumentLibrary,
+  kind: attachments.kind,
   version: attachments.version,
   createdBy: attachments.createdBy,
   updatedBy: attachments.updatedBy,
@@ -86,10 +89,12 @@ const attachmentSelect = {
 function buildAttachment(
   record: AttachmentRecord,
   owners: AttachmentOwner[],
-  folders: AttachmentFolder[]
+  folders: AttachmentFolder[],
+  parentFolderId: number | null = null
 ): Attachment {
   return {
     id: record.id,
+    kind: record.kind,
     owners,
     originalName: record.originalName,
     filename: record.filename,
@@ -97,11 +102,12 @@ function buildAttachment(
     size: record.size,
     displayName: record.displayName,
     description: record.description,
-    url: `/api/attachments/${record.id}/content`,
+    url: record.kind === "document" ? `/api/documents/${record.id}/content` : `/api/attachments/${record.id}/content`,
     contentHash: record.contentHash,
-    isInDocumentLibrary: record.isInDocumentLibrary,
+    isInDocumentLibrary: record.kind === "document",
     folder: folders[0] ?? null,
     folders,
+    parentFolderId,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     version: record.version
@@ -121,7 +127,6 @@ async function loadAttachmentFoldersForIds(
       attachmentId: folderAttachments.attachmentId,
       id: attachmentFolders.id,
       parentId: attachmentFolders.parentId,
-      projectId: attachmentFolders.projectId,
       name: attachmentFolders.name,
       version: attachmentFolders.version
     })
@@ -133,7 +138,6 @@ async function loadAttachmentFoldersForIds(
     const folder: AttachmentFolder = {
       id: row.id,
       parentId: row.parentId,
-      projectId: row.projectId,
       name: row.name,
       childCount: 0,
       directDocumentCount: 0,
@@ -223,7 +227,7 @@ export async function ensureAttachmentOwnerExists(database: DbClient, owner: Att
   await ensureTicketExists(database, owner.id);
 }
 
-async function getOwnerJournalObject(database: DbClient, owner: AttachmentOwner): Promise<JournalObjectRef> {
+export async function getAttachmentOwnerJournalObject(database: DbClient, owner: AttachmentOwner): Promise<JournalObjectRef> {
   if (owner.type === "project") {
     const project = firstRow(await database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, owner.id)));
     if (!project) {
@@ -271,7 +275,7 @@ async function getOwnerJournalObject(database: DbClient, owner: AttachmentOwner)
 // getOwnerJournalObject bleibt für Erstell-/Link-Pfade bewusst streng.
 async function resolveOwnerJournalObjectOrNull(database: DbClient, owner: AttachmentOwner): Promise<JournalObjectRef | null> {
   try {
-    return await getOwnerJournalObject(database, owner);
+    return await getAttachmentOwnerJournalObject(database, owner);
   } catch (error) {
     if (error instanceof AppError && error.error === "NOT_FOUND") {
       return null;
@@ -322,14 +326,27 @@ export async function listAttachmentOwners(database: DbClient, attachmentId: num
   const featureRows = await database.select({ id: featureAttachments.featureId }).from(featureAttachments).where(eq(featureAttachments.attachmentId, attachmentId));
   const wikiPageRows = await database.select({ id: wikiPageAttachments.wikiPageId }).from(wikiPageAttachments).where(eq(wikiPageAttachments.attachmentId, attachmentId));
   const ticketRows = await database.select({ id: ticketAttachments.ticketId }).from(ticketAttachments).where(eq(ticketAttachments.attachmentId, attachmentId));
-  return [
+  const projectDocumentRows = await database.select({ id: projectDocumentLinks.ownerId }).from(projectDocumentLinks).where(eq(projectDocumentLinks.documentId, attachmentId));
+  const taskDocumentRows = await database.select({ id: taskDocumentLinks.ownerId }).from(taskDocumentLinks).where(eq(taskDocumentLinks.documentId, attachmentId));
+  const milestoneDocumentRows = await database.select({ id: milestoneDocumentLinks.ownerId }).from(milestoneDocumentLinks).where(eq(milestoneDocumentLinks.documentId, attachmentId));
+  const featureDocumentRows = await database.select({ id: featureDocumentLinks.ownerId }).from(featureDocumentLinks).where(eq(featureDocumentLinks.documentId, attachmentId));
+  const wikiPageDocumentRows = await database.select({ id: wikiPageDocumentLinks.ownerId }).from(wikiPageDocumentLinks).where(eq(wikiPageDocumentLinks.documentId, attachmentId));
+  const ticketDocumentRows = await database.select({ id: ticketDocumentLinks.ownerId }).from(ticketDocumentLinks).where(eq(ticketDocumentLinks.documentId, attachmentId));
+  const owners: AttachmentOwner[] = [
     ...projectRows.map((row) => ({ type: "project" as const, id: row.id })),
     ...taskRows.map((row) => ({ type: "task" as const, id: row.id })),
     ...milestoneRows.map((row) => ({ type: "milestone" as const, id: row.id })),
     ...featureRows.map((row) => ({ type: "feature" as const, id: row.id })),
     ...wikiPageRows.map((row) => ({ type: "wikiPage" as const, id: row.id })),
-    ...ticketRows.map((row) => ({ type: "ticket" as const, id: row.id }))
+    ...ticketRows.map((row) => ({ type: "ticket" as const, id: row.id })),
+    ...projectDocumentRows.map((row) => ({ type: "project" as const, id: row.id })),
+    ...taskDocumentRows.map((row) => ({ type: "task" as const, id: row.id })),
+    ...milestoneDocumentRows.map((row) => ({ type: "milestone" as const, id: row.id })),
+    ...featureDocumentRows.map((row) => ({ type: "feature" as const, id: row.id })),
+    ...wikiPageDocumentRows.map((row) => ({ type: "wikiPage" as const, id: row.id })),
+    ...ticketDocumentRows.map((row) => ({ type: "ticket" as const, id: row.id }))
   ];
+  return owners.filter((owner, index) => owners.findIndex((candidate) => candidate.type === owner.type && candidate.id === owner.id) === index);
 }
 
 // Batch-Variante von listAttachmentOwners: lädt die Owner ALLER übergebenen Anhänge in
@@ -362,12 +379,27 @@ export async function listAttachmentOwnersForIds(
   const featureRows = await database.select({ attachmentId: featureAttachments.attachmentId, id: featureAttachments.featureId }).from(featureAttachments).where(inArray(featureAttachments.attachmentId, attachmentIds));
   const wikiPageRows = await database.select({ attachmentId: wikiPageAttachments.attachmentId, id: wikiPageAttachments.wikiPageId }).from(wikiPageAttachments).where(inArray(wikiPageAttachments.attachmentId, attachmentIds));
   const ticketRows = await database.select({ attachmentId: ticketAttachments.attachmentId, id: ticketAttachments.ticketId }).from(ticketAttachments).where(inArray(ticketAttachments.attachmentId, attachmentIds));
+  const projectDocumentRows = await database.select({ attachmentId: projectDocumentLinks.documentId, id: projectDocumentLinks.ownerId }).from(projectDocumentLinks).where(inArray(projectDocumentLinks.documentId, attachmentIds));
+  const taskDocumentRows = await database.select({ attachmentId: taskDocumentLinks.documentId, id: taskDocumentLinks.ownerId }).from(taskDocumentLinks).where(inArray(taskDocumentLinks.documentId, attachmentIds));
+  const milestoneDocumentRows = await database.select({ attachmentId: milestoneDocumentLinks.documentId, id: milestoneDocumentLinks.ownerId }).from(milestoneDocumentLinks).where(inArray(milestoneDocumentLinks.documentId, attachmentIds));
+  const featureDocumentRows = await database.select({ attachmentId: featureDocumentLinks.documentId, id: featureDocumentLinks.ownerId }).from(featureDocumentLinks).where(inArray(featureDocumentLinks.documentId, attachmentIds));
+  const wikiPageDocumentRows = await database.select({ attachmentId: wikiPageDocumentLinks.documentId, id: wikiPageDocumentLinks.ownerId }).from(wikiPageDocumentLinks).where(inArray(wikiPageDocumentLinks.documentId, attachmentIds));
+  const ticketDocumentRows = await database.select({ attachmentId: ticketDocumentLinks.documentId, id: ticketDocumentLinks.ownerId }).from(ticketDocumentLinks).where(inArray(ticketDocumentLinks.documentId, attachmentIds));
   for (const row of projectRows) push(row.attachmentId, { type: "project", id: row.id });
   for (const row of taskRows) push(row.attachmentId, { type: "task", id: row.id });
   for (const row of milestoneRows) push(row.attachmentId, { type: "milestone", id: row.id });
   for (const row of featureRows) push(row.attachmentId, { type: "feature", id: row.id });
   for (const row of wikiPageRows) push(row.attachmentId, { type: "wikiPage", id: row.id });
   for (const row of ticketRows) push(row.attachmentId, { type: "ticket", id: row.id });
+  for (const row of projectDocumentRows) push(row.attachmentId, { type: "project", id: row.id });
+  for (const row of taskDocumentRows) push(row.attachmentId, { type: "task", id: row.id });
+  for (const row of milestoneDocumentRows) push(row.attachmentId, { type: "milestone", id: row.id });
+  for (const row of featureDocumentRows) push(row.attachmentId, { type: "feature", id: row.id });
+  for (const row of wikiPageDocumentRows) push(row.attachmentId, { type: "wikiPage", id: row.id });
+  for (const row of ticketDocumentRows) push(row.attachmentId, { type: "ticket", id: row.id });
+  for (const [attachmentId, owners] of result) {
+    result.set(attachmentId, owners.filter((owner, index) => owners.findIndex((candidate) => candidate.type === owner.type && candidate.id === owner.id) === index));
+  }
   return result;
 }
 
@@ -393,120 +425,6 @@ async function insertAttachmentLink(database: DbSession, owner: AttachmentOwner,
     return;
   }
   await database.insert(ticketAttachments).ignore().values({ ticketId: owner.id, attachmentId });
-}
-
-async function deleteAttachmentLink(database: DbSession, owner: AttachmentOwner, attachmentId: number): Promise<number> {
-  if (owner.type === "project") {
-    return mutationAffectedRows(await database.delete(projectAttachments).where(and(eq(projectAttachments.projectId, owner.id), eq(projectAttachments.attachmentId, attachmentId))));
-  }
-  if (owner.type === "task") {
-    return mutationAffectedRows(await database.delete(taskAttachments).where(and(eq(taskAttachments.taskId, owner.id), eq(taskAttachments.attachmentId, attachmentId))));
-  }
-  if (owner.type === "milestone") {
-    return mutationAffectedRows(await database.delete(milestoneAttachments).where(and(eq(milestoneAttachments.milestoneId, owner.id), eq(milestoneAttachments.attachmentId, attachmentId))));
-  }
-  if (owner.type === "feature") {
-    return mutationAffectedRows(await database.delete(featureAttachments).where(and(eq(featureAttachments.featureId, owner.id), eq(featureAttachments.attachmentId, attachmentId))));
-  }
-  if (owner.type === "wikiPage") {
-    return mutationAffectedRows(await database.delete(wikiPageAttachments).where(and(eq(wikiPageAttachments.wikiPageId, owner.id), eq(wikiPageAttachments.attachmentId, attachmentId))));
-  }
-  return mutationAffectedRows(await database.delete(ticketAttachments).where(and(eq(ticketAttachments.ticketId, owner.id), eq(ticketAttachments.attachmentId, attachmentId))));
-}
-
-async function deleteAttachmentLinks(
-  database: DbSession,
-  owner: AttachmentOwner,
-  attachmentIds: number[]
-): Promise<number> {
-  if (owner.type === "project") {
-    return mutationAffectedRows(
-      await database
-        .delete(projectAttachments)
-        .where(
-          and(
-            eq(projectAttachments.projectId, owner.id),
-            inArray(projectAttachments.attachmentId, attachmentIds)
-          )
-        )
-    );
-  }
-  if (owner.type === "task") {
-    return mutationAffectedRows(
-      await database
-        .delete(taskAttachments)
-        .where(
-          and(
-            eq(taskAttachments.taskId, owner.id),
-            inArray(taskAttachments.attachmentId, attachmentIds)
-          )
-        )
-    );
-  }
-  if (owner.type === "milestone") {
-    return mutationAffectedRows(
-      await database
-        .delete(milestoneAttachments)
-        .where(
-          and(
-            eq(milestoneAttachments.milestoneId, owner.id),
-            inArray(milestoneAttachments.attachmentId, attachmentIds)
-          )
-        )
-    );
-  }
-  if (owner.type === "feature") {
-    return mutationAffectedRows(
-      await database
-        .delete(featureAttachments)
-        .where(
-          and(
-            eq(featureAttachments.featureId, owner.id),
-            inArray(featureAttachments.attachmentId, attachmentIds)
-          )
-        )
-    );
-  }
-  if (owner.type === "wikiPage") {
-    return mutationAffectedRows(
-      await database
-        .delete(wikiPageAttachments)
-        .where(
-          and(
-            eq(wikiPageAttachments.wikiPageId, owner.id),
-            inArray(wikiPageAttachments.attachmentId, attachmentIds)
-          )
-        )
-    );
-  }
-  return mutationAffectedRows(
-    await database
-      .delete(ticketAttachments)
-      .where(
-        and(
-          eq(ticketAttachments.ticketId, owner.id),
-          inArray(ticketAttachments.attachmentId, attachmentIds)
-        )
-      )
-  );
-}
-
-async function hasAnyAttachmentOwner(database: DbSession, attachmentId: number): Promise<boolean> {
-  const ownerTables = [
-    projectAttachments,
-    taskAttachments,
-    milestoneAttachments,
-    featureAttachments,
-    wikiPageAttachments,
-    ticketAttachments
-  ] as const;
-  for (const ownerTable of ownerTables) {
-    const row = firstRow(await database.select({ attachmentId: ownerTable.attachmentId }).from(ownerTable).where(eq(ownerTable.attachmentId, attachmentId)).limit(1));
-    if (row) {
-      return true;
-    }
-  }
-  return false;
 }
 
 async function removeAttachmentFiles(records: AttachmentCleanupRecord[]): Promise<void> {
@@ -546,11 +464,11 @@ async function persistAttachment(values: {
       mimetype: values.upload.mimetype,
       size: values.upload.buffer.byteLength,
       contentHash: createHash("sha256").update(values.upload.buffer).digest("hex"),
-      isInDocumentLibrary: values.upload.librarySelection === "document-library"
+      kind: "parent_attachment"
     }, values.actor?.actorUserId ?? undefined);
     await insertAttachmentLink(tx, values.owner, attachment.id);
     const attachmentObject = attachmentJournalObject(attachment);
-    const ownerObject = await getOwnerJournalObject(values.database, values.owner);
+    const ownerObject = await getAttachmentOwnerJournalObject(values.database, values.owner);
     await recordJournalEntry(tx, {
       operation: "create",
       object: attachmentObject,
@@ -584,7 +502,7 @@ export async function createUnboundAttachment(database: DbClient, upload: Attach
         mimetype: upload.mimetype,
         size: upload.buffer.byteLength,
         contentHash: createHash("sha256").update(upload.buffer).digest("hex"),
-        isInDocumentLibrary: true
+        kind: "document"
       },
       actor?.actorUserId ?? undefined
     );
@@ -614,7 +532,7 @@ async function selectOwnerAttachments(
       .select(attachmentSelect)
       .from(projectAttachments)
       .innerJoin(attachments, eq(projectAttachments.attachmentId, attachments.id))
-      .where(idsCondition ? and(eq(projectAttachments.projectId, owner.id), idsCondition) : eq(projectAttachments.projectId, owner.id))
+      .where(and(eq(projectAttachments.projectId, owner.id), eq(attachments.kind, "parent_attachment"), idsCondition))
       .orderBy(desc(attachments.createdAt))
       ;
   }
@@ -623,7 +541,7 @@ async function selectOwnerAttachments(
       .select(attachmentSelect)
       .from(taskAttachments)
       .innerJoin(attachments, eq(taskAttachments.attachmentId, attachments.id))
-      .where(idsCondition ? and(eq(taskAttachments.taskId, owner.id), idsCondition) : eq(taskAttachments.taskId, owner.id))
+      .where(and(eq(taskAttachments.taskId, owner.id), eq(attachments.kind, "parent_attachment"), idsCondition))
       .orderBy(desc(attachments.createdAt))
       ;
   }
@@ -632,7 +550,7 @@ async function selectOwnerAttachments(
       .select(attachmentSelect)
       .from(milestoneAttachments)
       .innerJoin(attachments, eq(milestoneAttachments.attachmentId, attachments.id))
-      .where(idsCondition ? and(eq(milestoneAttachments.milestoneId, owner.id), idsCondition) : eq(milestoneAttachments.milestoneId, owner.id))
+      .where(and(eq(milestoneAttachments.milestoneId, owner.id), eq(attachments.kind, "parent_attachment"), idsCondition))
       .orderBy(desc(attachments.createdAt))
       ;
   }
@@ -641,7 +559,7 @@ async function selectOwnerAttachments(
       .select(attachmentSelect)
       .from(featureAttachments)
       .innerJoin(attachments, eq(featureAttachments.attachmentId, attachments.id))
-      .where(idsCondition ? and(eq(featureAttachments.featureId, owner.id), idsCondition) : eq(featureAttachments.featureId, owner.id))
+      .where(and(eq(featureAttachments.featureId, owner.id), eq(attachments.kind, "parent_attachment"), idsCondition))
       .orderBy(desc(attachments.createdAt))
       ;
   }
@@ -650,7 +568,7 @@ async function selectOwnerAttachments(
       .select(attachmentSelect)
       .from(wikiPageAttachments)
       .innerJoin(attachments, eq(wikiPageAttachments.attachmentId, attachments.id))
-      .where(idsCondition ? and(eq(wikiPageAttachments.wikiPageId, owner.id), idsCondition) : eq(wikiPageAttachments.wikiPageId, owner.id))
+      .where(and(eq(wikiPageAttachments.wikiPageId, owner.id), eq(attachments.kind, "parent_attachment"), idsCondition))
       .orderBy(desc(attachments.createdAt))
       ;
   }
@@ -658,7 +576,7 @@ async function selectOwnerAttachments(
     .select(attachmentSelect)
     .from(ticketAttachments)
     .innerJoin(attachments, eq(ticketAttachments.attachmentId, attachments.id))
-    .where(idsCondition ? and(eq(ticketAttachments.ticketId, owner.id), idsCondition) : eq(ticketAttachments.ticketId, owner.id))
+    .where(and(eq(ticketAttachments.ticketId, owner.id), eq(attachments.kind, "parent_attachment"), idsCondition))
     .orderBy(desc(attachments.createdAt))
     ;
 }
@@ -980,21 +898,102 @@ export async function listRecentAttachments(database: DbClient, options: { owner
     }));
 }
 
-async function listOwnerAttachments(database: DbClient, owner: AttachmentOwner): Promise<Attachment[]> {
+export async function listOwnerAttachments(database: DbClient, owner: AttachmentOwner): Promise<Attachment[]> {
   await ensureAttachmentOwnerExists(database, owner);
   const ownerAttachments = await selectOwnerAttachments(database, owner);
   const attachmentIds = ownerAttachments.map((attachment) => attachment.id);
-  const [ownersById, foldersById] = await Promise.all([
-    listAttachmentOwnersForIds(database, attachmentIds),
-    loadAttachmentFoldersForIds(database, attachmentIds)
-  ]);
+  const ownersById = await listAttachmentOwnersForIds(database, attachmentIds);
+  const assignments = await parentFileRepository.listAttachmentFolderAssignments(database, owner);
+  const parentFolderByAttachmentId = new Map(assignments.map((assignment) => [assignment.attachmentId, assignment.folderId]));
   return ownerAttachments.map((attachment) =>
     buildAttachment(
       attachment,
       ownersById.get(attachment.id) ?? [],
-      foldersById.get(attachment.id) ?? []
+      [],
+      parentFolderByAttachmentId.get(attachment.id) ?? null
     )
   );
+}
+
+export async function deleteParentAttachmentsForOwners(
+  database: DbClient,
+  owners: AttachmentOwner[]
+): Promise<void> {
+  const ownerIdsByType = new Map<AttachmentOwner["type"], Set<number>>();
+  for (const owner of owners) {
+    const ids = ownerIdsByType.get(owner.type) ?? new Set<number>();
+    ids.add(owner.id);
+    ownerIdsByType.set(owner.type, ids);
+  }
+
+  const records: AttachmentRecord[] = [];
+  const projectIds = [...(ownerIdsByType.get("project") ?? [])];
+  if (projectIds.length > 0) {
+    records.push(...await database
+      .select(attachmentSelect)
+      .from(attachments)
+      .innerJoin(projectAttachments, eq(projectAttachments.attachmentId, attachments.id))
+      .where(and(inArray(projectAttachments.projectId, projectIds), eq(attachments.kind, "parent_attachment"))));
+  }
+  const taskIds = [...(ownerIdsByType.get("task") ?? [])];
+  if (taskIds.length > 0) {
+    records.push(...await database
+      .select(attachmentSelect)
+      .from(attachments)
+      .innerJoin(taskAttachments, eq(taskAttachments.attachmentId, attachments.id))
+      .where(and(inArray(taskAttachments.taskId, taskIds), eq(attachments.kind, "parent_attachment"))));
+  }
+  const milestoneIds = [...(ownerIdsByType.get("milestone") ?? [])];
+  if (milestoneIds.length > 0) {
+    records.push(...await database
+      .select(attachmentSelect)
+      .from(attachments)
+      .innerJoin(milestoneAttachments, eq(milestoneAttachments.attachmentId, attachments.id))
+      .where(and(inArray(milestoneAttachments.milestoneId, milestoneIds), eq(attachments.kind, "parent_attachment"))));
+  }
+  const featureIds = [...(ownerIdsByType.get("feature") ?? [])];
+  if (featureIds.length > 0) {
+    records.push(...await database
+      .select(attachmentSelect)
+      .from(attachments)
+      .innerJoin(featureAttachments, eq(featureAttachments.attachmentId, attachments.id))
+      .where(and(inArray(featureAttachments.featureId, featureIds), eq(attachments.kind, "parent_attachment"))));
+  }
+  const ticketIds = [...(ownerIdsByType.get("ticket") ?? [])];
+  if (ticketIds.length > 0) {
+    records.push(...await database
+      .select(attachmentSelect)
+      .from(attachments)
+      .innerJoin(ticketAttachments, eq(ticketAttachments.attachmentId, attachments.id))
+      .where(and(inArray(ticketAttachments.ticketId, ticketIds), eq(attachments.kind, "parent_attachment"))));
+  }
+  const wikiPageIds = [...(ownerIdsByType.get("wikiPage") ?? [])];
+  if (wikiPageIds.length > 0) {
+    records.push(...await database
+      .select(attachmentSelect)
+      .from(attachments)
+      .innerJoin(wikiPageAttachments, eq(wikiPageAttachments.attachmentId, attachments.id))
+      .where(and(inArray(wikiPageAttachments.wikiPageId, wikiPageIds), eq(attachments.kind, "parent_attachment"))));
+  }
+
+  const uniqueRecords = [...new Map(records.map((record) => [record.id, record])).values()];
+  if (uniqueRecords.length === 0) {
+    return;
+  }
+  const attachmentIds = uniqueRecords.map((record) => record.id);
+  const deleted = mutationAffectedRows(
+    await database
+      .delete(attachments)
+      .where(and(inArray(attachments.id, attachmentIds), eq(attachments.kind, "parent_attachment")))
+  );
+  if (deleted !== uniqueRecords.length) {
+    throw conflict("Mindestens ein Parent-Anhang wurde zwischenzeitlich geändert.");
+  }
+  try {
+    await removeAttachmentFiles(uniqueRecords);
+  } catch {
+    throw internalError("Die Parent-Anhänge wurden gelöscht, mindestens eine physische Datei konnte jedoch nicht vollständig entfernt werden.");
+  }
 }
 
 export async function listProjectAttachments(database: DbClient, projectId: number): Promise<Attachment[]> {
@@ -1057,72 +1056,19 @@ export async function createWikiPageAttachment(database: DbClient, wikiPageId: n
   return persistAttachment({ database, owner, upload, actor });
 }
 
-export async function linkAttachment(database: DbClient, owner: AttachmentOwner, attachmentId: number, actor?: JournalActor | null): Promise<Attachment> {
-  await ensureAttachmentOwnerExists(database, owner);
-  const attachment = await attachmentRepository.findById(database, attachmentId);
-  if (!attachment) {
-    throw notFound(`Attachment with id ${attachmentId} not found`);
-  }
-  const ownerObject = await getOwnerJournalObject(database, owner);
-  const attachmentObject = attachmentJournalObject(attachment);
-  const alreadyLinked = (await listAttachmentOwners(database, attachmentId)).some((currentOwner) => currentOwner.type === owner.type && currentOwner.id === owner.id);
-  await database.transaction(async (tx) => {
-    await insertAttachmentLink(tx, owner, attachmentId);
-    if (!alreadyLinked) {
-      await recordJournalEntry(tx, {
-        operation: "link",
-        object: attachmentObject,
-        summary: buildLinkSummary(attachmentObject, ownerObject),
-        actor,
-        contexts: [makeJournalContext(ownerObject, "owner")]
-      });
-    }
-  });
-  return mapAttachment(database, attachment);
-}
-
-export async function unlinkAttachment(
+export async function deleteParentAttachment(
   database: DbClient,
   owner: AttachmentOwner,
   attachmentId: number,
-  input: { expectedVersion: number; orphanAction?: "add-to-library" },
+  input: { expectedVersion: number },
   actor?: JournalActor | null
 ): Promise<void> {
-  await ensureAttachmentOwnerExists(database, owner);
-  const record = await attachmentRepository.findById(database, attachmentId);
-  if (!record) {
-    throw notFound(`Attachment with id ${attachmentId} not found`);
-  }
-  assertVersion(record.version, input.expectedVersion);
-
-  const ownerObject = await getOwnerJournalObject(database, owner);
-  const attachmentObject = attachmentJournalObject(record);
-  await database.transaction(async (tx) => {
-    const removed = await deleteAttachmentLink(tx, owner, attachmentId);
-    if (removed === 0) {
-      throw notFound(`Attachment with id ${attachmentId} is not linked to ${owner.type} ${owner.id}`);
-    }
-    const hasRemainingOwner = await hasAnyAttachmentOwner(tx, attachmentId);
-    const mustPromote = !record.isInDocumentLibrary && !hasRemainingOwner;
-    if (mustPromote && input.orphanAction !== "add-to-library") {
-      throw conflict("Die letzte Verknüpfung einer bibliotheksunsichtbaren Datei kann nur gelöst werden, wenn die Datei dabei in die Dokumentenbibliothek aufgenommen wird.");
-    }
-    const updated = mustPromote
-      ? await attachmentRepository.updateLibraryVisibility(tx, attachmentId, input.expectedVersion, true, actor?.actorUserId ?? undefined)
-      : await attachmentRepository.bumpVersion(tx, attachmentId, input.expectedVersion, actor?.actorUserId ?? undefined);
-    if (!updated) {
-      throw conflict("Das Attachment wurde zwischenzeitlich geändert.");
-    }
-    await recordJournalEntry(tx, {
-      operation: "unlink",
-      object: attachmentObject,
-      summary: mustPromote
-        ? `${buildUnlinkSummary(attachmentObject, ownerObject)} Die Datei wurde in die Dokumentenbibliothek aufgenommen.`
-        : buildUnlinkSummary(attachmentObject, ownerObject),
-      actor,
-      contexts: [makeJournalContext(ownerObject, "owner")]
-    });
-  });
+  await bulkDeleteAttachments(
+    database,
+    owner,
+    [{ id: attachmentId, expectedVersion: input.expectedVersion }],
+    actor
+  );
 }
 
 interface AttachmentVersionSelection {
@@ -1188,73 +1134,6 @@ function versionSelectionCondition(items: AttachmentVersionSelection[]) {
   return condition;
 }
 
-export async function bulkUnlinkAttachments(
-  database: DbClient,
-  owner: AttachmentOwner,
-  items: AttachmentVersionSelection[],
-  actor?: JournalActor | null
-): Promise<void> {
-  const { selections, records } = await loadSelectedOwnerAttachments(database, owner, items);
-  const ownerObject = await getOwnerJournalObject(database, owner);
-  const ownersById = await listAttachmentOwnersForIds(
-    database,
-    selections.map((item) => item.id)
-  );
-  const promoteIds = records
-    .filter((record) => {
-      const otherOwners = (ownersById.get(record.id) ?? []).filter(
-        (currentOwner) => currentOwner.type !== owner.type || currentOwner.id !== owner.id
-      );
-      return !record.isInDocumentLibrary && otherOwners.length === 0;
-    })
-    .map((record) => record.id);
-  const promoteIdSet = new Set(promoteIds);
-  const promoteSelections = selections.filter((item) => promoteIdSet.has(item.id));
-  const regularSelections = selections.filter((item) => !promoteIdSet.has(item.id));
-  const now = new Date().toISOString();
-
-  await database.transaction(async (tx) => {
-    if ((await deleteAttachmentLinks(tx, owner, selections.map((item) => item.id))) !== selections.length) {
-      throw conflict("Mindestens eine Attachment-Verknüpfung wurde zwischenzeitlich geändert.");
-    }
-    let updatedCount = 0;
-    if (promoteSelections.length > 0) {
-      updatedCount += mutationAffectedRows(
-        await tx
-          .update(attachments)
-          .set({
-            isInDocumentLibrary: true,
-            version: sql`${attachments.version} + 1`,
-            updatedBy: actor?.actorUserId ?? null,
-            updatedAt: now
-          })
-          .where(versionSelectionCondition(promoteSelections))
-      );
-    }
-    if (regularSelections.length > 0) {
-      updatedCount += mutationAffectedRows(
-        await tx
-          .update(attachments)
-          .set({
-            version: sql`${attachments.version} + 1`,
-            updatedBy: actor?.actorUserId ?? null,
-            updatedAt: now
-          })
-          .where(versionSelectionCondition(regularSelections))
-      );
-    }
-    if (updatedCount !== selections.length) {
-      throw conflict("Mindestens ein Attachment wurde zwischenzeitlich geändert.");
-    }
-    await recordJournalEntry(tx, {
-      operation: "update",
-      object: ownerObject,
-      summary: `${selections.length} Attachment-Verknüpfung(en) wurden gesammelt gelöst.${promoteIds.length > 0 ? ` ${promoteIds.length} ownerlose Datei(en) wurden in die Dokumentenbibliothek aufgenommen.` : ""}`,
-      actor
-    });
-  });
-}
-
 export async function bulkDeleteAttachments(
   database: DbClient,
   owner: AttachmentOwner,
@@ -1262,7 +1141,7 @@ export async function bulkDeleteAttachments(
   actor?: JournalActor | null
 ): Promise<void> {
   const { selections, records } = await loadSelectedOwnerAttachments(database, owner, items);
-  const ownerObject = await getOwnerJournalObject(database, owner);
+  const ownerObject = await getAttachmentOwnerJournalObject(database, owner);
   await database.transaction(async (tx) => {
     await recordJournalEntry(tx, {
       operation: "update",
@@ -1284,102 +1163,15 @@ export async function bulkDeleteAttachments(
   }
 }
 
-export async function bulkSetAttachmentFolder(
-  database: DbClient,
-  owner: AttachmentOwner,
-  items: AttachmentVersionSelection[],
-  folderId: number | null,
-  actor?: JournalActor | null
-): Promise<void> {
-  const { selections } = await loadSelectedOwnerAttachments(database, owner, items);
-  if (folderId !== null) {
-    const folder = firstRow(
-      await database
-        .select({ id: attachmentFolders.id })
-        .from(attachmentFolders)
-        .where(eq(attachmentFolders.id, folderId))
-    );
-    if (!folder) {
-      throw notFound(`Attachment folder with id ${folderId} not found`);
-    }
-  }
-  const ownerObject = await getOwnerJournalObject(database, owner);
-  const attachmentIds = selections.map((item) => item.id);
-  const now = new Date().toISOString();
-  await database.transaction(async (tx) => {
-    await tx.delete(folderAttachments).where(inArray(folderAttachments.attachmentId, attachmentIds));
-    if (folderId !== null) {
-      await tx
-        .insert(folderAttachments)
-        .values(attachmentIds.map((attachmentId) => ({ folderId, attachmentId })));
-    }
-    const updated = mutationAffectedRows(
-      await tx
-        .update(attachments)
-        .set({
-          version: sql`${attachments.version} + 1`,
-          updatedBy: actor?.actorUserId ?? null,
-          updatedAt: now
-        })
-        .where(versionSelectionCondition(selections))
-    );
-    if (updated !== selections.length) {
-      throw conflict("Mindestens ein Attachment wurde zwischenzeitlich geändert.");
-    }
-    await recordJournalEntry(tx, {
-      operation: "update",
-      object: ownerObject,
-      summary:
-        folderId === null
-          ? `${selections.length} Attachment(s) wurden aus ihrem virtuellen Ordner entfernt.`
-          : `${selections.length} Attachment(s) wurden in den virtuellen Ordner ${folderId} verschoben.`,
-      actor
-    });
-  });
-}
-
-export async function removeAttachmentFromDocumentLibrary(
+export async function deleteAttachment(
   database: DbClient,
   id: number,
   expectedVersion: number,
-  actor?: JournalActor | null
+  actor?: JournalActor | null,
+  expectedKind?: AttachmentRecord["kind"]
 ): Promise<void> {
   const record = await attachmentRepository.findById(database, id);
-  if (!record || !record.isInDocumentLibrary) {
-    throw notFound(`Attachment with id ${id} not found in document library`);
-  }
-  assertVersion(record.version, expectedVersion);
-  const owners = await listAttachmentOwners(database, id);
-  if (owners.length === 0) {
-    throw conflict("Ein Dokument ohne Owner-Verknüpfung kann nicht aus der Bibliothek entfernt werden. Es muss endgültig gelöscht oder zuerst verknüpft werden.");
-  }
-
-  const ownerContexts: Array<ReturnType<typeof makeJournalContext>> = [];
-  for (const owner of owners) {
-    const ownerObject = await resolveOwnerJournalObjectOrNull(database, owner);
-    if (ownerObject) {
-      ownerContexts.push(makeJournalContext(ownerObject, "owner"));
-    }
-  }
-  await database.transaction(async (tx) => {
-    const updated = await attachmentRepository.updateLibraryVisibility(tx, id, expectedVersion, false, actor?.actorUserId ?? undefined);
-    if (!updated) {
-      throw conflict("Das Attachment wurde zwischenzeitlich geändert.");
-    }
-    const journalObject = attachmentJournalObject(record);
-    await recordJournalEntry(tx, {
-      operation: "update",
-      object: journalObject,
-      summary: `${journalObject.label} wurde aus der Dokumentenbibliothek entfernt. Die Datei und ${owners.length} Owner-Verknüpfung(en) bleiben bestehen.`,
-      actor,
-      contexts: ownerContexts
-    });
-  });
-}
-
-export async function deleteAttachment(database: DbClient, id: number, expectedVersion: number, actor?: JournalActor | null): Promise<void> {
-  const record = await attachmentRepository.findById(database, id);
-  if (!record) {
+  if (!record || (expectedKind !== undefined && record.kind !== expectedKind)) {
     throw notFound(`Attachment with id ${id} not found`);
   }
   assertVersion(record.version, expectedVersion);
@@ -1414,9 +1206,15 @@ export async function deleteAttachment(database: DbClient, id: number, expectedV
   }
 }
 
-export async function openAttachment(database: DbClient, id: number, fileOpener: FileOpener, actor?: JournalActor | null): Promise<void> {
+export async function openAttachment(
+  database: DbClient,
+  id: number,
+  fileOpener: FileOpener,
+  actor?: JournalActor | null,
+  expectedKind?: AttachmentRecord["kind"]
+): Promise<void> {
   const record = await attachmentRepository.findById(database, id);
-  if (!record) {
+  if (!record || (expectedKind !== undefined && record.kind !== expectedKind)) {
     throw notFound(`Attachment with id ${id} not found`);
   }
 
@@ -1434,9 +1232,13 @@ export async function openAttachment(database: DbClient, id: number, fileOpener:
   await watchAttachmentForChanges(database, record.id, diskPath, actor?.actorUserId ?? null);
 }
 
-export async function getAttachmentFile(database: DbClient, id: number): Promise<AttachmentFile> {
+export async function getAttachmentFile(
+  database: DbClient,
+  id: number,
+  expectedKind?: AttachmentRecord["kind"]
+): Promise<AttachmentFile> {
   const record = await attachmentRepository.findById(database, id);
-  if (!record) {
+  if (!record || (expectedKind !== undefined && record.kind !== expectedKind)) {
     throw notFound(`Attachment with id ${id} not found`);
   }
   assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");

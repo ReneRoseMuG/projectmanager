@@ -1,5 +1,4 @@
 import type {
-  AttachmentLibrarySelection,
   BacklogItem,
   DraftComment,
   DraftNote,
@@ -429,9 +428,9 @@ export function ProjectForm({
     }
   };
 
-  const uploadAttachment = async (file: File, librarySelection: AttachmentLibrarySelection) => {
+  const uploadAttachment = async (file: File) => {
     try {
-      const uploaded = await attachments.uploadAttachment(file, librarySelection);
+      const uploaded = await attachments.uploadAttachment(file);
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {
@@ -539,7 +538,7 @@ export function ProjectForm({
         await createTaskNote(created.id, note);
       }
       for (const file of pendingFiles) {
-        await uploadTaskAttachment(created.id, file.file, file.librarySelection);
+        await uploadTaskAttachment(created.id, file.file);
       }
       showToast({ tone: "success", title: "Aufgabe angelegt" });
       return created;
@@ -594,7 +593,7 @@ export function ProjectForm({
         await createTicketNote(created.id, note);
       }
       for (const file of pendingFiles) {
-        await uploadTicketAttachment(created.id, file.file, file.librarySelection);
+        await uploadTicketAttachment(created.id, file.file);
       }
       showToast({ tone: "success", title: "Ticket angelegt" });
       return created;

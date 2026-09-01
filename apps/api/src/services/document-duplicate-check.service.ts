@@ -108,7 +108,6 @@ async function loadFoldersForIds(database: DbClient, attachmentIds: number[]): P
       attachmentId: folderAttachments.attachmentId,
       id: attachmentFolders.id,
       parentId: attachmentFolders.parentId,
-      projectId: attachmentFolders.projectId,
       name: attachmentFolders.name,
       childCount: sql<number>`0`,
       directDocumentCount: sql<number>`0`,
@@ -189,7 +188,7 @@ async function executeDuplicateCheck(database: DbClient, check: MutableDuplicate
         .from(attachments)
         .where(
           and(
-            eq(attachments.isInDocumentLibrary, true),
+            eq(attachments.kind, "document"),
             gt(attachments.id, cursor),
             lte(attachments.id, maxAttachmentId)
           )
@@ -252,7 +251,7 @@ export async function startDocumentDuplicateCheck(database: DbClient): Promise<D
   const [scope] = await database
     .select({ total: count(), maxAttachmentId: max(attachments.id) })
     .from(attachments)
-    .where(eq(attachments.isInDocumentLibrary, true));
+    .where(eq(attachments.kind, "document"));
   const check: MutableDuplicateCheck = {
     id: randomUUID(),
     status: "running",

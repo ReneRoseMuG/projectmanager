@@ -3,11 +3,14 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type {
   Attachment,
   AttachmentFolder,
+  BacklogItem,
   CatalogEntry,
   Comment,
+  DiaryEntry,
   Feature,
   Milestone,
   Note,
+  ParentDocumentLink,
   Project,
   Tag,
   Task,
@@ -33,8 +36,8 @@ import { createProjectManagerMcpServer } from "./server.js";
  * - Jedes verfügbare MCP-v1-Tool wird einmal über den MCP-Transport ausgeführt.
  * - Die Tools arbeiten gegen echte Fastify-Routen mit isolierter temporärer MySQL-Datenbank.
  * - Attachment-Uploads verwenden ein isoliertes Temp-Upload-Verzeichnis.
- * - Owner-Attachments setzen die Bibliothekssichtbarkeit explizit; DMS-Importe geben Sichtbarkeit,
- *   direkte Sammlung, Tags und Version aus dem echten API-Vertrag zurück.
+ * - Owner-Attachments bleiben exklusiv; DMS-Importe geben Art, direkte Sammlung, Tags und Version
+ *   aus dem echten API-Vertrag zurück und werden über eigene Relationstools verknüpft.
  * - Schreibende Tools erzeugen oder ändern beobachtbare Daten versionsgeschützt.
  * - Destruktive Delete-Tools bleiben bewusst außerhalb der MCP-Oberfläche.
  *
@@ -220,6 +223,53 @@ describe("MCP tools integration", () => {
     });
     expect(createdProject).toMatchObject({ name: "MCP Tool Projekt", color: "#2563eb" });
 
+    const createdBacklogItem = await callTool<BacklogItem>(executedTools, "create_backlog_item", {
+      projectId: createdProject.id,
+      title: "MCP Backlog",
+      description: "Per MCP angelegt",
+      status: "open",
+      sortOrder: 10
+    });
+    expect(createdBacklogItem).toMatchObject({
+      projectId: createdProject.id,
+      title: "MCP Backlog",
+      status: "open",
+      sortOrder: 10
+    });
+    const updatedBacklogItem = await callTool<BacklogItem>(executedTools, "update_backlog_item", {
+      id: createdBacklogItem.id,
+      title: "MCP Backlog aktualisiert",
+      status: "in_progress",
+      responsibleUserId: 1
+    });
+    expect(updatedBacklogItem).toMatchObject({
+      id: createdBacklogItem.id,
+      title: "MCP Backlog aktualisiert",
+      status: "in_progress",
+      responsibleUserId: 1
+    });
+    expect(updatedBacklogItem.version).toBeGreaterThan(createdBacklogItem.version);
+
+    expect(await callTool<DiaryEntry | null>(executedTools, "get_project_diary", { projectId: createdProject.id })).toBeNull();
+    const createdDiary = await callTool<DiaryEntry>(executedTools, "create_diary_entry", {
+      projectId: createdProject.id,
+      title: "MCP Tagebuch",
+      content: "Start",
+      sourceCount: 1
+    });
+    expect(createdDiary).toMatchObject({
+      projectId: createdProject.id,
+      title: "MCP Tagebuch",
+      sourceCount: 1
+    });
+    const updatedDiary = await callTool<DiaryEntry>(executedTools, "update_diary_entry", {
+      id: createdDiary.id,
+      content: "Fortgeschrieben",
+      sourceCount: 2
+    });
+    expect(updatedDiary).toMatchObject({ id: createdDiary.id, sourceCount: 2 });
+    expect(updatedDiary.version).toBeGreaterThan(createdDiary.version);
+
     const createdMilestone = await callTool<Milestone>(executedTools, "create_milestone", {
       projectId: createdProject.id,
       name: "MCP Tool Meilenstein",
@@ -352,8 +402,7 @@ describe("MCP tools integration", () => {
       parentId: task.id,
       fileName: "mcp-attachment.txt",
       contentBase64: Buffer.from(attachmentContent, "utf8").toString("base64"),
-      mimetype: "text/plain",
-      libraryVisibility: "attachment-only"
+      mimetype: "text/plain"
     });
     expect(attachment).toMatchObject({
       owners: [{ type: "task", id: task.id }],
@@ -387,6 +436,27 @@ describe("MCP tools integration", () => {
       version: expect.any(Number)
     });
     expect(await fs.readFile(path.join(uploadDir, importedDocument.filename), "utf8")).toBe("MCP document library content");
+
+    const parentDocumentLink = await callTool<ParentDocumentLink>(executedTools, "link_document_to_parent", {
+      parentType: "task",
+      parentId: task.id,
+      documentId: importedDocument.id
+    });
+    expect(parentDocumentLink).toMatchObject({
+      owner: { type: "task", id: task.id },
+      document: { id: importedDocument.id, kind: "document" }
+    });
+    expect(await callTool<ParentDocumentLink[]>(executedTools, "list_parent_document_links", {
+      parentType: "task",
+      parentId: task.id
+    })).toEqual([expect.objectContaining({ id: parentDocumentLink.id })]);
+    expect(await callTool(executedTools, "unlink_document_from_parent", {
+      parentType: "task",
+      parentId: task.id,
+      linkId: parentDocumentLink.id,
+      expectedVersion: parentDocumentLink.version
+    })).toEqual({ success: true });
+    expect(await seedClient.get<Attachment>(`documents/${importedDocument.id}`)).toMatchObject({ id: importedDocument.id, kind: "document" });
 
     const tagCatalog = await callTool<Tag[]>(executedTools, "list_tags");
     expect(Array.isArray(tagCatalog)).toBe(true);
@@ -446,14 +516,12 @@ describe("MCP tools integration", () => {
         {
           fileName: "bulk-one.txt",
           contentBase64: Buffer.from("bulk one", "utf8").toString("base64"),
-          mimetype: "text/plain",
-          libraryVisibility: "attachment-only"
+          mimetype: "text/plain"
         },
         {
           fileName: "bulk-two.txt",
           contentBase64: Buffer.from("bulk two", "utf8").toString("base64"),
-          mimetype: "text/plain",
-          libraryVisibility: "attachment-only"
+          mimetype: "text/plain"
         }
       ]
     });
@@ -472,8 +540,7 @@ describe("MCP tools integration", () => {
           attachment: {
             fileName: "bulk-task.txt",
             contentBase64: Buffer.from("bulk task", "utf8").toString("base64"),
-            mimetype: "text/plain",
-            libraryVisibility: "attachment-only"
+            mimetype: "text/plain"
           }
         },
         {
@@ -504,8 +571,7 @@ describe("MCP tools integration", () => {
           attachment: {
             fileName: "bulk-ticket.txt",
             contentBase64: Buffer.from("bulk ticket", "utf8").toString("base64"),
-            mimetype: "text/plain",
-            libraryVisibility: "attachment-only"
+            mimetype: "text/plain"
           }
         }
       ]
@@ -693,6 +759,8 @@ describe("MCP tools integration", () => {
     expect(preview.cascadeImpact.tasks).toBeGreaterThanOrEqual(1);
     expect(preview.cascadeImpact.tickets).toBeGreaterThanOrEqual(1);
 
+    await seedClient.del(`projects/${delProject.id}/tasks/${delTask.id}`);
+    await seedClient.del(`projects/${delProject.id}/tickets/${delTicket.id}`);
     expect(await callTool(executedTools, "delete_use_case", { id: delUseCase.id })).toMatchObject({ deleted: true, type: "useCase", id: delUseCase.id });
     expect(await callTool(executedTools, "delete_feature", { id: delFeature.id })).toMatchObject({ deleted: true, type: "feature", id: delFeature.id });
     expect(await callTool(executedTools, "delete_task", { id: delTask.id })).toMatchObject({ deleted: true, type: "task", id: delTask.id });

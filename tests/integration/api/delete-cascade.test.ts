@@ -133,7 +133,7 @@ async function insertAttachmentFor(
 ): Promise<number> {
   const now = new Date().toISOString();
   const [result] = await testDb.pool.execute(
-    "INSERT INTO attachments (original_name, filename, mimetype, size, version, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)",
+    "INSERT INTO attachments (original_name, filename, mimetype, size, kind, version, created_at, updated_at) VALUES (?, ?, ?, ?, 'parent_attachment', 1, ?, ?)",
     ["test.txt", `att-${Date.now()}.txt`, "text/plain", 100, now, now]
   );
   const attachmentId = (result as { insertId: number }).insertId;
@@ -665,7 +665,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining[0].featureId).toBeNull();
     });
 
-    it("entfernt feature_attachments-Join und behält Attachment-Datensatz", async () => {
+    it("entfernt feature_attachments-Join und exklusiven Attachment-Datensatz", async () => {
       const feature = await createFeature(app);
       const attachmentId = await insertAttachmentFor(testDb, "feature_attachments", "feature_id", feature.id);
 
@@ -674,7 +674,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const remainingLinks = (await testDb.db.select().from(featureAttachments).where(eq(featureAttachments.featureId, feature.id)));
       expect(remainingLinks).toHaveLength(0);
       const remaining = (await testDb.db.select().from(attachments).where(eq(attachments.id, attachmentId)));
-      expect(remaining).toHaveLength(1);
+      expect(remaining).toHaveLength(0);
     });
 
     it("entfernt feature_tickets-Einträge (Ticket bleibt erhalten)", async () => {
@@ -839,7 +839,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining).toHaveLength(0);
     });
 
-    it("entfernt ticket_attachments-Join und behält Attachment-Datensatz", async () => {
+    it("entfernt ticket_attachments-Join und exklusiven Attachment-Datensatz", async () => {
       const ticket = await createTicket(app, null);
       const attachmentId = await insertAttachmentFor(testDb, "ticket_attachments", "ticket_id", ticket.id);
 
@@ -848,7 +848,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const remainingLinks = (await testDb.db.select().from(ticketAttachments).where(eq(ticketAttachments.ticketId, ticket.id)));
       expect(remainingLinks).toHaveLength(0);
       const remaining = (await testDb.db.select().from(attachments).where(eq(attachments.id, attachmentId)));
-      expect(remaining).toHaveLength(1);
+      expect(remaining).toHaveLength(0);
     });
 
     it("bereinigt ticket_attachments-Join-Einträge vollständig", async () => {
@@ -980,7 +980,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining).toHaveLength(0);
     });
 
-    it("entfernt wiki_page_attachments-Join – Attachment-Datensatz selbst bleibt erhalten", async () => {
+    it("entfernt wiki_page_attachments-Join und exklusiven Attachment-Datensatz", async () => {
       const page = await createWikiPage(app);
       const attachmentId = await insertAttachmentFor(testDb, "wiki_page_attachments", "wiki_page_id", page.id);
 
@@ -990,7 +990,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remainingJoin).toHaveLength(0);
 
       const remainingRecord = (await testDb.db.select().from(attachments).where(eq(attachments.id, attachmentId)));
-      expect(remainingRecord).toHaveLength(1);
+      expect(remainingRecord).toHaveLength(0);
     });
   });
 

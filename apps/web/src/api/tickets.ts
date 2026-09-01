@@ -1,6 +1,5 @@
 import type {
   Attachment,
-  AttachmentLibrarySelection,
   Note,
   NoteInput,
   Paginated,
@@ -187,8 +186,8 @@ export async function getTicketAttachments(ticketId: number): Promise<Attachment
   return api.get(`tickets/${ticketId}/attachments`).json<Attachment[]>();
 }
 
-export async function uploadTicketAttachment(ticketId: number, file: File, librarySelection: AttachmentLibrarySelection): Promise<Attachment> {
+export async function uploadTicketAttachment(ticketId: number, file: File): Promise<Attachment> {
   const formData = new FormData();
   formData.append("file", file);
-  return api.post(`tickets/${ticketId}/attachments?libraryVisibility=${librarySelection}`, { body: formData }).json<Attachment>();
+  return api.post(`tickets/${ticketId}/attachments`, { body: formData }).json<Attachment>();
 }

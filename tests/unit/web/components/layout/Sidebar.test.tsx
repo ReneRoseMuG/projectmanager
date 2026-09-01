@@ -23,6 +23,7 @@
  * - Klick löst keine Router-Navigation im aktuellen Tab aus.
  * - Die Sidebar kann kollabiert werden und persistiert den Zustand in localStorage.
  * - Der kollabierte Zustand zeigt nur Icon-Navigation und keine Section-/User-Texte.
+ * - Die globale Dokumentnavigation verwendet documents:read und nicht attachments:read.
  *
  * Fehlerfälle:
  * - NavLink-Klick darf window.open nicht aufrufen.
@@ -124,6 +125,28 @@ const projectReaderUser: CurrentUser = {
     permissions: [{ id: 4, roleId: 2, resource: "projects", action: "read" }],
   },
   permissions: [{ id: 4, roleId: 2, resource: "projects", action: "read" }],
+};
+
+const attachmentReaderUser: CurrentUser = {
+  ...readerUser,
+  id: 3,
+  role: {
+    ...readerUser.role,
+    id: 3,
+    permissions: [{ id: 5, roleId: 3, resource: "attachments", action: "read" }],
+  },
+  permissions: [{ id: 5, roleId: 3, resource: "attachments", action: "read" }],
+};
+
+const documentReaderUser: CurrentUser = {
+  ...readerUser,
+  id: 4,
+  role: {
+    ...readerUser.role,
+    id: 4,
+    permissions: [{ id: 6, roleId: 4, resource: "documents", action: "read" }],
+  },
+  permissions: [{ id: 6, roleId: 4, resource: "documents", action: "read" }],
 };
 
 beforeEach(() => {
@@ -251,6 +274,16 @@ describe("Sidebar", () => {
     expect(screen.queryByText("Startseite")).not.toBeInTheDocument();
     expect(screen.queryByText("Notizen")).not.toBeInTheDocument();
     expect(screen.getByText("Projekte")).toBeInTheDocument();
+  });
+
+  it("zeigt Dokumente nur mit documents:read und nicht mit attachments:read", () => {
+    const firstRender = renderSidebar(attachmentReaderUser);
+    expect(screen.queryByText("Dokumente")).not.toBeInTheDocument();
+    firstRender.unmount();
+
+    renderSidebar(documentReaderUser);
+    expect(screen.getByText("Dokumente")).toBeInTheDocument();
+    expect(screen.getByTitle("Dokumente in neuem Tab öffnen")).toBeInTheDocument();
   });
 
   it("ändert beim Button-Klick nicht die aktuelle Route", () => {

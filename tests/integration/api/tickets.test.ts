@@ -472,7 +472,7 @@ describe("Tickets API", () => {
     await supertest(app.server).post(`/api/tickets/${countedTicket.id}/notes`).send({ title: "Ticket note" }).expect(201);
     await supertest(app.server).post(`/api/tickets/${countedTicket.id}/comments`).send({ body: "Ticket comment" }).expect(201);
     await supertest(app.server)
-      .post(`/api/tickets/${countedTicket.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/tickets/${countedTicket.id}/attachments`)
       .attach("file", Buffer.from("Ticket-Datei"), { filename: "ticket.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -732,7 +732,7 @@ describe("Tickets API", () => {
     const ticket = await createTicket(app, null);
 
     const res = await supertest(app.server)
-      .post(`/api/tickets/${ticket.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/tickets/${ticket.id}/attachments`)
       .attach("file", Buffer.from("Ticket file"), { filename: "ticket.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -742,7 +742,7 @@ describe("Tickets API", () => {
   it("Ticket attachments appear in detail", async () => {
     const ticket = await createTicket(app, null);
     const upload = await supertest(app.server)
-      .post(`/api/tickets/${ticket.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/tickets/${ticket.id}/attachments`)
       .attach("file", Buffer.from("Ticket file"), { filename: "ticket.txt", contentType: "text/plain" })
       .expect(201);
 

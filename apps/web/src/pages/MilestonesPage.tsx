@@ -235,7 +235,7 @@ export function MilestonesPage() {
         await createTaskNote(created.id, note);
       }
       for (const file of pendingFiles) {
-        await uploadTaskAttachment(created.id, file.file, file.librarySelection);
+        await uploadTaskAttachment(created.id, file.file);
       }
       showToast({ tone: "success", title: "Aufgabe angelegt" });
       return created;
@@ -290,7 +290,7 @@ export function MilestonesPage() {
         await createTicketNote(created.id, note);
       }
       for (const file of pendingFiles) {
-        await uploadTicketAttachment(created.id, file.file, file.librarySelection);
+        await uploadTicketAttachment(created.id, file.file);
       }
       showToast({ tone: "success", title: "Ticket angelegt" });
       return created;

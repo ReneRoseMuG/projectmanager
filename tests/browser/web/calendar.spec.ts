@@ -188,7 +188,7 @@ test.describe("Kalender-Events", () => {
       expect(event.owners).toEqual([{ type: "task", id: task.id }]);
       const tile = page.getByTestId(`week-event-${event.id}`);
       await expect(tile).toContainText(task.title);
-      expect(await tile.evaluate((element) => element.getAttribute("style") ?? "")).toContain("border-left: 4px solid var(--color-tangerine)");
+      expect(await tile.evaluate((element) => element.getAttribute("style") ?? "")).toContain("--event-accent: var(--color-teal)");
     } finally {
       await deleteEvent(request, eventId);
       await deleteEventsByTitle(request, title);
@@ -290,7 +290,7 @@ test.describe("Kalender-Events", () => {
       await expect(page.getByTestId(`week-task-${task.id}`)).toContainText(task.title);
 
       await page.getByTestId(`week-task-${task.id}`).click();
-      await expect(page.getByRole("heading", { name: "Aufgabe bearbeiten", exact: true })).toBeVisible();
+      await expect(formPage(page, "Aufgabe bearbeiten")).toBeVisible();
 
       await authenticatedGoto(page, "/calendar");
       await page.getByRole("button", { name: "Monat", exact: true }).click();

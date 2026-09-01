@@ -1,12 +1,17 @@
 import type {
   Attachment,
-  AttachmentLibrarySelection,
   AttachmentLocalEntry,
   AttachmentLocalFileInput,
   AttachmentLocalFolder,
   AttachmentOwner,
   AttachmentPreviewInfo,
   AttachmentVersionInput,
+  ParentAttachmentFolder,
+  ParentAttachmentFolderInput,
+  ParentAttachmentFolderUpdate,
+  ParentDocumentLink,
+  ParentDocumentLinkInput,
+  ParentFileMoveInput,
   Paginated
 } from "@taskmanager/shared-types";
 import { api } from "./client";
@@ -31,57 +36,52 @@ export async function getWikiPageAttachments(wikiPageId: number): Promise<Attach
   return api.get(`wiki/${wikiPageId}/attachments`).json<Attachment[]>();
 }
 
-export async function uploadProjectAttachment(projectId: number, file: File, librarySelection: AttachmentLibrarySelection): Promise<Attachment> {
+export async function uploadProjectAttachment(projectId: number, file: File): Promise<Attachment> {
   const formData = new FormData();
   formData.append("file", file);
-  return api.post(`projects/${projectId}/attachments?libraryVisibility=${librarySelection}`, { body: formData }).json<Attachment>();
+  return api.post(`projects/${projectId}/attachments`, { body: formData }).json<Attachment>();
 }
 
-export async function uploadTaskAttachment(taskId: number, file: File, librarySelection: AttachmentLibrarySelection): Promise<Attachment> {
+export async function uploadTaskAttachment(taskId: number, file: File): Promise<Attachment> {
   const formData = new FormData();
   formData.append("file", file);
-  return api.post(`tasks/${taskId}/attachments?libraryVisibility=${librarySelection}`, { body: formData }).json<Attachment>();
+  return api.post(`tasks/${taskId}/attachments`, { body: formData }).json<Attachment>();
 }
 
-export async function uploadMilestoneAttachment(milestoneId: number, file: File, librarySelection: AttachmentLibrarySelection): Promise<Attachment> {
+export async function uploadMilestoneAttachment(milestoneId: number, file: File): Promise<Attachment> {
   const formData = new FormData();
   formData.append("file", file);
-  return api.post(`milestones/${milestoneId}/attachments?libraryVisibility=${librarySelection}`, { body: formData }).json<Attachment>();
+  return api.post(`milestones/${milestoneId}/attachments`, { body: formData }).json<Attachment>();
 }
 
-export async function uploadFeatureAttachment(featureId: number, file: File, librarySelection: AttachmentLibrarySelection): Promise<Attachment> {
+export async function uploadFeatureAttachment(featureId: number, file: File): Promise<Attachment> {
   const formData = new FormData();
   formData.append("file", file);
-  return api.post(`features/${featureId}/attachments?libraryVisibility=${librarySelection}`, { body: formData }).json<Attachment>();
+  return api.post(`features/${featureId}/attachments`, { body: formData }).json<Attachment>();
 }
 
-export async function uploadWikiPageAttachment(wikiPageId: number, file: File, librarySelection: AttachmentLibrarySelection): Promise<Attachment> {
+export async function uploadWikiPageAttachment(wikiPageId: number, file: File): Promise<Attachment> {
   const formData = new FormData();
   formData.append("file", file);
-  return api.post(`wiki/${wikiPageId}/attachments?libraryVisibility=${librarySelection}`, { body: formData }).json<Attachment>();
+  return api.post(`wiki/${wikiPageId}/attachments`, { body: formData }).json<Attachment>();
+}
+
+function ownerBasePath(owner: AttachmentOwner): string {
+  if (owner.type === "wikiPage") {
+    return `wiki/${owner.id}`;
+  }
+  return `${owner.type === "milestone" ? "milestones" : `${owner.type}s`}/${owner.id}`;
 }
 
 function ownerAttachmentPath(owner: AttachmentOwner, attachmentId: number): string {
-  if (owner.type === "wikiPage") {
-    return `wiki/${owner.id}/attachments/${attachmentId}`;
-  }
-  return `${owner.type === "milestone" ? "milestones" : `${owner.type}s`}/${owner.id}/attachments/${attachmentId}`;
+  return `${ownerBasePath(owner)}/attachments/${attachmentId}`;
 }
 
-export async function unlinkOwnerAttachment(
+export async function deleteOwnerAttachment(
   owner: AttachmentOwner,
-  attachment: Pick<Attachment, "id" | "version">,
-  orphanAction?: "add-to-library"
+  attachment: Pick<Attachment, "id" | "version">
 ): Promise<void> {
-  const searchParams = new URLSearchParams({ expectedVersion: String(attachment.version) });
-  if (orphanAction) {
-    searchParams.set("orphanAction", orphanAction);
-  }
-  await api.delete(`${ownerAttachmentPath(owner, attachment.id)}?${searchParams.toString()}`);
-}
-
-export async function deleteAttachmentPermanently(attachment: Pick<Attachment, "id" | "version">): Promise<void> {
-  await api.delete(`attachments/${attachment.id}?expectedVersion=${attachment.version}`);
+  await api.delete(`${ownerAttachmentPath(owner, attachment.id)}?expectedVersion=${attachment.version}`);
 }
 
 export async function openAttachment(id: number): Promise<void> {
@@ -96,15 +96,6 @@ function ownerPayload(owner: AttachmentOwner) {
   return { ownerType: owner.type, ownerId: owner.id };
 }
 
-export async function bulkUnlinkAttachments(
-  owner: AttachmentOwner,
-  attachments: AttachmentVersionInput[]
-): Promise<void> {
-  await api.post("attachments/bulk-unlink", {
-    json: { ...ownerPayload(owner), attachments }
-  });
-}
-
 export async function bulkDeleteAttachments(
   owner: AttachmentOwner,
   attachments: AttachmentVersionInput[]
@@ -114,14 +105,40 @@ export async function bulkDeleteAttachments(
   });
 }
 
-export async function bulkSetAttachmentFolder(
-  owner: AttachmentOwner,
-  attachments: AttachmentVersionInput[],
-  folderId: number | null
-): Promise<void> {
-  await api.post("attachments/bulk-folder", {
-    json: { ...ownerPayload(owner), attachments, folderId }
-  });
+export async function getParentAttachmentFolders(owner: AttachmentOwner): Promise<ParentAttachmentFolder[]> {
+  return api.get(`${ownerBasePath(owner)}/attachment-folders`).json<ParentAttachmentFolder[]>();
+}
+
+export async function createParentAttachmentFolder(owner: AttachmentOwner, input: ParentAttachmentFolderInput): Promise<ParentAttachmentFolder> {
+  return api.post(`${ownerBasePath(owner)}/attachment-folders`, { json: input }).json<ParentAttachmentFolder>();
+}
+
+export async function updateParentAttachmentFolder(owner: AttachmentOwner, folderId: number, input: ParentAttachmentFolderUpdate): Promise<ParentAttachmentFolder> {
+  return api.patch(`${ownerBasePath(owner)}/attachment-folders/${folderId}`, { json: input }).json<ParentAttachmentFolder>();
+}
+
+export async function deleteParentAttachmentFolder(owner: AttachmentOwner, folderId: number, expectedVersion: number): Promise<void> {
+  await api.delete(`${ownerBasePath(owner)}/attachment-folders/${folderId}?expectedVersion=${expectedVersion}`);
+}
+
+export async function moveParentAttachment(owner: AttachmentOwner, attachmentId: number, input: ParentFileMoveInput): Promise<Attachment> {
+  return api.patch(`${ownerBasePath(owner)}/attachments/${attachmentId}/folder`, { json: input }).json<Attachment>();
+}
+
+export async function getParentDocumentLinks(owner: AttachmentOwner): Promise<ParentDocumentLink[]> {
+  return api.get(`${ownerBasePath(owner)}/document-links`).json<ParentDocumentLink[]>();
+}
+
+export async function createParentDocumentLink(owner: AttachmentOwner, input: ParentDocumentLinkInput): Promise<ParentDocumentLink> {
+  return api.post(`${ownerBasePath(owner)}/document-links`, { json: input }).json<ParentDocumentLink>();
+}
+
+export async function moveParentDocumentLink(owner: AttachmentOwner, linkId: number, input: ParentFileMoveInput): Promise<ParentDocumentLink> {
+  return api.patch(`${ownerBasePath(owner)}/document-links/${linkId}/folder`, { json: input }).json<ParentDocumentLink>();
+}
+
+export async function deleteParentDocumentLink(owner: AttachmentOwner, linkId: number, expectedVersion: number): Promise<void> {
+  await api.delete(`${ownerBasePath(owner)}/document-links/${linkId}?expectedVersion=${expectedVersion}`);
 }
 
 export async function downloadAttachmentArchive(

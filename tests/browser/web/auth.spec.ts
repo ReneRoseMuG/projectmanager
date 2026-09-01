@@ -4,7 +4,7 @@ import { apiBaseUrl, authenticatedGoto, ensureApiAuth, uniqueTitle } from "./dom
 test.describe.configure({ mode: "serial" });
 
 test("Direktaufruf ohne Session landet beim Login und kehrt nach Login zur Route zurück", async ({ browser, baseURL }) => {
-  const context = await browser.newContext({ baseURL });
+  const context = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   try {
     await page.goto("/projects");

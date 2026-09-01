@@ -179,7 +179,7 @@ export function TaskDetailPage() {
         setSavingLabel(
           `Speichern… (Datei ${index + 1} von ${pendingFiles.length})`,
         );
-        await uploadTaskAttachment(created.id, file.file, file.librarySelection);
+        await uploadTaskAttachment(created.id, file.file);
       }
 
       showToast({ tone: "success", title: "Aufgabe erstellt" });

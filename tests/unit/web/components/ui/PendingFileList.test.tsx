@@ -2,10 +2,23 @@
 
 /**
  * Test Scope:
+ *
+ * Test-Ebene:
+ * - Unit/Komponente
+ *
+ * Realitätsgrad:
+ * - Reales Rendering, echte File-Objekte und Eingabeereignisse; keine API.
+ *
+ * Mock-Entscheidung:
+ * - Nur URL.createObjectURL wird als Browser-Ressource kontrolliert.
+ *
+ * Isolation:
+ * - JSDOM mit Cleanup nach jedem Test.
+ *
  * Abgedeckte Regeln:
  * - EmptyState wenn keine Dateien pending.
  * - Footer-Hinweis „Dateien werden nach dem Speichern hochgeladen." immer sichtbar.
- * - Ohne bewusste Sichtbarkeitsauswahl bleibt die Dateiauswahl gesperrt.
+ * - Vorgemerkte Dateien sind immer exklusive Parent-Anhänge; eine DMS-Auswahl existiert nicht.
  * - Datei auswählen (≤ 25 MB) → onAdd() mit korrekten DraftFiles aufgerufen.
  * - Datei > 25 MB → onAdd() nicht aufgerufen, Fehlermeldung sichtbar.
  * - Dateiname und formatierte Dateigröße sichtbar.
@@ -52,7 +65,7 @@ describe("PendingFileList", () => {
 
     expect(screen.getByText("Dateien werden nach dem Speichern hochgeladen.")).toBeInTheDocument();
 
-    rerender(<PendingFileList files={[{ file: textFile, librarySelection: "attachment-only" }]} onAdd={vi.fn()} onRemove={vi.fn()} />);
+    rerender(<PendingFileList files={[{ file: textFile }]} onAdd={vi.fn()} onRemove={vi.fn()} />);
 
     expect(screen.getByText("Dateien werden nach dem Speichern hochgeladen.")).toBeInTheDocument();
   });
@@ -62,11 +75,10 @@ describe("PendingFileList", () => {
     const imageFile = new File(["image"], "bild.png", { type: "image/png" });
     const { container } = render(<PendingFileList files={[]} onAdd={onAdd} onRemove={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("radio", { name: /Zusätzlich in der Dokumentenbibliothek/ }));
     fireEvent.change(getFileInput(container), { target: { files: [imageFile] } });
 
     expect(onAdd).toHaveBeenCalledWith([
-      { file: imageFile, previewUrl: "blob:test-preview", librarySelection: "document-library" }
+      { file: imageFile, previewUrl: "blob:test-preview" }
     ]);
   });
 
@@ -75,7 +87,6 @@ describe("PendingFileList", () => {
     const largeFile = new File([new Uint8Array(25 * 1024 * 1024 + 1)], "riesig.bin", { type: "application/octet-stream" });
     const { container } = render(<PendingFileList files={[]} onAdd={onAdd} onRemove={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("radio", { name: /Nur als Anhang/ }));
     fireEvent.change(getFileInput(container), { target: { files: [largeFile] } });
 
     expect(onAdd).not.toHaveBeenCalled();
@@ -85,7 +96,7 @@ describe("PendingFileList", () => {
   it("zeigt Dateiname und formatierte Dateigröße", () => {
     const file = new File([new Uint8Array(2048)], "anhang.pdf", { type: "application/pdf" });
 
-    render(<PendingFileList files={[{ file, librarySelection: "attachment-only" }]} onAdd={vi.fn()} onRemove={vi.fn()} />);
+    render(<PendingFileList files={[{ file }]} onAdd={vi.fn()} onRemove={vi.fn()} />);
 
     expect(screen.getByText("anhang.pdf")).toBeInTheDocument();
     expect(screen.getByText("2 KB")).toBeInTheDocument();
@@ -99,8 +110,8 @@ describe("PendingFileList", () => {
     render(
       <PendingFileList
         files={[
-          { file: firstFile, librarySelection: "attachment-only" },
-          { file: secondFile, librarySelection: "document-library" }
+          { file: firstFile },
+          { file: secondFile }
         ]}
         onAdd={vi.fn()}
         onRemove={onRemove}
@@ -111,11 +122,11 @@ describe("PendingFileList", () => {
     expect(onRemove).toHaveBeenCalledWith(1);
   });
 
-  it("verlangt vor der Dateiauswahl eine bewusste Sichtbarkeitsentscheidung", () => {
+  it("erlaubt die Dateiauswahl ohne DMS-Sichtbarkeitsentscheidung", () => {
     render(<PendingFileList files={[]} onAdd={vi.fn()} onRemove={vi.fn()} />);
 
-    expect(screen.getByRole("button", { name: "Dateien auswählen" })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: /Nur als Anhang/ })).not.toBeChecked();
-    expect(screen.getByRole("radio", { name: /Zusätzlich in der Dokumentenbibliothek/ })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Dateien auswählen" })).toBeEnabled();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getByText(/ausschließlich als Anhänge des neuen Elements/)).toBeInTheDocument();
   });
 });

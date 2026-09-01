@@ -260,7 +260,7 @@ vi.mock("../../../../apps/web/src/components/tasks/TaskForm", () => ({
       pendingTickets: [];
       pendingComments: Array<{ text: string }>;
       pendingNotes: Array<{ title: string; contentJson: Record<string, never> }>;
-      pendingFiles: Array<{ file: File; previewUrl: undefined; librarySelection: "document-library" }>;
+      pendingFiles: Array<{ file: File; previewUrl: undefined }>;
     }) => Promise<unknown> | unknown;
   }) {
     return open ? (
@@ -275,7 +275,7 @@ vi.mock("../../../../apps/web/src/components/tasks/TaskForm", () => ({
               pendingTickets: [],
               pendingComments: [{ text: "Task-Kommentar aus Meilenstein" }],
               pendingNotes: [{ title: "Task-Notiz aus Meilenstein", contentJson: {} }],
-              pendingFiles: [{ file: new File(["task"], "task.txt", { type: "text/plain" }), previewUrl: undefined, librarySelection: "document-library" }],
+              pendingFiles: [{ file: new File(["task"], "task.txt", { type: "text/plain" }), previewUrl: undefined }],
             })
           }
         >
@@ -304,7 +304,7 @@ vi.mock("../../../../apps/web/src/components/tickets/TicketForm", () => ({
       pendingRelations: [];
       pendingComments: Array<{ text: string }>;
       pendingNotes: Array<{ title: string; contentJson: Record<string, never> }>;
-      pendingFiles: Array<{ file: File; previewUrl: undefined; librarySelection: "document-library" }>;
+      pendingFiles: Array<{ file: File; previewUrl: undefined }>;
     }) => Promise<unknown> | unknown;
   }) {
     return open ? (
@@ -322,7 +322,7 @@ vi.mock("../../../../apps/web/src/components/tickets/TicketForm", () => ({
               pendingRelations: [],
               pendingComments: [{ text: "Ticket-Kommentar aus Meilenstein" }],
               pendingNotes: [{ title: "Ticket-Notiz aus Meilenstein", contentJson: {} }],
-              pendingFiles: [{ file: new File(["ticket"], "ticket.txt", { type: "text/plain" }), previewUrl: undefined, librarySelection: "document-library" }],
+              pendingFiles: [{ file: new File(["ticket"], "ticket.txt", { type: "text/plain" }), previewUrl: undefined }],
             })
           }
         >

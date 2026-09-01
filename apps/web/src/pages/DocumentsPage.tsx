@@ -79,8 +79,8 @@ function clampDetailWidth(value: number, max: number): number {
 // Verständliche Typ-Darstellung: Kürzel-Badge und Größe statt rohem MIME-Type.
 // Der technische MIME-Type bleibt als Tooltip (title) erreichbar.
 export function DocumentsPage() {
-  const canWrite = useHasPermission("attachments", "write");
-  const canDelete = useHasPermission("attachments", "delete");
+  const canWrite = useHasPermission("documents", "write");
+  const canDelete = useHasPermission("documents", "delete");
   const { showToast } = useToast();
   const { confirm } = useConfirm();
 
@@ -140,7 +140,6 @@ export function DocumentsPage() {
   const { tags } = useTags("dms");
   const {
     uploadDocument,
-    removeFromLibrary,
     deleteDocumentPermanently,
     setTags,
     addTagsBulk,
@@ -215,35 +214,6 @@ export function DocumentsPage() {
     );
     if (applied) {
       clearDocumentSelection();
-    }
-  };
-
-  const removeDocumentLibraryVisibility = async (document: Attachment) => {
-    if (document.owners.length === 0) {
-      showToast({
-        tone: "warn",
-        title: "Dokument kann nicht nur aus der Bibliothek entfernt werden",
-        message: "Ohne Owner-Verknüpfung würde eine unsichtbare, nicht erreichbare Datei verbleiben. Bitte löschen Sie die Datei stattdessen endgültig."
-      });
-      return;
-    }
-    const approved = await confirm({
-      title: "Aus der Dokumentenbibliothek entfernen?",
-      body: `„${documentTitle(document)}“ wird nur aus der zentralen Bibliothek entfernt. ${document.owners.length} Owner-Verknüpfung(en), die physische Datei und der Download bleiben bestehen.`,
-      severity: "warn",
-      confirmLabel: "Aus Bibliothek entfernen"
-    });
-    if (!approved) {
-      return;
-    }
-    try {
-      await removeFromLibrary(document.id, document.version);
-      if (selectedId === document.id) {
-        setSelectedId(null);
-      }
-      showToast({ tone: "success", title: "Aus der Dokumentenbibliothek entfernt" });
-    } catch (mutationError) {
-      showToast({ tone: "error", title: "Dokument konnte nicht aus der Bibliothek entfernt werden", message: toQueryError(mutationError) ?? "Unbekannter Fehler" });
     }
   };
 
@@ -494,7 +464,7 @@ export function DocumentsPage() {
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-ink">Dokumente</h1>
         <p className="text-sm text-steel-500">
-          Zentrale Bibliothek für alle Anhänge – über Sammlungen und Tags schnell auffindbar.
+          Zentrale Bibliothek für eigenständige Dokumente – über Sammlungen und Tags schnell auffindbar.
         </p>
       </header>
 
@@ -791,7 +761,7 @@ export function DocumentsPage() {
               title={hasActiveFilters ? "Keine Treffer" : "Dokumentenbibliothek ist leer"}
               body={hasActiveFilters
                 ? "Kein Dokument erfüllt alle aktiven Filter. Entfernen Sie einzelne Filter oder setzen Sie die Auswahl zurück."
-                : "Laden Sie ein Dokument hoch oder veröffentlichen Sie einen Anhang in der Bibliothek."}
+                : "Laden Sie ein Dokument direkt in das Dokumentenmanagement hoch."}
               actions={hasActiveFilters ? [{ label: "Alle Filter zurücksetzen", onClick: () => setSearchParams(new URLSearchParams()) }] : undefined}
             />
           ) : (
@@ -813,7 +783,6 @@ export function DocumentsPage() {
                     window.open(assetUrl(`${document.url}?download=true`), "_blank", "noopener,noreferrer");
                   }}
                   canRemoveFromLibrary={canWrite && document.owners.length > 0}
-                  onRemoveFromLibrary={() => void removeDocumentLibraryVisibility(document)}
                   canDelete={canDelete}
                   onDelete={() => void deleteDocumentForever(document)}
                   pills={<DocumentTagPills tags={document.tags ?? []} />}

@@ -47,7 +47,7 @@ async function loadTags(database: DbClient, attachmentId: number): Promise<Tag[]
 
 async function loadFolders(database: DbClient, attachmentId: number): Promise<AttachmentFolder[]> {
   return database
-    .select({ id: attachmentFolders.id, parentId: attachmentFolders.parentId, projectId: attachmentFolders.projectId, name: attachmentFolders.name, childCount: sql<number>`0`, directDocumentCount: sql<number>`0`, version: attachmentFolders.version })
+    .select({ id: attachmentFolders.id, parentId: attachmentFolders.parentId, name: attachmentFolders.name, childCount: sql<number>`0`, directDocumentCount: sql<number>`0`, version: attachmentFolders.version })
     .from(folderAttachments)
     .innerJoin(attachmentFolders, eq(folderAttachments.folderId, attachmentFolders.id))
     .where(eq(folderAttachments.attachmentId, attachmentId))
@@ -85,7 +85,7 @@ async function loadFoldersForIds(database: DbClient, attachmentIds: number[]): P
     return result;
   }
   const rows = await database
-    .select({ attachmentId: folderAttachments.attachmentId, id: attachmentFolders.id, parentId: attachmentFolders.parentId, projectId: attachmentFolders.projectId, name: attachmentFolders.name, childCount: sql<number>`0`, directDocumentCount: sql<number>`0`, version: attachmentFolders.version })
+    .select({ attachmentId: folderAttachments.attachmentId, id: attachmentFolders.id, parentId: attachmentFolders.parentId, name: attachmentFolders.name, childCount: sql<number>`0`, directDocumentCount: sql<number>`0`, version: attachmentFolders.version })
     .from(folderAttachments)
     .innerJoin(attachmentFolders, eq(folderAttachments.folderId, attachmentFolders.id))
     .where(inArray(folderAttachments.attachmentId, attachmentIds))
@@ -110,6 +110,7 @@ function buildDocument(
 ): Attachment {
   return {
     id: record.id,
+    kind: record.kind,
     owners,
     originalName: record.originalName,
     displayName: record.displayName,
@@ -117,9 +118,9 @@ function buildDocument(
     filename: record.filename,
     mimetype: record.mimetype,
     size: record.size,
-    url: `/api/attachments/${record.id}/content`,
+    url: `/api/documents/${record.id}/content`,
     contentHash: record.contentHash,
-    isInDocumentLibrary: record.isInDocumentLibrary,
+    isInDocumentLibrary: record.kind === "document",
     tags: documentTags,
     folder: folders[0] ?? null,
     folders,
@@ -141,7 +142,7 @@ async function mapDocument(database: DbClient, record: AttachmentRecord): Promis
 
 export async function getDocument(database: DbClient, id: number): Promise<Attachment> {
   const record = await attachmentRepository.findById(database, id);
-  if (!record || !record.isInDocumentLibrary) {
+  if (!record || record.kind !== "document") {
     throw notFound(`Attachment with id ${id} not found`);
   }
   return mapDocument(database, record);
@@ -150,7 +151,7 @@ export async function getDocument(database: DbClient, id: number): Promise<Attac
 const supportedDocumentTypes = new Set(["image/", "application/pdf", "text/", "video/", "audio/"]);
 
 async function buildDocumentLibraryWhere(database: DbClient, filter: DocumentLibraryFilter): Promise<SQL> {
-  const conditions: SQL[] = [eq(attachments.isInDocumentLibrary, true)];
+  const conditions: SQL[] = [eq(attachments.kind, "document")];
 
   if (typeof filter.folder === "number") {
     const folderIds = await listFolderAndDescendantIds(database, filter.folder);
@@ -272,7 +273,7 @@ export async function updateDocumentMetadata(
   actor?: JournalActor | null
 ): Promise<Attachment> {
   const current = await attachmentRepository.findById(database, id);
-  if (!current || !current.isInDocumentLibrary) {
+  if (!current || current.kind !== "document") {
     throw notFound(`Attachment with id ${id} not found in document library`);
   }
   assertVersion(current.version, input.expectedVersion);
@@ -321,7 +322,7 @@ export async function setDocumentTags(
   actor?: JournalActor | null
 ): Promise<Attachment> {
   const record = await attachmentRepository.findById(database, attachmentId);
-  if (!record || !record.isInDocumentLibrary) {
+  if (!record || record.kind !== "document") {
     throw notFound(`Attachment with id ${attachmentId} not found in document library`);
   }
   assertVersion(record.version, expectedVersion);
@@ -389,6 +390,117 @@ export async function setDocumentTags(
   return mapDocument(database, updated);
 }
 
+export async function listDocumentsByIds(database: DbClient, ids: number[]): Promise<Attachment[]> {
+  const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+  const records = await database
+    .select()
+    .from(attachments)
+    .where(and(inArray(attachments.id, uniqueIds), eq(attachments.kind, "document")));
+  return enrichDocuments(database, records);
+}
+
+export async function setDocumentFolderBulk(
+  database: DbClient,
+  items: AttachmentVersionInput[],
+  folderId: number,
+  actor?: JournalActor | null
+): Promise<Attachment[]> {
+  const selections = normalizeDocumentVersionSelection(items);
+  const targetFolder = firstRow(
+    await database
+      .select({ id: attachmentFolders.id, name: attachmentFolders.name })
+      .from(attachmentFolders)
+      .where(eq(attachmentFolders.id, folderId))
+  );
+  if (!targetFolder) {
+    throw notFound(`Attachment folder with id ${folderId} not found`);
+  }
+
+  const records = await database
+    .select()
+    .from(attachments)
+    .where(and(
+      inArray(attachments.id, selections.map((item) => item.id)),
+      eq(attachments.kind, "document")
+    ));
+  if (records.length !== selections.length) {
+    throw notFound("Mindestens ein ausgewähltes Dokument ist nicht mehr in der Dokumentenbibliothek vorhanden.");
+  }
+  const recordById = new Map(records.map((record) => [record.id, record]));
+  for (const selection of selections) {
+    const record = recordById.get(selection.id);
+    if (!record) {
+      throw notFound(`Attachment with id ${selection.id} not found in document library`);
+    }
+    assertVersion(record.version, selection.expectedVersion);
+  }
+
+  const currentLinks = await database
+    .select({ attachmentId: folderAttachments.attachmentId, folderId: folderAttachments.folderId })
+    .from(folderAttachments)
+    .where(inArray(folderAttachments.attachmentId, selections.map((item) => item.id)));
+  const currentFolderIdsByAttachmentId = new Map<number, number[]>();
+  for (const link of currentLinks) {
+    const current = currentFolderIdsByAttachmentId.get(link.attachmentId);
+    if (current) {
+      current.push(link.folderId);
+    } else {
+      currentFolderIdsByAttachmentId.set(link.attachmentId, [link.folderId]);
+    }
+  }
+
+  const changedSelections = selections.filter((selection) => {
+    const currentFolderIds = currentFolderIdsByAttachmentId.get(selection.id) ?? [];
+    return currentFolderIds.length !== 1 || currentFolderIds[0] !== folderId;
+  });
+
+  if (changedSelections.length > 0) {
+    await database.transaction(async (tx) => {
+      const changedIds = changedSelections.map((selection) => selection.id);
+      await tx.delete(folderAttachments).where(inArray(folderAttachments.attachmentId, changedIds));
+      await tx.insert(folderAttachments).values(changedIds.map((attachmentId) => ({ folderId, attachmentId })));
+      const updated = mutationAffectedRows(
+        await tx
+          .update(attachments)
+          .set({
+            version: sql`${attachments.version} + 1`,
+            updatedBy: actor?.actorUserId ?? null,
+            updatedAt: new Date().toISOString()
+          })
+          .where(documentVersionSelectionCondition(changedSelections))
+      );
+      if (updated !== changedSelections.length) {
+        throw conflict("Mindestens ein Dokument wurde zwischenzeitlich geändert.");
+      }
+
+      const changedRecords = changedSelections.map((selection) => recordById.get(selection.id)!);
+      const journalObject = makeJournalObject("attachment", changedRecords[0]!.id, changedRecords[0]!.originalName);
+      await recordJournalEntry(tx, {
+        operation: "update",
+        object: journalObject,
+        summary: `${changedRecords.length} Dokument(e) wurden in die Sammlung ${targetFolder.name} verschoben.`,
+        actor,
+        contexts: changedRecords.slice(1).map((record) =>
+          makeJournalContext(makeJournalObject("attachment", record.id, record.originalName), "related")
+        )
+      });
+    });
+  }
+
+  const updatedRecords = await database
+    .select()
+    .from(attachments)
+    .where(inArray(attachments.id, selections.map((item) => item.id)));
+  const updatedById = new Map(updatedRecords.map((record) => [record.id, record]));
+  return enrichDocuments(
+    database,
+    selections.map((selection) => updatedById.get(selection.id)!).filter(Boolean)
+  );
+}
+
 function normalizeDocumentVersionSelection(items: AttachmentVersionInput[]): AttachmentVersionInput[] {
   if (items.length === 0) {
     throw badRequest("Es wurden keine Dokumente ausgewählt.");
@@ -450,7 +562,7 @@ export async function addDocumentTagsBulk(
     .from(attachments)
     .where(and(
       inArray(attachments.id, selections.map((item) => item.id)),
-      eq(attachments.isInDocumentLibrary, true)
+      eq(attachments.kind, "document")
     ));
   if (records.length !== selections.length) {
     throw notFound("Mindestens ein ausgewähltes Dokument ist nicht mehr in der Dokumentenbibliothek vorhanden.");

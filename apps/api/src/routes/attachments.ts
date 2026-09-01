@@ -1,6 +1,5 @@
 import {
   ATTACHMENT_OWNER_TYPES,
-  type AttachmentLibrarySelection,
   type AttachmentLocalFileInput,
   type AttachmentOwner,
   type AttachmentVersionInput
@@ -15,11 +14,9 @@ import {
   createTaskAttachment,
   createWikiPageAttachment,
   bulkDeleteAttachments,
-  bulkSetAttachmentFolder,
-  bulkUnlinkAttachments,
+  deleteParentAttachment,
   deleteAttachment,
   getAttachmentFile,
-  unlinkAttachment,
   listRecentAttachments,
   listFeatureAttachments,
   listMilestoneAttachments,
@@ -53,25 +50,6 @@ const uploadBodySchema = {
     properties: {
       file: { $ref: "#multipartFile" }
     }
-  }
-} as const;
-
-const ownerUploadQuerySchema = {
-  type: "object",
-  required: ["libraryVisibility"],
-  additionalProperties: false,
-  properties: {
-    libraryVisibility: { type: "string", enum: ["attachment-only", "document-library"] }
-  }
-} as const;
-
-const attachmentLifecycleQuerySchema = {
-  type: "object",
-  required: ["expectedVersion"],
-  additionalProperties: false,
-  properties: {
-    expectedVersion: { type: "integer", minimum: 1 },
-    orphanAction: { type: "string", enum: ["add-to-library"] }
   }
 } as const;
 
@@ -143,15 +121,6 @@ const bulkAttachmentBodySchema = {
   }
 } as const;
 
-const bulkAttachmentFolderBodySchema = {
-  ...bulkAttachmentBodySchema,
-  required: ["ownerType", "ownerId", "attachments", "folderId"],
-  properties: {
-    ...bulkAttachmentBodySchema.properties,
-    folderId: { anyOf: [{ type: "integer", minimum: 1 }, { type: "null" }] }
-  }
-} as const;
-
 const attachmentArchiveBodySchema = {
   type: "object",
   required: ["ownerType", "ownerId", "attachmentIds", "localFiles"],
@@ -202,7 +171,7 @@ function contentDisposition(filename: string, download: boolean): string {
   return `${mode}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
-async function readUpload(request: FastifyRequest, librarySelection: AttachmentLibrarySelection) {
+async function readUpload(request: FastifyRequest) {
   const file = (request.body as UploadBody | undefined)?.file;
   if (!file || Array.isArray(file) || typeof file.toBuffer !== "function") {
     throw badRequest("A file upload is required");
@@ -211,8 +180,7 @@ async function readUpload(request: FastifyRequest, librarySelection: AttachmentL
   return {
     originalName: file.filename ?? "upload",
     mimetype: file.mimetype ?? "application/octet-stream",
-    buffer: await file.toBuffer(),
-    librarySelection
+    buffer: await file.toBuffer()
   };
 }
 
@@ -223,60 +191,6 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     async (request) => {
       const currentUser = await requireCurrentUser(request);
       return listRecentAttachments(app.db, { owner: recentAttachmentOwnerFromQuery(request.query), currentUserId: currentUser.id, limit: request.query.limit, mine: request.query.mine });
-    }
-  );
-
-  app.post<{
-    Body: {
-      ownerType: AttachmentOwner["type"];
-      ownerId: number;
-      attachments: AttachmentVersionInput[];
-    };
-  }>(
-    "/attachments/bulk-unlink",
-    {
-      config: { auth: { resource: "attachments", action: "write" } },
-      schema: {
-        body: bulkAttachmentBodySchema,
-        response: { 204: { type: "null" } }
-      }
-    },
-    async (request, reply) => {
-      await bulkUnlinkAttachments(
-        app.db,
-        attachmentOwner(request.body),
-        request.body.attachments,
-        createJournalActor(request.currentUser)
-      );
-      return reply.status(204).send();
-    }
-  );
-
-  app.post<{
-    Body: {
-      ownerType: AttachmentOwner["type"];
-      ownerId: number;
-      attachments: AttachmentVersionInput[];
-      folderId: number | null;
-    };
-  }>(
-    "/attachments/bulk-folder",
-    {
-      config: { auth: { resource: "attachments", action: "write" } },
-      schema: {
-        body: bulkAttachmentFolderBodySchema,
-        response: { 204: { type: "null" } }
-      }
-    },
-    async (request, reply) => {
-      await bulkSetAttachmentFolder(
-        app.db,
-        attachmentOwner(request.body),
-        request.body.attachments,
-        request.body.folderId,
-        createJournalActor(request.currentUser)
-      );
-      return reply.status(204).send();
     }
   );
 
@@ -373,7 +287,10 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
       config: { auth: { resource: "attachments", action: "read" } },
       schema: { params: idParamSchema, response: { 200: objectResponseSchema } }
     },
-    async (request) => getAttachmentPreview(app.db, request.params.id)
+    async (request) => {
+      await getAttachmentFile(app.db, request.params.id, "parent_attachment");
+      return getAttachmentPreview(app.db, request.params.id);
+    }
   );
 
   app.get<{ Params: { id: number }; Querystring: { download?: boolean } }>(
@@ -383,7 +300,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
       schema: { params: idParamSchema, querystring: attachmentContentQuerySchema }
     },
     async (request, reply) => {
-      const file = await getAttachmentFile(app.db, request.params.id);
+      const file = await getAttachmentFile(app.db, request.params.id, "parent_attachment");
       return reply
         .type(file.mimetype)
         .header("Content-Length", String(file.size))
@@ -399,6 +316,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
       schema: { params: idParamSchema }
     },
     async (request, reply) => {
+      await getAttachmentFile(app.db, request.params.id, "parent_attachment");
       const file = await getAttachmentPreviewFile(app.db, request.params.id);
       return reply
         .type("application/pdf")
@@ -415,72 +333,72 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
       schema: { params: idParamSchema, response: { 204: { type: "null" } } }
     },
     async (request, reply) => {
-      await openAttachment(app.db, request.params.id, app.fileOpener, createJournalActor(request.currentUser));
+      await openAttachment(app.db, request.params.id, app.fileOpener, createJournalActor(request.currentUser), "parent_attachment");
       return reply.status(204).send();
     }
   );
 
-  app.post<{ Params: { id: number }; Querystring: { libraryVisibility: AttachmentLibrarySelection } }>(
+  app.post<{ Params: { id: number } }>(
     "/projects/:id/attachments",
-    { schema: { params: idParamSchema, querystring: ownerUploadQuerySchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
+    { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const attachment = await createProjectAttachment(app.db, request.params.id, await readUpload(request, request.query.libraryVisibility), createJournalActor(request.currentUser));
+      const attachment = await createProjectAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(attachment);
     }
   );
 
-  app.post<{ Params: { id: number }; Querystring: { libraryVisibility: AttachmentLibrarySelection } }>(
+  app.post<{ Params: { id: number } }>(
     "/tasks/:id/attachments",
-    { schema: { params: idParamSchema, querystring: ownerUploadQuerySchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
+    { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const attachment = await createTaskAttachment(app.db, request.params.id, await readUpload(request, request.query.libraryVisibility), createJournalActor(request.currentUser));
+      const attachment = await createTaskAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(attachment);
     }
   );
 
-  app.post<{ Params: { id: number }; Querystring: { libraryVisibility: AttachmentLibrarySelection } }>(
+  app.post<{ Params: { id: number } }>(
     "/milestones/:id/attachments",
-    { schema: { params: idParamSchema, querystring: ownerUploadQuerySchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
+    { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const attachment = await createMilestoneAttachment(app.db, request.params.id, await readUpload(request, request.query.libraryVisibility), createJournalActor(request.currentUser));
+      const attachment = await createMilestoneAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(attachment);
     }
   );
 
-  app.post<{ Params: { id: number }; Querystring: { libraryVisibility: AttachmentLibrarySelection } }>(
+  app.post<{ Params: { id: number } }>(
     "/features/:id/attachments",
-    { schema: { params: idParamSchema, querystring: ownerUploadQuerySchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
+    { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const attachment = await createFeatureAttachment(app.db, request.params.id, await readUpload(request, request.query.libraryVisibility), createJournalActor(request.currentUser));
+      const attachment = await createFeatureAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(attachment);
     }
   );
 
   for (const basePath of ["/wiki", "/wiki-pages"]) {
-    app.post<{ Params: { id: number }; Querystring: { libraryVisibility: AttachmentLibrarySelection } }>(
+    app.post<{ Params: { id: number } }>(
       `${basePath}/:id/attachments`,
-      { schema: { params: idParamSchema, querystring: ownerUploadQuerySchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
+      { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
       async (request, reply) => {
-        const attachment = await createWikiPageAttachment(app.db, request.params.id, await readUpload(request, request.query.libraryVisibility), createJournalActor(request.currentUser));
+        const attachment = await createWikiPageAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
         return reply.status(201).send(attachment);
       }
     );
 
     app.delete<{
       Params: { id: number; attachmentId: number };
-      Querystring: { expectedVersion: number; orphanAction?: "add-to-library" };
+      Querystring: { expectedVersion: number };
     }>(
       `${basePath}/:id/attachments/:attachmentId`,
       {
-        config: { auth: { resource: "attachments", action: "write" } },
+        config: { auth: { resource: "attachments", action: "delete" } },
         schema: {
           params: ownerAttachmentParamSchema,
-          querystring: attachmentLifecycleQuerySchema,
+          querystring: expectedVersionQuerySchema,
           response: { 204: { type: "null" } }
         }
       },
       async (request, reply) => {
-        await unlinkAttachment(
+        await deleteParentAttachment(
           app.db,
           { type: "wikiPage", id: request.params.id },
           request.params.attachmentId,
@@ -501,15 +419,15 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
   for (const route of unlinkRoutes) {
     app.delete<{
       Params: { id: number; attachmentId: number };
-      Querystring: { expectedVersion: number; orphanAction?: "add-to-library" };
+      Querystring: { expectedVersion: number };
     }>(
       route.path,
       {
-        config: { auth: { resource: "attachments", action: "write" } },
-        schema: { params: ownerAttachmentParamSchema, querystring: attachmentLifecycleQuerySchema, response: { 204: { type: "null" } } }
+        config: { auth: { resource: "attachments", action: "delete" } },
+        schema: { params: ownerAttachmentParamSchema, querystring: expectedVersionQuerySchema, response: { 204: { type: "null" } } }
       },
       async (request, reply) => {
-        await unlinkAttachment(
+        await deleteParentAttachment(
           app.db,
           { type: route.ownerType, id: request.params.id },
           request.params.attachmentId,
@@ -528,7 +446,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
       schema: { params: idParamSchema, querystring: expectedVersionQuerySchema, response: { 204: { type: "null" } } }
     },
     async (request, reply) => {
-      await deleteAttachment(app.db, request.params.id, request.query.expectedVersion, createJournalActor(request.currentUser));
+      await deleteAttachment(app.db, request.params.id, request.query.expectedVersion, createJournalActor(request.currentUser), "parent_attachment");
       return reply.status(204).send();
     }
   );

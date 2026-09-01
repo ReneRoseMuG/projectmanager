@@ -16,7 +16,7 @@
  * Abgedeckte Regeln:
  * - Meilensteine sind projektgebundene, versionierte Projektmanagement-Objekte mit CRUD und expectedVersion.
  * - Meilensteine können Tasks, Tickets, Features, Tags, Notes, Comments, Attachments und Events zugeordnet werden.
- * - Löschregeln entfernen Join-Zeilen und meilenstein-eigene Notes/Comments, behalten Attachments als DMS-Dokumente und löschen keine unabhängigen Fachobjekte.
+ * - Löschregeln entfernen exklusive Parent-Anhänge samt Upload-Datei, lösen DMS-Links und löschen keine unabhängigen Fachobjekte.
  * - Meilenstein-Listen skalieren ohne Pool-Queue-Überlauf auf mindestens 500 Einträge.
  *
  * Fehlerfälle:
@@ -222,7 +222,7 @@ describe("Milestones API", () => {
     expect(comments.body).toEqual([expect.objectContaining({ id: comment.body.id, body: "<p>Milestone-Kommentar</p>" })]);
 
     const attachment = await supertest(app.server)
-      .post(`/api/milestones/${milestone.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/milestones/${milestone.id}/attachments`)
       .attach("file", Buffer.from("Milestone-Datei"), { filename: "milestone.txt", contentType: "text/plain" })
       .expect(201);
     expect(attachment.body.owners).toEqual([{ type: "milestone", id: milestone.id }]);
@@ -268,7 +268,7 @@ describe("Milestones API", () => {
     });
   });
 
-  it("löscht Milestone-Supportobjekte, behält Attachments als DMS-Dokumente und löscht keine unabhängigen Fachobjekte", async () => {
+  it("löscht Milestone-Supportobjekte und exklusive Parent-Anhänge, aber keine unabhängigen Fachobjekte", async () => {
     const project = await createProject(app);
     const milestone = await createMilestone(app, project.id);
     const task = await createTask(app, project.id);
@@ -280,7 +280,7 @@ describe("Milestones API", () => {
     const note = await supertest(app.server).post(`/api/milestones/${milestone.id}/notes`).send({ title: "Delete Note", contentJson: { type: "doc" } }).expect(201);
     const comment = await supertest(app.server).post(`/api/milestones/${milestone.id}/comments`).send({ body: "Delete Comment" }).expect(201);
     const attachment = await supertest(app.server)
-      .post(`/api/milestones/${milestone.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/milestones/${milestone.id}/attachments`)
       .attach("file", Buffer.from("Delete"), { filename: "delete.txt", contentType: "text/plain" })
       .expect(201);
     const event = await supertest(app.server)
@@ -297,7 +297,8 @@ describe("Milestones API", () => {
 
     expect(await countRows(testDb, "notes", "id", note.body.id)).toBe(0);
     expect(await countRows(testDb, "comments", "id", comment.body.id)).toBe(0);
-    expect(await countRows(testDb, "attachments", "id", attachment.body.id)).toBe(1);
+    expect(await countRows(testDb, "attachments", "id", attachment.body.id)).toBe(0);
+    await expect(fs.access(path.join(uploadDir, attachment.body.filename))).rejects.toThrow();
     expect(await countRows(testDb, "milestone_tasks", "owner_id", milestone.id)).toBe(0);
     expect(await countRows(testDb, "milestone_tickets", "owner_id", milestone.id)).toBe(0);
     expect(await countRows(testDb, "milestone_features", "milestone_id", milestone.id)).toBe(0);
@@ -310,12 +311,12 @@ describe("Milestones API", () => {
     expect(remainingEvent.owners).toEqual([]);
   });
 
-  it("bereinigt Milestone-Supportobjekte bei Projektlöschung und behält Attachments als DMS-Dokumente", async () => {
+  it("bereinigt Milestone-Supportobjekte und exklusive Parent-Anhänge bei Projektlöschung", async () => {
     const project = await createProject(app);
     const milestone = await createMilestone(app, project.id);
     const note = await supertest(app.server).post(`/api/milestones/${milestone.id}/notes`).send({ title: "Projekt Delete Note", contentJson: { type: "doc" } }).expect(201);
     const attachment = await supertest(app.server)
-      .post(`/api/milestones/${milestone.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/milestones/${milestone.id}/attachments`)
       .attach("file", Buffer.from("Project Delete"), { filename: "project-delete.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -323,7 +324,8 @@ describe("Milestones API", () => {
 
     await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(404);
     expect(await countRows(testDb, "notes", "id", note.body.id)).toBe(0);
-    expect(await countRows(testDb, "attachments", "id", attachment.body.id)).toBe(1);
+    expect(await countRows(testDb, "attachments", "id", attachment.body.id)).toBe(0);
+    await expect(fs.access(path.join(uploadDir, attachment.body.filename))).rejects.toThrow();
     expect(await countRows(testDb, "milestone_attachments", "milestone_id", milestone.id)).toBe(0);
   });
 

@@ -16,6 +16,7 @@ import {
 
 export type AttachmentFamily =
   | "image"
+  | "affinity"
   | "pdf"
   | "text"
   | "code"
@@ -101,6 +102,16 @@ export function describeAttachmentType(
   const mimetype = attachment.mimetype.toLowerCase();
   const extension = extensionOf(attachment.originalName);
 
+  if (extension === "af") {
+    return {
+      family: "affinity",
+      label: "Affinity",
+      badge: "AF",
+      toneClassName: "bg-violet text-white",
+      Icon: FileImage,
+      previewEnabled: false,
+    };
+  }
   if (mimetype.startsWith("image/")) {
     return {
       family: "image",

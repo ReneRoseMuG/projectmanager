@@ -402,8 +402,8 @@ vi.mock("../../../../../apps/web/src/components/attachments/AttachmentUploader",
 }));
 
 vi.mock("../../../../../apps/web/src/components/attachments/AttachmentList", () => ({
-  AttachmentList({ attachments }: { attachments: Attachment[] }) {
-    return <div data-testid="attachment-list">{attachments.length}</div>;
+  AttachmentList({ manager }: { manager: { attachments: Attachment[] } }) {
+    return <div data-testid="attachment-list">{manager.attachments.length}</div>;
   }
 }));
 

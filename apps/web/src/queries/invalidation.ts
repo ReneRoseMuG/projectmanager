@@ -247,7 +247,16 @@ export async function invalidateAllAttachments(queryClient: QueryClient): Promis
 }
 
 export async function invalidateAttachments(queryClient: QueryClient, ownerType: QueryOwnerType, ownerId: number): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.attachments.owner(ownerType, ownerId), queryKeys.documents.root, ...attachmentOwnerKeys(ownerType, ownerId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [
+    queryKeys.attachments.owner(ownerType, ownerId),
+    queryKeys.attachments.parentFolders(ownerType, ownerId),
+    queryKeys.attachments.documentLinks(ownerType, ownerId),
+    queryKeys.attachments.localFolders(ownerType, ownerId),
+    queryKeys.documents.root,
+    ...attachmentOwnerKeys(ownerType, ownerId),
+    queryKeys.dashboards.root,
+    queryKeys.globalSearch.root
+  ]);
 }
 
 export async function invalidateTags(queryClient: QueryClient): Promise<void> {

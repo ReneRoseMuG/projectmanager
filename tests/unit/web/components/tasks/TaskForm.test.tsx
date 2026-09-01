@@ -237,7 +237,7 @@ describe("TaskForm", () => {
           pendingTickets: [{ kind: "existing", ticket }],
           pendingComments: [{ text: "Task-Kommentar" }],
           pendingNotes: [{ title: "Task-Notiz", contentJson: { html: "" } }],
-          pendingFiles: [{ file, previewUrl: undefined, librarySelection: "document-library" }]
+          pendingFiles: [{ file, previewUrl: undefined }]
         })
       )
     );

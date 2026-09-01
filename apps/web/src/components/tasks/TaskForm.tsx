@@ -1,5 +1,4 @@
 import type {
-  AttachmentLibrarySelection,
   DraftComment,
   DraftNote,
   DraftSubtask,
@@ -349,9 +348,9 @@ export function TaskForm({
     }
   };
 
-  const uploadAttachment = async (file: File, librarySelection: AttachmentLibrarySelection) => {
+  const uploadAttachment = async (file: File) => {
     try {
-      const uploaded = await attachments.uploadAttachment(file, librarySelection);
+      const uploaded = await attachments.uploadAttachment(file);
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {

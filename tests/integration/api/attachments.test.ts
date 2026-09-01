@@ -2,8 +2,21 @@
  * Test Scope:
  * Attachments API
  *
+ * Test-Ebene:
+ * - Integration
+ *
+ * Realitätsgrad:
+ * - Echte Fastify-Routen, MySQL-Testdatenbank, Upload-/Preview-Temp-Root und echte Dateioperationen.
+ *
+ * Mock-Entscheidung:
+ * - Keine Fachmocks; nur der native File-Opener ist als kontrollierter Collaborator injiziert.
+ *
+ * Isolation:
+ * - Zufällige Testdatenbank und eindeutige Betriebssystem-Temp-Verzeichnisse.
+ *
  * Abgedeckte Regeln:
  * - Multipart-Uploads, Listen, Vorschau, Löschen und lokales Öffnen von Attachments.
+ * - Jeder Parent-Upload erzeugt einen exklusiven parent_attachment-Datensatz, auch bei gleichem Inhalt.
  * - Lokales Öffnen nutzt einen injizierten File-Opener und verlangt attachments:read.
  * - Dateiinhalt, generierte Vorschauen und Kachel-Thumbnails werden ausschließlich über authentifizierte,
  *   berechtigungsgeprüfte Routen ausgeliefert; statische erratbare URLs bleiben geschlossen.
@@ -106,7 +119,7 @@ describe("Attachments API", () => {
     const project = await createProject(app);
 
     const res = await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("Projekt-Datei"), { filename: "projekt.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -115,12 +128,13 @@ describe("Attachments API", () => {
     expect(res.body.mimetype).toBe("text/plain");
     expect(res.body.size).toBeGreaterThan(0);
     expect(res.body.url).toBe(`/api/attachments/${res.body.id}/content`);
+    expect(res.body).toMatchObject({ kind: "parent_attachment", isInDocumentLibrary: false });
   });
 
   it("GET /api/projects/:id/attachments gibt Attachment-Liste zurueck", async () => {
     const project = await createProject(app);
     const upload = await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("Liste"), { filename: "liste.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -133,7 +147,7 @@ describe("Attachments API", () => {
     const task = await createTask(app, project.id);
 
     const res = await supertest(app.server)
-      .post(`/api/tasks/${task.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/tasks/${task.id}/attachments`)
       .attach("file", Buffer.from("Task-Datei"), { filename: "aufgabe.pdf", contentType: "application/pdf" })
       .expect(201);
 
@@ -141,7 +155,7 @@ describe("Attachments API", () => {
     expect(res.body.mimetype).toBe("application/pdf");
   });
 
-  it("verknuepft ein Inhaltsduplikat mit dem neuen Parent, ohne Datei und Datensatz zu duplizieren", async () => {
+  it("speichert Inhaltsduplikate als unabhängige exklusive Parent-Anhänge", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
 
@@ -154,23 +168,22 @@ describe("Attachments API", () => {
       .attach("file", Buffer.from("identischer Inhalt"), { filename: "kopie.txt", contentType: "text/plain" })
       .expect(201);
 
-    expect(second.body.id).toBe(first.body.id);
-    expect(second.body.filename).toBe(first.body.filename);
-    expect(second.body.owners).toEqual(
-      expect.arrayContaining([
-        { type: "project", id: project.id },
-        { type: "task", id: task.id }
-      ])
-    );
+    expect(second.body.id).not.toBe(first.body.id);
+    expect(second.body.filename).not.toBe(first.body.filename);
+    expect(first.body.owners).toEqual([{ type: "project", id: project.id }]);
+    expect(second.body.owners).toEqual([{ type: "task", id: task.id }]);
+    expect(first.body.kind).toBe("parent_attachment");
+    expect(second.body.kind).toBe("parent_attachment");
 
     const [attachmentRows] = await testDb.pool.execute("SELECT COUNT(*) AS count FROM attachments");
-    expect((attachmentRows as Array<{ count: number }>)[0].count).toBe(1);
+    expect((attachmentRows as Array<{ count: number }>)[0].count).toBe(2);
     await expect(fs.stat(path.join(uploadDir, first.body.filename))).resolves.toBeDefined();
+    await expect(fs.stat(path.join(uploadDir, second.body.filename))).resolves.toBeDefined();
 
     const projectList = await supertest(app.server).get(`/api/projects/${project.id}/attachments`).expect(200);
     const taskList = await supertest(app.server).get(`/api/tasks/${task.id}/attachments`).expect(200);
     expect((projectList.body as Array<{ id: number }>).map((item) => item.id)).toEqual([first.body.id]);
-    expect((taskList.body as Array<{ id: number }>).map((item) => item.id)).toEqual([first.body.id]);
+    expect((taskList.body as Array<{ id: number }>).map((item) => item.id)).toEqual([second.body.id]);
   });
 
   it.each([
@@ -229,19 +242,19 @@ describe("Attachments API", () => {
     const filename = `${label}-create-flow.txt`;
 
     const created = await supertest(app.server)
-      .post(`${owner.path}?libraryVisibility=document-library`)
+      .post(owner.path)
       .attach("file", Buffer.from(`Datei fuer ${label}`), { filename, contentType: "text/plain" })
       .expect(201);
     const listed = await supertest(app.server).get(owner.path).expect(200);
 
-    expect(created.body).toEqual(expect.objectContaining({ originalName: filename, isInDocumentLibrary: true, owners: [{ type: ownerType, id: owner.id }] }));
-    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, originalName: filename, isInDocumentLibrary: true, owners: [{ type: ownerType, id: owner.id }] })]);
+    expect(created.body).toEqual(expect.objectContaining({ originalName: filename, kind: "parent_attachment", isInDocumentLibrary: false, owners: [{ type: ownerType, id: owner.id }] }));
+    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, originalName: filename, kind: "parent_attachment", isInDocumentLibrary: false, owners: [{ type: ownerType, id: owner.id }] })]);
   });
 
-  it("DELETE /api/wiki/:id/attachments/:attachmentId entfernt die Wiki-Verknüpfung und behält das Attachment", async () => {
+  it("DELETE /api/wiki/:id/attachments/:attachmentId löscht den exklusiven Wiki-Anhang physisch", async () => {
     const page = await createWikiPage(app);
     const created = await supertest(app.server)
-      .post(`/api/wiki/${page.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/wiki/${page.id}/attachments`)
       .attach("file", Buffer.from("Wiki-Datei"), { filename: "wiki.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -254,12 +267,13 @@ describe("Attachments API", () => {
     const [linkRows] = await testDb.pool.execute("SELECT attachment_id FROM wiki_page_attachments WHERE wiki_page_id = ? AND attachment_id = ?", [page.id, created.body.id]);
     expect((linkRows as unknown[]).length).toBe(0);
     const [existRows] = await testDb.pool.execute("SELECT id FROM attachments WHERE id = ?", [created.body.id]);
-    expect((existRows as unknown[]).length).toBe(1);
+    expect((existRows as unknown[]).length).toBe(0);
+    await expect(fs.stat(path.join(uploadDir, created.body.filename))).rejects.toThrow();
   });
 
   it("POST zu nicht existierendem Projekt gibt 404 zurueck", async () => {
     await supertest(app.server)
-      .post("/api/projects/9999/attachments?libraryVisibility=document-library")
+      .post("/api/projects/9999/attachments")
       .attach("file", Buffer.from("X"), { filename: "x.txt", contentType: "text/plain" })
       .expect(404);
   });
@@ -267,7 +281,7 @@ describe("Attachments API", () => {
   it("DELETE /api/attachments/:id entfernt den Eintrag aus der DB", async () => {
     const project = await createProject(app);
     const upload = await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("Zu loeschen"), { filename: "delete-me.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -284,7 +298,7 @@ describe("Attachments API", () => {
   it("GET /api/attachments/:id/preview gibt Textvorschau begrenzt zurueck", async () => {
     const project = await createProject(app);
     const upload = await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("Erste Zeile\nZweite Zeile"), { filename: "notiz.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -303,7 +317,7 @@ describe("Attachments API", () => {
   it("GET /api/attachments/:id/preview erkennt PDF als native Vorschau", async () => {
     const project = await createProject(app);
     const upload = await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("%PDF-1.4"), { filename: "dokument.pdf", contentType: "application/pdf" })
       .expect(201);
 
@@ -321,7 +335,7 @@ describe("Attachments API", () => {
   it("POST /api/attachments/:id/open oeffnet die absolute Upload-Datei", async () => {
     const project = await createProject(app);
     const upload = await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("Lokal öffnen"), { filename: "lokal.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -335,7 +349,7 @@ describe("Attachments API", () => {
   it("POST /api/attachments/:id/open aktualisiert Metadaten nach externer Dateiänderung", async () => {
     const project = await createProject(app);
     const upload = await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("vorher"), { filename: "watch.txt", contentType: "text/plain" })
       .expect(201);
     const [beforeRows] = await testDb.pool.execute("SELECT size, version, updated_at FROM attachments WHERE id = ?", [upload.body.id]);
@@ -363,7 +377,7 @@ describe("Attachments API", () => {
     setAttachmentWatcherPollIntervalForTests(20);
     const project = await createProject(app);
     const upload = await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("timeout"), { filename: "timeout.txt", contentType: "text/plain" })
       .expect(201);
     const [beforeRows2] = await testDb.pool.execute("SELECT size, version FROM attachments WHERE id = ?", [upload.body.id]);
@@ -387,7 +401,7 @@ describe("Attachments API", () => {
   it("POST /api/attachments/:id/open gibt 404 fuer fehlende Upload-Datei zurueck", async () => {
     const project = await createProject(app);
     const upload = await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("Fehlt"), { filename: "fehlt.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -400,7 +414,7 @@ describe("Attachments API", () => {
   it("POST /api/attachments/:id/open meldet Opener-Fehler einheitlich", async () => {
     const project = await createProject(app);
     const upload = await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("Fehler"), { filename: "fehler.txt", contentType: "text/plain" })
       .expect(201);
 
@@ -456,7 +470,7 @@ describe("Attachments API Auth", () => {
     const admin = await loginAdmin();
     const project = await admin.post("/api/projects").send({ name: "Auth-Projekt", status: "active", color: "#6366f1" }).expect(201);
     const upload = await admin
-      .post(`/api/projects/${project.body.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/projects/${project.body.id}/attachments`)
       .attach("file", Buffer.from("Auth"), { filename: "auth.txt", contentType: "text/plain" })
       .expect(201);
     return upload.body as { id: number; filename: string };

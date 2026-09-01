@@ -4,7 +4,7 @@
  *
  * Abgedeckte Regeln:
  * - Bilder zeigen das Asset direkt, Typen ohne Seitenlayout ein Typ-Icon mit Badge.
- * - PDF, Office und ODF fordern zusätzlich ein serverseitig gerendertes Vorschaubild an; das
+ * - PDF, Office, ODF und ausschließlich `.af` fordern ein serverseitiges Vorschaubild an; das
  *   Typ-Icon bleibt darunter liegen und ist damit Platzhalter wie Rückfall.
  * - Die Auswahl-Checkbox togglet die Mehrfachauswahl.
  * - Einfach- und Doppelklick auf die Kachel öffnen die Datei, ohne die Mehrfachauswahl zu verändern.
@@ -136,6 +136,22 @@ describe("DocumentTile", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     expect(props.onToggleSelect).toHaveBeenCalledTimes(1);
     expect(props.onOpen).not.toHaveBeenCalled();
+  });
+
+  it("fordert für .af ein Vorschaubild an und fällt bei Fehler auf das AF-Icon zurück", () => {
+    renderTile({
+      document: doc({
+        id: 12,
+        originalName: "entwurf.af",
+        mimetype: "application/octet-stream",
+      }),
+    });
+
+    const preview = screen.getByRole("img", { name: "Vorschau von entwurf" });
+    expect(preview).toHaveAttribute("src", "http://api.test/api/documents/12/thumbnail");
+    fireEvent.error(preview);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("AF")).toBeInTheDocument();
   });
 
   it("öffnet bei Einfachklick die Details ohne die Mehrfachauswahl zu ändern", () => {

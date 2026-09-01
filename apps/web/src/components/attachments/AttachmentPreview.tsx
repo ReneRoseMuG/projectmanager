@@ -1,5 +1,5 @@
 import type { Attachment } from "@taskmanager/shared-types";
-import { Download, FolderOpen, Trash2, X } from "lucide-react";
+import { Download, FolderOpen, Trash2 } from "lucide-react";
 import { assetUrl } from "../../api/client";
 import { errorMessageAsync } from "../../hooks/errors";
 import { formatHumanDate } from "../../utils/date";
@@ -11,7 +11,6 @@ import { DocumentPreviewBody, prettyBytes } from "./DocumentPreviewBody";
 
 interface AttachmentPreviewProps {
   attachment: Attachment;
-  onUnlink: (attachment: Attachment) => Promise<void>;
   onDeletePermanently?: (attachment: Attachment) => Promise<void>;
   onOpen: (attachment: Attachment) => Promise<void>;
   opening?: boolean;
@@ -19,7 +18,6 @@ interface AttachmentPreviewProps {
 
 export function AttachmentPreview({
   attachment,
-  onUnlink,
   onDeletePermanently,
   onOpen,
   opening = false,
@@ -42,38 +40,13 @@ export function AttachmentPreview({
     }
   };
 
-  const unlink = async () => {
-    const promotesToLibrary = !attachment.isInDocumentLibrary && attachment.owners.length <= 1;
-    const approved = await confirm({
-      title: promotesToLibrary ? "Verknüpfung lösen und Datei behalten?" : "Verknüpfung lösen?",
-      body: promotesToLibrary
-        ? "Dies ist die letzte Owner-Verknüpfung. Beim Lösen wird die Datei in die Dokumentenbibliothek aufgenommen, damit sie nicht verborgen und ownerlos zurückbleibt."
-        : "Nur die Verknüpfung zu diesem Element wird gelöst. Bibliothekssichtbarkeit, andere Owner und die physische Datei bleiben unverändert.",
-      severity: "warn",
-      confirmLabel: promotesToLibrary ? "Lösen & aufnehmen" : "Verknüpfung lösen"
-    });
-    if (!approved) {
-      return;
-    }
-    try {
-      await onUnlink(attachment);
-      showToast({ tone: "success", title: "Verknüpfung gelöst" });
-    } catch (unlinkError) {
-      showToast({
-        tone: "error",
-        title: "Verknüpfung konnte nicht gelöst werden",
-        message: await errorMessageAsync(unlinkError)
-      });
-    }
-  };
-
   const deletePermanently = async () => {
     if (!onDeletePermanently) {
       return;
     }
     const approved = await confirm({
       title: "Datei endgültig löschen?",
-      body: "Die physische Datei, alle Owner-Verknüpfungen sowie alle DMS-Zuordnungen werden dauerhaft entfernt. Diese Aktion kann nicht rückgängig gemacht werden.",
+      body: "Der exklusive Parent-Anhang und seine physische Datei werden dauerhaft entfernt. Das Dokumentenmanagement bleibt unverändert.",
       severity: "danger",
       confirmLabel: "Endgültig löschen",
       requireCheck: "Ich bestätige das endgültige Löschen."
@@ -137,14 +110,6 @@ export function AttachmentPreview({
             variant="ghost"
             disabled={opening}
             onClick={() => void openLocally()}
-          />
-          <Button
-            aria-label="Verknüpfung lösen"
-            title="Verknüpfung lösen"
-            className="h-10 w-10"
-            icon={<X size={18} />}
-            variant="ghost"
-            onClick={() => void unlink()}
           />
           {onDeletePermanently ? (
             <Button

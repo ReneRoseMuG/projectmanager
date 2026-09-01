@@ -1,7 +1,6 @@
-import type { AttachmentLibrarySelection } from "@taskmanager/shared-types";
 import type { DraftFile } from "../../types";
 import { FilePlus2, Image, Trash2 } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "./Button";
 import { EmptyState } from "./EmptyState";
 
@@ -26,18 +25,11 @@ function formatFileSize(size: number) {
 export function PendingFileList({ files, onAdd, onRemove }: PendingFileListProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [librarySelection, setLibrarySelection] = useState<AttachmentLibrarySelection | null>(null);
-  const radioName = useId();
 
   const addFiles = (selectedFiles: FileList | null) => {
     if (!selectedFiles) {
       return;
     }
-    if (librarySelection === null) {
-      setError("Bitte wählen Sie vor dem Upload eine der beiden Optionen.");
-      return;
-    }
-
     const accepted: DraftFile[] = [];
     const rejected: string[] = [];
     Array.from(selectedFiles).forEach((file) => {
@@ -47,8 +39,7 @@ export function PendingFileList({ files, onAdd, onRemove }: PendingFileListProps
       }
       accepted.push({
         file,
-        previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
-        librarySelection
+        previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined
       });
     });
 
@@ -63,43 +54,14 @@ export function PendingFileList({ files, onAdd, onRemove }: PendingFileListProps
 
   return (
     <div className="grid gap-4">
-      <fieldset className="grid gap-2">
-        <legend className="mb-1 text-sm font-semibold text-ink">Wo sollen diese Dateien erscheinen?</legend>
-        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-white p-3">
-          <input
-            type="radio"
-            name={radioName}
-            value="attachment-only"
-            checked={librarySelection === "attachment-only"}
-            onChange={() => setLibrarySelection("attachment-only")}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="block text-sm font-medium text-ink">Nur als Anhang</span>
-            <span className="block text-xs text-steel-500">Die Dateien bleiben ausschließlich am neuen Element verknüpft.</span>
-          </span>
-        </label>
-        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-white p-3">
-          <input
-            type="radio"
-            name={radioName}
-            value="document-library"
-            checked={librarySelection === "document-library"}
-            onChange={() => setLibrarySelection("document-library")}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="block text-sm font-medium text-ink">Zusätzlich in der Dokumentenbibliothek</span>
-            <span className="block text-xs text-steel-500">Dieselben Dateien erscheinen außerdem zentral im Dokumentenmanagement.</span>
-          </span>
-        </label>
-      </fieldset>
+      <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs text-steel-600">
+        Diese Dateien werden ausschließlich als Anhänge des neuen Elements gespeichert. DMS-Dokumente werden separat im Dokumentenmanagement importiert und können anschließend verknüpft werden.
+      </p>
       <div className="flex justify-end">
         <input ref={inputRef} className="sr-only" type="file" multiple onChange={(event) => addFiles(event.target.files)} />
         <Button
           variant="primary"
           icon={<FilePlus2 size={17} />}
-          disabled={librarySelection === null}
           onClick={() => inputRef.current?.click()}
         >
           Dateien auswählen
@@ -125,9 +87,7 @@ export function PendingFileList({ files, onAdd, onRemove }: PendingFileListProps
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink">{draftFile.file.name}</p>
                   <p className="text-xs font-semibold text-steel-500">{formatFileSize(draftFile.file.size)}</p>
-                  <p className="text-xs text-steel-500">
-                    {draftFile.librarySelection === "document-library" ? "Zusätzlich in der Dokumentenbibliothek" : "Nur als Anhang"}
-                  </p>
+                  <p className="text-xs text-steel-500">Exklusiver Parent-Anhang</p>
                 </div>
               </div>
               <Button aria-label={`${draftFile.file.name} entfernen`} title="Entfernen" variant="ghost" icon={<Trash2 size={16} />} onClick={() => onRemove(index)} />

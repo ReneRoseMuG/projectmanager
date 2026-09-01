@@ -2,6 +2,18 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 01.09.26 | 09:11:04 | Abschluss | Attachment/DMS-Trennung | ✅ |
+| 01.09.26 | 08:59:51 | Fix | E2E-Auth- und Kalender-Startblocker | ✅ |
+| 31.08.26 | 18:05:41 | Test | Nicht ausgeführte Abnahmeblöcke | ⚠️ |
+| 31.08.26 | 17:16:23 | Fix | DMS-Bulk-Vertrag | ✅ |
+| 31.08.26 | 10:47:22 | Fix | Testdrift und Lint | ✅ |
+| 31.08.26 | 10:43:39 | Fix | E2E-Worker-DB-Rechte | ✅ |
+| 27.08.26 | 15:17:17 | 5 | MCP und Dokumentation | ✅ |
+| 27.08.26 | 15:15:09 | 4 | Parent-Dateiansicht | ✅ |
+| 27.08.26 | 15:14:32 | 3 | Backend und Berechtigungen | ✅ |
+| 27.08.26 | 14:54:17 | 2 | Datenmodell und Migration | ✅ |
+| 27.08.26 | 10:20:35 | 1 | Attachment-Trennungs-Preflight | ✅ |
+| 27.08.26 | 09:28:31 | Feature | `.af`-Thumbnails über Windows Shell | ⚠️ |
 | 06.08.26 | 12:52:22 | Fix | Admin-Tag-Verwendungsstatus | ✅ |
 | 06.08.26 | 12:43:09 | Fix | Admin-Tag-Bereichsfilter | ✅ |
 | 06.08.26 | 11:30:50 | Fix | Dokument-Kachel-Scrollcontainer | ⚠️ |

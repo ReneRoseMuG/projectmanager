@@ -110,7 +110,7 @@ describe("Features API", () => {
     const emptyFeature = await createFeature(app, { title: "Ohne Support" });
     await supertest(app.server).post(`/api/features/${countedFeature.id}/comments`).send({ body: "Feature comment" }).expect(201);
     await supertest(app.server)
-      .post(`/api/features/${countedFeature.id}/attachments?libraryVisibility=document-library`)
+      .post(`/api/features/${countedFeature.id}/attachments`)
       .attach("file", Buffer.from("Feature-Datei"), { filename: "feature.txt", contentType: "text/plain" })
       .expect(201);
 

@@ -9,7 +9,7 @@ export type AttachmentFolderCreateData = Omit<
   typeof attachmentFolders.$inferInsert,
   "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy"
 >;
-export type AttachmentFolderUpdateData = Partial<Pick<AttachmentFolderCreateData, "parentId" | "projectId" | "name">>;
+export type AttachmentFolderUpdateData = Partial<Pick<AttachmentFolderCreateData, "parentId" | "name">>;
 
 function nowIso(): string {
   return new Date().toISOString();

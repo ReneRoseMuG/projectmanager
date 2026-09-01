@@ -10,10 +10,12 @@ import { describeAttachmentType, type AttachmentFamily } from "./attachmentTypes
 // öffnet die Details. Die Checkbox steuert davon getrennt die Mehrfachauswahl. Die volle
 // Detail- und Metadatenpflege liegt in der Großansicht; hier bleiben nur schnelle Datei-Aktionen.
 
-// Dokumente, aus denen der Server die erste Seite als Vorschaubild rendern kann (PDF direkt,
-// Office/ODF über die PDF-Fassung). Das Typ-Icon bleibt darunter liegen: Es ist der Platzhalter,
+// Dokumente, aus denen der Server ein Vorschaubild rendern kann (PDF direkt, Office/ODF über die
+// PDF-Fassung und `.af` über den Windows-Thumbnail-Handler). Das Typ-Icon bleibt darunter liegen:
+// Es ist der Platzhalter,
 // solange das Bild lädt, und der Rückfall, wenn es keins gibt (404) oder die Erzeugung scheitert.
 const THUMBNAIL_FAMILIES: ReadonlySet<AttachmentFamily> = new Set([
+  "affinity",
   "pdf",
   "word",
   "spreadsheet",

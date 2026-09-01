@@ -46,6 +46,8 @@ function resourceForPath(path: string): AuthResource {
     ["/comments", "comments"],
     ["/notes", "notes"],
     ["/content/images", "contentImages"],
+    ["/attachment-folders", "documents"],
+    ["/documents", "documents"],
     ["/attachments", "attachments"],
     ["/tickets", "tickets"],
     ["/tasks", "tasks"],
@@ -75,7 +77,7 @@ function resourceForPath(path: string): AuthResource {
 }
 
 function sessionUserId(request: FastifyRequest): number | undefined {
-  const value = request.session.userId;
+  const value = request.session?.userId;
   return typeof value === "number" && Number.isInteger(value) ? value : undefined;
 }
 

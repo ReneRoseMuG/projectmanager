@@ -2,7 +2,6 @@ import { TICKET_RESOLUTIONS } from "@taskmanager/shared-types";
 import type {
   Attachment,
   AttachmentFolder,
-  AttachmentLibrarySelection,
   BacklogItem,
   BacklogItemInput,
   BacklogItemUpdate,
@@ -26,6 +25,7 @@ import type {
   Project,
   ProjectInput,
   ProjectUpdate,
+  ParentDocumentLink,
   Tag,
   Task,
   TaskInput,
@@ -106,9 +106,7 @@ const base64FileSchema = z.object({
   contentBase64: z.string().min(1),
   mimetype: z.string().min(1).optional()
 });
-const attachmentFileSchema = base64FileSchema.extend({
-  libraryVisibility: z.enum(["attachment-only", "document-library"])
-});
+const attachmentFileSchema = base64FileSchema.strict();
 const documentImportSchema = base64FileSchema.extend({
   folderId: z.number().int().positive().nullable().optional(),
   tagIds: z.array(z.number().int().positive()).max(20).optional()
@@ -178,6 +176,17 @@ const attachmentListInputSchema = z.object({
   parentType: z.enum(["project", "milestone", "task", "feature", "ticket"]),
   parentId: z.number().int().positive(),
   attachments: z.array(attachmentFileSchema).min(1)
+});
+const parentDocumentLinkSchema = z.object({
+  parentType: z.enum(["project", "milestone", "task", "feature", "ticket"]),
+  parentId: z.number().int().positive(),
+  documentId: z.number().int().positive(),
+  folderId: z.number().int().positive().nullable().optional()
+});
+const parentDocumentLinksSchema = parentDocumentLinkSchema.pick({ parentType: true, parentId: true });
+const parentDocumentUnlinkSchema = parentDocumentLinksSchema.extend({
+  linkId: z.number().int().positive(),
+  expectedVersion: z.number().int().positive()
 });
 const taskListInputSchema = taskCreateParentSchema.extend({
   tasks: z.array(taskInputSchema.omit({ parentType: true, parentId: true }).extend({ attachment: attachmentFileSchema.optional() })).min(1)
@@ -625,8 +634,33 @@ async function uploadAttachmentFile(
   parentId: number,
   attachment: z.infer<typeof attachmentFileSchema>
 ): Promise<Attachment> {
-  const path = `${attachmentOwnerPath(parentType, parentId)}/attachments?libraryVisibility=${attachment.libraryVisibility satisfies AttachmentLibrarySelection}`;
+  const path = `${attachmentOwnerPath(parentType, parentId)}/attachments`;
   return client.postForm<Attachment>(path, attachmentFileFormData(attachment));
+}
+
+async function listParentDocumentLinks(
+  client: ProjectManagerApiClient,
+  input: z.infer<typeof parentDocumentLinksSchema>
+): Promise<ParentDocumentLink[]> {
+  return client.get<ParentDocumentLink[]>(`${attachmentOwnerPath(input.parentType, input.parentId)}/document-links`);
+}
+
+async function linkDocumentToParent(
+  client: ProjectManagerApiClient,
+  input: z.infer<typeof parentDocumentLinkSchema>
+): Promise<ParentDocumentLink> {
+  return client.post<ParentDocumentLink>(`${attachmentOwnerPath(input.parentType, input.parentId)}/document-links`, {
+    documentId: input.documentId,
+    folderId: input.folderId ?? null
+  });
+}
+
+async function unlinkDocumentFromParent(
+  client: ProjectManagerApiClient,
+  input: z.infer<typeof parentDocumentUnlinkSchema>
+): Promise<{ success: true }> {
+  await client.del(`${attachmentOwnerPath(input.parentType, input.parentId)}/document-links/${input.linkId}?expectedVersion=${input.expectedVersion}`);
+  return { success: true };
 }
 
 async function loadDocumentLibraryOptions(client: ProjectManagerApiClient): Promise<{ folders: AttachmentFolder[]; tags: Tag[] }> {
@@ -1215,16 +1249,37 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
     defineTool({
       name: "add_attachment_to_parent",
       title: "Attachment hinzufügen",
-      description: "Hängt eine Base64-codierte Datei an Projekt, Meilenstein, Task, Feature oder Ticket. libraryVisibility muss seit MS-80 (19.07.26) explizit als attachment-only oder document-library angegeben werden.",
+      description: "Hängt eine Base64-codierte Datei exklusiv an Projekt, Meilenstein, Task, Feature oder Ticket. DMS-Dokumente werden separat importiert und verknüpft.",
       inputSchema: attachmentInputSchema,
       execute: (input) => uploadAttachmentFile(client, input.parentType, input.parentId, input)
     }),
     defineTool({
       name: "add_attachments_to_parent",
       title: "Attachments hinzufügen",
-      description: "Hängt mehrere Base64-codierte Dateien seriell an Projekt, Meilenstein, Task, Feature oder Ticket. Jede Datei verlangt seit MS-80 (19.07.26) eine explizite libraryVisibility.",
+      description: "Hängt mehrere Base64-codierte Dateien seriell und exklusiv an Projekt, Meilenstein, Task, Feature oder Ticket.",
       inputSchema: attachmentListInputSchema,
       execute: (input) => createAttachmentsBulk(client, input)
+    }),
+    defineTool({
+      name: "list_parent_document_links",
+      title: "DMS-Verknüpfungen eines Parents lesen",
+      description: "Listet ausschließlich die expliziten DMS-Dokumentverknüpfungen eines Parents; Parent-Anhänge bleiben getrennt.",
+      inputSchema: parentDocumentLinksSchema,
+      execute: (input) => listParentDocumentLinks(client, input)
+    }),
+    defineTool({
+      name: "link_document_to_parent",
+      title: "DMS-Dokument mit Parent verknüpfen",
+      description: "Verknüpft ein vorhandenes DMS-Dokument ohne Kopie mit einem Parent und optional mit dessen lokalem Attachment-Ordner.",
+      inputSchema: parentDocumentLinkSchema,
+      execute: (input) => linkDocumentToParent(client, input)
+    }),
+    defineTool({
+      name: "unlink_document_from_parent",
+      title: "DMS-Verknüpfung lösen",
+      description: "Löst nur die Parent-Verknüpfung; das DMS-Dokument, seine Sammlungen und Tags bleiben bestehen.",
+      inputSchema: parentDocumentUnlinkSchema,
+      execute: (input) => unlinkDocumentFromParent(client, input)
     }),
     defineTool({
       name: "list_document_library_options",

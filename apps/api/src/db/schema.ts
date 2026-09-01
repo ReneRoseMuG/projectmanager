@@ -1,5 +1,5 @@
 ﻿import { sql } from "drizzle-orm";
-import { ATTACHMENT_OWNER_TYPES } from "@taskmanager/shared-types";
+import { ATTACHMENT_KINDS, ATTACHMENT_OWNER_TYPES } from "@taskmanager/shared-types";
 import type { AnyMySqlColumn } from "drizzle-orm/mysql-core";
 import { boolean, check, double, index, int, longblob, longtext, mysqlTable, primaryKey, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
@@ -47,6 +47,7 @@ export const JOURNAL_OBJECT_TYPES = [
   "tag",
   "note",
   "attachment",
+  "document",
   "comment"
 ] as const;
 export const JOURNAL_OPERATIONS = ["create", "update", "delete", "link", "unlink"] as const;
@@ -480,10 +481,12 @@ export const wikiPageAttachments = mysqlTable(
       .references(() => wikiPages.id, { onDelete: "cascade" }),
     attachmentId: int("attachment_id")
       .notNull()
-      .references(() => attachments.id, { onDelete: "cascade" })
+      .references(() => attachments.id, { onDelete: "cascade" }),
+    folderId: int("folder_id").references(() => wikiPageAttachmentFolders.id, { onDelete: "set null" })
   },
   (table) => ({
-    wikiPageAttachmentUnique: uniqueIndex("wiki_page_attachments_parent_attachment_unique").on(table.wikiPageId, table.attachmentId)
+    wikiPageAttachmentUnique: uniqueIndex("wiki_page_attachments_parent_attachment_unique").on(table.wikiPageId, table.attachmentId),
+    wikiPageAttachmentFolderIndex: index("wiki_page_attachments_folder_idx").on(table.folderId)
   })
 );
 
@@ -612,7 +615,7 @@ export const attachments = mysqlTable(
     displayName: shortText("display_name"),
     description: longtext("description"),
     contentHash: varchar("content_hash", { length: 64 }),
-    isInDocumentLibrary: boolean("is_in_document_library").notNull().default(true),
+    kind: shortText("kind", { enum: ATTACHMENT_KINDS }).notNull().default("document"),
     version: int("version").notNull().default(1),
     createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
     updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -621,9 +624,9 @@ export const attachments = mysqlTable(
   },
   (table) => ({
     contentHashIndex: index("attachments_content_hash_idx").on(table.contentHash),
-    libraryCreatedAtIndex: index("attachments_library_created_at_idx").on(table.isInDocumentLibrary, table.createdAt),
-    libraryMimetypeCreatedAtIndex: index("attachments_library_mimetype_created_at_idx").on(
-      table.isInDocumentLibrary,
+    kindCreatedAtIndex: index("attachments_kind_created_at_idx").on(table.kind, table.createdAt),
+    kindMimetypeCreatedAtIndex: index("attachments_kind_mimetype_created_at_idx").on(
+      table.kind,
       table.mimetype,
       table.createdAt
     )
@@ -638,10 +641,12 @@ export const projectAttachments = mysqlTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     attachmentId: int("attachment_id")
       .notNull()
-      .references(() => attachments.id, { onDelete: "cascade" })
+      .references(() => attachments.id, { onDelete: "cascade" }),
+    folderId: int("folder_id").references(() => projectAttachmentFolders.id, { onDelete: "set null" })
   },
   (table) => ({
-    projectAttachmentUnique: uniqueIndex("project_attachments_parent_attachment_unique").on(table.projectId, table.attachmentId)
+    projectAttachmentUnique: uniqueIndex("project_attachments_parent_attachment_unique").on(table.projectId, table.attachmentId),
+    projectAttachmentFolderIndex: index("project_attachments_folder_idx").on(table.folderId)
   })
 );
 
@@ -653,10 +658,12 @@ export const milestoneAttachments = mysqlTable(
       .references(() => milestones.id, { onDelete: "cascade" }),
     attachmentId: int("attachment_id")
       .notNull()
-      .references(() => attachments.id, { onDelete: "cascade" })
+      .references(() => attachments.id, { onDelete: "cascade" }),
+    folderId: int("folder_id").references(() => milestoneAttachmentFolders.id, { onDelete: "set null" })
   },
   (table) => ({
-    milestoneAttachmentUnique: uniqueIndex("milestone_attachments_parent_attachment_unique").on(table.milestoneId, table.attachmentId)
+    milestoneAttachmentUnique: uniqueIndex("milestone_attachments_parent_attachment_unique").on(table.milestoneId, table.attachmentId),
+    milestoneAttachmentFolderIndex: index("milestone_attachments_folder_idx").on(table.folderId)
   })
 );
 
@@ -668,10 +675,12 @@ export const taskAttachments = mysqlTable(
       .references(() => tasks.id, { onDelete: "cascade" }),
     attachmentId: int("attachment_id")
       .notNull()
-      .references(() => attachments.id, { onDelete: "cascade" })
+      .references(() => attachments.id, { onDelete: "cascade" }),
+    folderId: int("folder_id").references(() => taskAttachmentFolders.id, { onDelete: "set null" })
   },
   (table) => ({
-    taskAttachmentUnique: uniqueIndex("task_attachments_parent_attachment_unique").on(table.taskId, table.attachmentId)
+    taskAttachmentUnique: uniqueIndex("task_attachments_parent_attachment_unique").on(table.taskId, table.attachmentId),
+    taskAttachmentFolderIndex: index("task_attachments_folder_idx").on(table.folderId)
   })
 );
 
@@ -683,10 +692,12 @@ export const featureAttachments = mysqlTable(
       .references(() => features.id, { onDelete: "cascade" }),
     attachmentId: int("attachment_id")
       .notNull()
-      .references(() => attachments.id, { onDelete: "cascade" })
+      .references(() => attachments.id, { onDelete: "cascade" }),
+    folderId: int("folder_id").references(() => featureAttachmentFolders.id, { onDelete: "set null" })
   },
   (table) => ({
-    featureAttachmentUnique: uniqueIndex("feature_attachments_parent_attachment_unique").on(table.featureId, table.attachmentId)
+    featureAttachmentUnique: uniqueIndex("feature_attachments_parent_attachment_unique").on(table.featureId, table.attachmentId),
+    featureAttachmentFolderIndex: index("feature_attachments_folder_idx").on(table.folderId)
   })
 );
 
@@ -698,20 +709,19 @@ export const ticketAttachments = mysqlTable(
       .references(() => tickets.id, { onDelete: "cascade" }),
     attachmentId: int("attachment_id")
       .notNull()
-      .references(() => attachments.id, { onDelete: "cascade" })
+      .references(() => attachments.id, { onDelete: "cascade" }),
+    folderId: int("folder_id").references(() => ticketAttachmentFolders.id, { onDelete: "set null" })
   },
   (table) => ({
-    ticketAttachmentUnique: uniqueIndex("ticket_attachments_parent_attachment_unique").on(table.ticketId, table.attachmentId)
+    ticketAttachmentUnique: uniqueIndex("ticket_attachments_parent_attachment_unique").on(table.ticketId, table.attachmentId),
+    ticketAttachmentFolderIndex: index("ticket_attachments_folder_idx").on(table.folderId)
   })
 );
 
-// Virtuelle Sammlung ("Ordner"): hierarchisch (Selbst-FK parent_id, restrict — kein
-// DB-Kaskadenlöschen, der Service steuert die Löschung mit Bestätigung), optional an
-// ein Projekt gebunden (project_id nullable, set null — Sammlung bleibt als globale).
+// Globale DMS-Sammlung: hierarchisch und unabhängig von Domänenobjekten.
 export const attachmentFolders = mysqlTable("attachment_folders", {
   id: int("id").autoincrement().primaryKey(),
   parentId: int("parent_id").references((): AnyMySqlColumn => attachmentFolders.id, { onDelete: "restrict" }),
-  projectId: int("project_id").references(() => projects.id, { onDelete: "set null" }),
   name: shortText("name").notNull(),
   version: int("version").notNull().default(1),
   createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -719,6 +729,150 @@ export const attachmentFolders = mysqlTable("attachment_folders", {
   createdAt: timestampText("created_at"),
   updatedAt: timestampText("updated_at")
 });
+
+function parentAttachmentFolderColumns(ownerColumn: () => AnyMySqlColumn) {
+  return {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("owner_id").notNull().references(ownerColumn, { onDelete: "cascade" }),
+    name: shortText("name").notNull(),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  };
+}
+
+export const projectAttachmentFolders = mysqlTable(
+  "project_attachment_folders",
+  {
+    ...parentAttachmentFolderColumns(() => projects.id),
+    parentId: int("parent_id").references((): AnyMySqlColumn => projectAttachmentFolders.id, { onDelete: "cascade" })
+  },
+  (table) => ({ ownerParentIndex: index("project_attachment_folders_owner_parent_idx").on(table.ownerId, table.parentId) })
+);
+
+export const milestoneAttachmentFolders = mysqlTable(
+  "milestone_attachment_folders",
+  {
+    ...parentAttachmentFolderColumns(() => milestones.id),
+    parentId: int("parent_id").references((): AnyMySqlColumn => milestoneAttachmentFolders.id, { onDelete: "cascade" })
+  },
+  (table) => ({ ownerParentIndex: index("milestone_attachment_folders_owner_parent_idx").on(table.ownerId, table.parentId) })
+);
+
+export const taskAttachmentFolders = mysqlTable(
+  "task_attachment_folders",
+  {
+    ...parentAttachmentFolderColumns(() => tasks.id),
+    parentId: int("parent_id").references((): AnyMySqlColumn => taskAttachmentFolders.id, { onDelete: "cascade" })
+  },
+  (table) => ({ ownerParentIndex: index("task_attachment_folders_owner_parent_idx").on(table.ownerId, table.parentId) })
+);
+
+export const featureAttachmentFolders = mysqlTable(
+  "feature_attachment_folders",
+  {
+    ...parentAttachmentFolderColumns(() => features.id),
+    parentId: int("parent_id").references((): AnyMySqlColumn => featureAttachmentFolders.id, { onDelete: "cascade" })
+  },
+  (table) => ({ ownerParentIndex: index("feature_attachment_folders_owner_parent_idx").on(table.ownerId, table.parentId) })
+);
+
+export const wikiPageAttachmentFolders = mysqlTable(
+  "wiki_page_attachment_folders",
+  {
+    ...parentAttachmentFolderColumns(() => wikiPages.id),
+    parentId: int("parent_id").references((): AnyMySqlColumn => wikiPageAttachmentFolders.id, { onDelete: "cascade" })
+  },
+  (table) => ({ ownerParentIndex: index("wiki_page_attachment_folders_owner_parent_idx").on(table.ownerId, table.parentId) })
+);
+
+export const ticketAttachmentFolders = mysqlTable(
+  "ticket_attachment_folders",
+  {
+    ...parentAttachmentFolderColumns(() => tickets.id),
+    parentId: int("parent_id").references((): AnyMySqlColumn => ticketAttachmentFolders.id, { onDelete: "cascade" })
+  },
+  (table) => ({ ownerParentIndex: index("ticket_attachment_folders_owner_parent_idx").on(table.ownerId, table.parentId) })
+);
+
+function parentDocumentLinkColumns(
+  ownerColumn: () => AnyMySqlColumn,
+  folderColumn: () => AnyMySqlColumn
+) {
+  return {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("owner_id").notNull().references(ownerColumn, { onDelete: "cascade" }),
+    documentId: int("document_id").notNull().references(() => attachments.id, { onDelete: "cascade" }),
+    folderId: int("folder_id").references(folderColumn, { onDelete: "set null" }),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  };
+}
+
+export const projectDocumentLinks = mysqlTable(
+  "project_document_links",
+  parentDocumentLinkColumns(() => projects.id, () => projectAttachmentFolders.id),
+  (table) => ({
+    ownerDocumentUnique: uniqueIndex("project_document_links_owner_document_unique").on(table.ownerId, table.documentId),
+    documentIndex: index("project_document_links_document_idx").on(table.documentId),
+    folderIndex: index("project_document_links_folder_idx").on(table.folderId)
+  })
+);
+
+export const milestoneDocumentLinks = mysqlTable(
+  "milestone_document_links",
+  parentDocumentLinkColumns(() => milestones.id, () => milestoneAttachmentFolders.id),
+  (table) => ({
+    ownerDocumentUnique: uniqueIndex("milestone_document_links_owner_document_unique").on(table.ownerId, table.documentId),
+    documentIndex: index("milestone_document_links_document_idx").on(table.documentId),
+    folderIndex: index("milestone_document_links_folder_idx").on(table.folderId)
+  })
+);
+
+export const taskDocumentLinks = mysqlTable(
+  "task_document_links",
+  parentDocumentLinkColumns(() => tasks.id, () => taskAttachmentFolders.id),
+  (table) => ({
+    ownerDocumentUnique: uniqueIndex("task_document_links_owner_document_unique").on(table.ownerId, table.documentId),
+    documentIndex: index("task_document_links_document_idx").on(table.documentId),
+    folderIndex: index("task_document_links_folder_idx").on(table.folderId)
+  })
+);
+
+export const featureDocumentLinks = mysqlTable(
+  "feature_document_links",
+  parentDocumentLinkColumns(() => features.id, () => featureAttachmentFolders.id),
+  (table) => ({
+    ownerDocumentUnique: uniqueIndex("feature_document_links_owner_document_unique").on(table.ownerId, table.documentId),
+    documentIndex: index("feature_document_links_document_idx").on(table.documentId),
+    folderIndex: index("feature_document_links_folder_idx").on(table.folderId)
+  })
+);
+
+export const wikiPageDocumentLinks = mysqlTable(
+  "wiki_page_document_links",
+  parentDocumentLinkColumns(() => wikiPages.id, () => wikiPageAttachmentFolders.id),
+  (table) => ({
+    ownerDocumentUnique: uniqueIndex("wiki_page_document_links_owner_document_unique").on(table.ownerId, table.documentId),
+    documentIndex: index("wiki_page_document_links_document_idx").on(table.documentId),
+    folderIndex: index("wiki_page_document_links_folder_idx").on(table.folderId)
+  })
+);
+
+export const ticketDocumentLinks = mysqlTable(
+  "ticket_document_links",
+  parentDocumentLinkColumns(() => tickets.id, () => ticketAttachmentFolders.id),
+  (table) => ({
+    ownerDocumentUnique: uniqueIndex("ticket_document_links_owner_document_unique").on(table.ownerId, table.documentId),
+    documentIndex: index("ticket_document_links_document_idx").on(table.documentId),
+    folderIndex: index("ticket_document_links_folder_idx").on(table.folderId)
+  })
+);
 
 export const attachmentLocalFolders = mysqlTable(
   "attachment_local_folders",
