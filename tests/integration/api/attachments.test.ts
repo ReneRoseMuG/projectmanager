@@ -1,10 +1,25 @@
-﻿/**
+/**
  * Test Scope:
  * Attachments API
  *
+ * Test-Ebene:
+ * - Integration
+ *
+ * Realitätsgrad:
+ * - Echte Fastify-Routen, MySQL-Testdatenbank, Upload-/Preview-Temp-Root und echte Dateioperationen.
+ *
+ * Mock-Entscheidung:
+ * - Keine Fachmocks; nur der native File-Opener ist als kontrollierter Collaborator injiziert.
+ *
+ * Isolation:
+ * - Zufällige Testdatenbank und eindeutige Betriebssystem-Temp-Verzeichnisse.
+ *
  * Abgedeckte Regeln:
  * - Multipart-Uploads, Listen, Vorschau, Löschen und lokales Öffnen von Attachments.
+ * - Jeder Parent-Upload erzeugt einen exklusiven parent_attachment-Datensatz, auch bei gleichem Inhalt.
  * - Lokales Öffnen nutzt einen injizierten File-Opener und verlangt attachments:read.
+ * - Dateiinhalt, generierte Vorschauen und Kachel-Thumbnails werden ausschließlich über authentifizierte,
+ *   berechtigungsgeprüfte Routen ausgeliefert; statische erratbare URLs bleiben geschlossen.
  *
  * Fehlerfälle:
  * - Fehlende Owner, fehlende Attachments, fehlende Dateien und fehlende Berechtigungen.
@@ -112,7 +127,8 @@ describe("Attachments API", () => {
     expect(res.body.originalName).toBe("projekt.txt");
     expect(res.body.mimetype).toBe("text/plain");
     expect(res.body.size).toBeGreaterThan(0);
-    expect(res.body.url).toMatch(/^\/uploads\//);
+    expect(res.body.url).toBe(`/api/attachments/${res.body.id}/content`);
+    expect(res.body).toMatchObject({ kind: "parent_attachment", isInDocumentLibrary: false });
   });
 
   it("GET /api/projects/:id/attachments gibt Attachment-Liste zurueck", async () => {
@@ -139,7 +155,7 @@ describe("Attachments API", () => {
     expect(res.body.mimetype).toBe("application/pdf");
   });
 
-  it("verknuepft ein Inhaltsduplikat mit dem neuen Parent, ohne Datei und Datensatz zu duplizieren", async () => {
+  it("speichert Inhaltsduplikate als unabhängige exklusive Parent-Anhänge", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
 
@@ -152,23 +168,22 @@ describe("Attachments API", () => {
       .attach("file", Buffer.from("identischer Inhalt"), { filename: "kopie.txt", contentType: "text/plain" })
       .expect(201);
 
-    expect(second.body.id).toBe(first.body.id);
-    expect(second.body.filename).toBe(first.body.filename);
-    expect(second.body.owners).toEqual(
-      expect.arrayContaining([
-        { type: "project", id: project.id },
-        { type: "task", id: task.id }
-      ])
-    );
+    expect(second.body.id).not.toBe(first.body.id);
+    expect(second.body.filename).not.toBe(first.body.filename);
+    expect(first.body.owners).toEqual([{ type: "project", id: project.id }]);
+    expect(second.body.owners).toEqual([{ type: "task", id: task.id }]);
+    expect(first.body.kind).toBe("parent_attachment");
+    expect(second.body.kind).toBe("parent_attachment");
 
     const [attachmentRows] = await testDb.pool.execute("SELECT COUNT(*) AS count FROM attachments");
-    expect((attachmentRows as Array<{ count: number }>)[0].count).toBe(1);
+    expect((attachmentRows as Array<{ count: number }>)[0].count).toBe(2);
     await expect(fs.stat(path.join(uploadDir, first.body.filename))).resolves.toBeDefined();
+    await expect(fs.stat(path.join(uploadDir, second.body.filename))).resolves.toBeDefined();
 
     const projectList = await supertest(app.server).get(`/api/projects/${project.id}/attachments`).expect(200);
     const taskList = await supertest(app.server).get(`/api/tasks/${task.id}/attachments`).expect(200);
     expect((projectList.body as Array<{ id: number }>).map((item) => item.id)).toEqual([first.body.id]);
-    expect((taskList.body as Array<{ id: number }>).map((item) => item.id)).toEqual([first.body.id]);
+    expect((taskList.body as Array<{ id: number }>).map((item) => item.id)).toEqual([second.body.id]);
   });
 
   it.each([
@@ -232,25 +247,28 @@ describe("Attachments API", () => {
       .expect(201);
     const listed = await supertest(app.server).get(owner.path).expect(200);
 
-    expect(created.body).toEqual(expect.objectContaining({ originalName: filename, owners: [{ type: ownerType, id: owner.id }] }));
-    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, originalName: filename, owners: [{ type: ownerType, id: owner.id }] })]);
+    expect(created.body).toEqual(expect.objectContaining({ originalName: filename, kind: "parent_attachment", isInDocumentLibrary: false, owners: [{ type: ownerType, id: owner.id }] }));
+    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, originalName: filename, kind: "parent_attachment", isInDocumentLibrary: false, owners: [{ type: ownerType, id: owner.id }] })]);
   });
 
-  it("DELETE /api/wiki/:id/attachments/:attachmentId entfernt die Wiki-Verknüpfung und behält das Attachment", async () => {
+  it("DELETE /api/wiki/:id/attachments/:attachmentId löscht den exklusiven Wiki-Anhang physisch", async () => {
     const page = await createWikiPage(app);
     const created = await supertest(app.server)
       .post(`/api/wiki/${page.id}/attachments`)
       .attach("file", Buffer.from("Wiki-Datei"), { filename: "wiki.txt", contentType: "text/plain" })
       .expect(201);
 
-    await supertest(app.server).delete(`/api/wiki/${page.id}/attachments/${created.body.id}`).expect(204);
+    await supertest(app.server)
+      .delete(`/api/wiki/${page.id}/attachments/${created.body.id}?expectedVersion=${created.body.version}`)
+      .expect(204);
 
     const listed = await supertest(app.server).get(`/api/wiki/${page.id}/attachments`).expect(200);
     expect(listed.body).toEqual([]);
     const [linkRows] = await testDb.pool.execute("SELECT attachment_id FROM wiki_page_attachments WHERE wiki_page_id = ? AND attachment_id = ?", [page.id, created.body.id]);
     expect((linkRows as unknown[]).length).toBe(0);
     const [existRows] = await testDb.pool.execute("SELECT id FROM attachments WHERE id = ?", [created.body.id]);
-    expect((existRows as unknown[]).length).toBe(1);
+    expect((existRows as unknown[]).length).toBe(0);
+    await expect(fs.stat(path.join(uploadDir, created.body.filename))).rejects.toThrow();
   });
 
   it("POST zu nicht existierendem Projekt gibt 404 zurueck", async () => {
@@ -267,14 +285,14 @@ describe("Attachments API", () => {
       .attach("file", Buffer.from("Zu loeschen"), { filename: "delete-me.txt", contentType: "text/plain" })
       .expect(201);
 
-    await supertest(app.server).delete(`/api/attachments/${upload.body.id}`).expect(204);
+    await supertest(app.server).delete(`/api/attachments/${upload.body.id}?expectedVersion=${upload.body.version}`).expect(204);
 
     const res = await supertest(app.server).get(`/api/projects/${project.id}/attachments`).expect(200);
     expect(res.body.find((item: { id: number }) => item.id === upload.body.id)).toBeUndefined();
   });
 
   it("DELETE eines nicht vorhandenen Attachments gibt 404 zurueck", async () => {
-    await supertest(app.server).delete("/api/attachments/9999").expect(404);
+    await supertest(app.server).delete("/api/attachments/9999?expectedVersion=1").expect(404);
   });
 
   it("GET /api/attachments/:id/preview gibt Textvorschau begrenzt zurueck", async () => {
@@ -455,8 +473,55 @@ describe("Attachments API Auth", () => {
       .post(`/api/projects/${project.body.id}/attachments`)
       .attach("file", Buffer.from("Auth"), { filename: "auth.txt", contentType: "text/plain" })
       .expect(201);
-    return upload.body as { id: number };
+    return upload.body as { id: number; filename: string };
   }
+
+  it("schützt Dateiinhalt und Vorschau vor anonymen, unberechtigten und statischen Zugriffen", async () => {
+    const attachment = await createAttachmentWithAdmin();
+    const admin = await loginAdmin();
+
+    const anonymousContent = await supertest(app.server).get(`/api/attachments/${attachment.id}/content`).expect(401);
+    expect(anonymousContent.body).toMatchObject({ error: "UNAUTHORIZED", statusCode: 401 });
+    await supertest(app.server).get(`/api/attachments/${attachment.id}/preview-file`).expect(401);
+    await supertest(app.server).get(`/api/documents/${attachment.id}/thumbnail`).expect(401);
+    await supertest(app.server).get(`/uploads/${attachment.filename}`).expect(401);
+    await supertest(app.server).get("/previews/erraten.pdf").expect(401);
+    await admin.get(`/uploads/${attachment.filename}`).expect(404);
+    await admin.get("/previews/erraten.pdf").expect(404);
+
+    const role = await admin
+      .post("/api/admin/roles")
+      .send({ key: "content_without_attachments", label: "Ohne Dateizugriff", permissions: [{ resource: "projects", action: "read" }] })
+      .expect(201);
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "No", lastName: "Content", email: "no-content@example.test", roleId: role.body.id, password: "password123", isActive: true })
+      .expect(201);
+    const custom = supertest.agent(app.server);
+    await custom.post("/api/auth/login").send({ email: "no-content@example.test", password: "password123" }).expect(200);
+    const forbiddenContent = await custom.get(`/api/attachments/${attachment.id}/content`).expect(403);
+    expect(forbiddenContent.body).toMatchObject({ error: "FORBIDDEN", statusCode: 403 });
+    await custom.get(`/api/attachments/${attachment.id}/preview-file`).expect(403);
+    await custom.get(`/api/documents/${attachment.id}/thumbnail`).expect(403);
+
+    await admin.get(`/api/documents/${attachment.id}/thumbnail`).expect(404);
+
+    const content = await admin.get(`/api/attachments/${attachment.id}/content?download=true`).expect(200);
+    expect(content.text).toBe("Auth");
+    expect(content.headers["content-disposition"]).toContain("attachment");
+    expect(content.headers["content-disposition"]).toContain("auth.txt");
+  });
+
+  it("blockiert manipulierte Speicherpfade vor dem Dateisystemzugriff", async () => {
+    const attachment = await createAttachmentWithAdmin();
+    const admin = await loginAdmin();
+    await testDb.pool.execute("UPDATE attachments SET filename = '../outside.txt' WHERE id = ?", [attachment.id]);
+
+    const response = await admin.get(`/api/attachments/${attachment.id}/content`).expect(400);
+
+    expect(response.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
+    expect(response.body.message).toContain("outside the upload directory");
+  });
 
   it("POST /api/attachments/:id/open verlangt eine Session", async () => {
     await supertest(app.server).post("/api/attachments/9999/open").expect(401);

@@ -243,7 +243,7 @@ const fixtures = vi.hoisted(() => {
     filename: "datei.txt",
     mimetype: "text/plain",
     size: 12,
-    url: "/uploads/datei.txt",
+    url: "/api/attachments/1/content",
     owners: [{ type: "project", id: project.id }],
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z",
@@ -402,8 +402,8 @@ vi.mock("../../../../../apps/web/src/components/attachments/AttachmentUploader",
 }));
 
 vi.mock("../../../../../apps/web/src/components/attachments/AttachmentList", () => ({
-  AttachmentList({ attachments }: { attachments: Attachment[] }) {
-    return <div data-testid="attachment-list">{attachments.length}</div>;
+  AttachmentList({ manager }: { manager: { attachments: Attachment[] } }) {
+    return <div data-testid="attachment-list">{manager.attachments.length}</div>;
   }
 }));
 
@@ -530,7 +530,8 @@ vi.mock("../../../../../apps/web/src/hooks/useAttachments", () => ({
     return {
       attachments: [fixtures.attachment],
       uploadAttachment: ownerFormMocks.uploadAttachment,
-      removeAttachment: vi.fn().mockResolvedValue(undefined)
+      unlinkAttachment: vi.fn().mockResolvedValue(undefined),
+      deleteAttachmentPermanently: vi.fn().mockResolvedValue(undefined)
     };
   }
 }));

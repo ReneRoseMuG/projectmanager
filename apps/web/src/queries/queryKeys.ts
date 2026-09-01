@@ -94,7 +94,15 @@ export const queryKeys = {
   attachments: {
     root: ["attachments"] as const,
     owner: (ownerType: QueryOwnerType, ownerId: number) => [...queryKeys.attachments.root, ownerType, ownerId] as const,
-    preview: (attachmentId: number) => [...queryKeys.attachments.root, "preview", attachmentId] as const
+    preview: (attachmentId: number) => [...queryKeys.attachments.root, "preview", attachmentId] as const,
+    parentFolders: (ownerType: QueryOwnerType, ownerId: number) =>
+      [...queryKeys.attachments.root, "parentFolders", ownerType, ownerId] as const,
+    documentLinks: (ownerType: QueryOwnerType, ownerId: number) =>
+      [...queryKeys.attachments.root, "documentLinks", ownerType, ownerId] as const,
+    localFolders: (ownerType: QueryOwnerType, ownerId: number) =>
+      [...queryKeys.attachments.root, "localFolders", ownerType, ownerId] as const,
+    localEntries: (folderId: number, relativePath: string) =>
+      [...queryKeys.attachments.root, "localEntries", folderId, relativePath] as const
   },
   tags: {
     root: ["tags"] as const,
@@ -135,8 +143,8 @@ export const queryKeys = {
     root: ["documents"] as const,
     library: (filter: object = {}, pagination: object = {}) => [...queryKeys.documents.root, "library", filter, pagination] as const,
     detail: (id: number) => [...queryKeys.documents.root, "detail", id] as const,
-    categories: () => [...queryKeys.documents.root, "categories"] as const,
-    folders: () => [...queryKeys.documents.root, "folders"] as const
+    folders: () => [...queryKeys.documents.root, "folders"] as const,
+    duplicateCheck: () => [...queryKeys.documents.root, "duplicateCheck"] as const
   },
   events: {
     root: ["events"] as const,

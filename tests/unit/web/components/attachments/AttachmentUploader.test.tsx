@@ -2,63 +2,44 @@
 
 /**
  * Test Scope:
- * AttachmentUploader — sequenzieller Mehrfach-Upload und der Abschluss-Rückruf `onBatchComplete`.
+ * AttachmentUploader mit strikt getrennten Parent- und DMS-Uploads.
  *
  * Test-Ebene:
- * - Unit
+ * - Unit/Komponente
  *
  * Realitätsgrad:
- * - Echte AttachmentUploader-Komponente mit echtem File-Input und echten `File`-Instanzen.
+ * - Reales Rendering, echte File-Objekte und reale Eingabeereignisse; nur der Upload-Callback ist kontrolliert.
  *
  * Mock-Entscheidung:
- * - Keine Modul-Mocks. `onUpload` und `onBatchComplete` sind die Callbacks des Aufrufers und werden
- *   als Spies übergeben — sie sind Gegenstand des Vertrags, nicht ein verstecktes Innenleben.
+ * - Kein API-Mock im Baustein; der übergebene Callback bildet die äußere Mutation ab.
  *
  * Isolation:
- * - jsdom, kein Netzwerk, kein Dateisystem.
+ * - JSDOM und vollständige Bereinigung nach jedem Test.
  *
  * Abgedeckte Regeln:
- * - Dateien werden sequenziell hochgeladen, in der übergebenen Reihenfolge.
- * - `onBatchComplete` läuft GENAU EINMAL je Upload-Vorgang und ERST nach der letzten Datei.
- *   Darauf beruht, dass die Dokumentenbibliothek nur einmal statt je Datei nachlädt.
- * - Die Prop ist optional: Aufrufer ohne sie funktionieren unverändert.
+ * - Owner-Uploads werden ohne Bibliotheksauswahl exklusiv an den Parent gesendet.
+ * - Alle Dateien eines Batches werden einzeln mit derselben exklusiven Semantik hochgeladen.
+ * - Direkte DMS-Uploads verwenden denselben Datei-Callback, aber keinen Parent-Hinweis.
  *
  * Fehlerfälle:
- * - Wirft ein Upload, läuft `onBatchComplete` dennoch genau einmal (bereits hochgeladene Dateien
- *   müssen sichtbar werden). Der Test hält zugleich fest, dass die Schleife dabei abbricht und die
- *   restlichen Dateien überspringt — bestehendes Verhalten, hier dokumentiert, nicht verändert.
- * - Wirft `onBatchComplete`, schlägt der Upload-Vorgang nicht fehl.
+ * - Ein abgelehnter Upload beendet den Batch-Zustand, ohne eine zweite Ablageart anzubieten.
  *
  * Ziel:
- * Absichern, dass ein Upload-Vorgang genau einen Abschluss meldet — die Grundlage dafür, dass nicht
- * je Datei die gesamte Bibliothek neu geladen wird.
+ * Die UI kann keinen Parent-Upload mehr versehentlich in das DMS umleiten.
  */
+
 import "@testing-library/jest-dom/vitest";
-import { fireEvent } from "@testing-library/dom";
-import { act, cleanup, render } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/dom";
+import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AttachmentUploader } from "../../../../../apps/web/src/components/attachments/AttachmentUploader";
 
-function file(name: string): File {
-  return new File(["Inhalt"], name, { type: "text/plain" });
-}
-
-function renderUploader(props: {
-  onUpload: (file: File) => Promise<unknown>;
-  onBatchComplete?: () => void | Promise<void>;
-}) {
-  const { container } = render(<AttachmentUploader {...props} />);
+function fileInput(container: HTMLElement): HTMLInputElement {
   const input = container.querySelector('input[type="file"]');
   if (!(input instanceof HTMLInputElement)) {
-    throw new Error("Datei-Input nicht gefunden");
+    throw new Error("File input not found");
   }
   return input;
-}
-
-async function selectFiles(input: HTMLInputElement, files: File[]) {
-  await act(async () => {
-    fireEvent.change(input, { target: { files } });
-  });
 }
 
 afterEach(() => {
@@ -67,66 +48,47 @@ afterEach(() => {
 });
 
 describe("AttachmentUploader", () => {
-  it("lädt sequenziell hoch und meldet den Abschluss genau einmal, nach der letzten Datei", async () => {
-    const order: string[] = [];
-    const onUpload = vi.fn(async (uploaded: File) => {
-      order.push(`upload:${uploaded.name}`);
-    });
-    const onBatchComplete = vi.fn(async () => {
-      order.push("abschluss");
-    });
+  it("kennzeichnet Owner-Uploads als exklusive Parent-Anhänge", () => {
+    render(<AttachmentUploader visibilityMode="owner" onUpload={vi.fn()} />);
 
-    const input = renderUploader({ onUpload, onBatchComplete });
-    await selectFiles(input, [file("a.txt"), file("b.txt"), file("c.txt")]);
-
-    expect(onUpload).toHaveBeenCalledTimes(3);
-    expect(onBatchComplete).toHaveBeenCalledTimes(1);
-    // Reihenfolge ist der Kern: erst alle Dateien, dann genau ein Abschluss.
-    expect(order).toEqual([
-      "upload:a.txt",
-      "upload:b.txt",
-      "upload:c.txt",
-      "abschluss",
-    ]);
+    expect(screen.getByRole("button", { name: "Auswählen" })).toBeEnabled();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getByText(/ausschließlich als Anhänge dieses Elements/)).toBeInTheDocument();
   });
 
-  it("meldet den Abschluss auch dann genau einmal, wenn ein Upload wirft", async () => {
-    const onUpload = vi
-      .fn<(uploaded: File) => Promise<unknown>>()
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error("Upload kaputt"));
-    const onBatchComplete = vi.fn(async () => undefined);
+  it("lädt alle Dateien eines Owner-Batches ohne DMS-Parameter hoch", async () => {
+    const onUpload = vi.fn().mockResolvedValue(undefined);
+    const first = new File(["a"], "a.txt", { type: "text/plain" });
+    const second = new File(["b"], "b.txt", { type: "text/plain" });
+    const { container } = render(<AttachmentUploader visibilityMode="owner" onUpload={onUpload} />);
 
-    const input = renderUploader({ onUpload, onBatchComplete });
-    await selectFiles(input, [file("a.txt"), file("b.txt"), file("c.txt")]);
+    fireEvent.change(fileInput(container), { target: { files: [first, second] } });
 
-    // Bestehendes Verhalten: Die Schleife bricht beim Wurf ab, die dritte Datei wird übersprungen.
-    expect(onUpload).toHaveBeenCalledTimes(2);
-    // Trotzdem genau ein Abschluss — die erste Datei ist hochgeladen und muss sichtbar werden.
-    expect(onBatchComplete).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onUpload).toHaveBeenCalledTimes(2));
+    expect(onUpload).toHaveBeenNthCalledWith(1, first);
+    expect(onUpload).toHaveBeenNthCalledWith(2, second);
   });
 
-  it("funktioniert unverändert ohne `onBatchComplete` (die übrigen Aufrufer)", async () => {
-    const onUpload = vi.fn(async () => undefined);
+  it("bietet auch nach einem fehlgeschlagenen Owner-Upload keine zweite Ablageart an", async () => {
+    const onUpload = vi.fn().mockRejectedValue(new Error("Upload fehlgeschlagen"));
+    const file = new File(["a"], "a.txt", { type: "text/plain" });
+    const { container } = render(<AttachmentUploader visibilityMode="owner" onUpload={onUpload} />);
 
-    const input = renderUploader({ onUpload });
-    await selectFiles(input, [file("a.txt"), file("b.txt")]);
+    fireEvent.change(fileInput(container), { target: { files: [file] } });
 
-    expect(onUpload).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(onUpload).toHaveBeenCalledWith(file));
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
   });
 
-  it("lässt den Upload-Vorgang nicht scheitern, wenn das Nachladen wirft", async () => {
-    const onUpload = vi.fn(async () => undefined);
-    const onBatchComplete = vi.fn(async () => {
-      throw new Error("Nachladen kaputt");
-    });
+  it("lädt aus der Dokumentenbibliothek ohne zusätzliche Auswahl hoch", async () => {
+    const onUpload = vi.fn().mockResolvedValue(undefined);
+    const file = new File(["a"], "a.txt", { type: "text/plain" });
+    const { container } = render(<AttachmentUploader onUpload={onUpload} />);
 
-    const input = renderUploader({ onUpload, onBatchComplete });
-    await expect(
-      selectFiles(input, [file("a.txt")]),
-    ).resolves.toBeUndefined();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Auswählen" })).toBeEnabled();
+    fireEvent.change(fileInput(container), { target: { files: [file] } });
 
-    expect(onUpload).toHaveBeenCalledTimes(1);
-    expect(onBatchComplete).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onUpload).toHaveBeenCalledWith(file));
   });
 });

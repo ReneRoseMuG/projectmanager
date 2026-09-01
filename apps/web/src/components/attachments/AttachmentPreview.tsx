@@ -4,24 +4,26 @@ import { assetUrl } from "../../api/client";
 import { errorMessageAsync } from "../../hooks/errors";
 import { formatHumanDate } from "../../utils/date";
 import { Button } from "../ui/Button";
+import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { useToast } from "../ui/ToastProvider";
 import { describeAttachmentType } from "./attachmentTypes";
 import { DocumentPreviewBody, prettyBytes } from "./DocumentPreviewBody";
 
 interface AttachmentPreviewProps {
   attachment: Attachment;
-  onDelete: (attachment: Attachment) => void;
+  onDeletePermanently?: (attachment: Attachment) => Promise<void>;
   onOpen: (attachment: Attachment) => Promise<void>;
   opening?: boolean;
 }
 
 export function AttachmentPreview({
   attachment,
-  onDelete,
+  onDeletePermanently,
   onOpen,
   opening = false,
 }: AttachmentPreviewProps) {
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const meta = describeAttachmentType(attachment);
   const url = assetUrl(attachment.url);
   const Icon = meta.Icon;
@@ -34,6 +36,32 @@ export function AttachmentPreview({
         tone: "error",
         title: "Datei konnte nicht geöffnet werden",
         message: await errorMessageAsync(openError),
+      });
+    }
+  };
+
+  const deletePermanently = async () => {
+    if (!onDeletePermanently) {
+      return;
+    }
+    const approved = await confirm({
+      title: "Datei endgültig löschen?",
+      body: "Der exklusive Parent-Anhang und seine physische Datei werden dauerhaft entfernt. Das Dokumentenmanagement bleibt unverändert.",
+      severity: "danger",
+      confirmLabel: "Endgültig löschen",
+      requireCheck: "Ich bestätige das endgültige Löschen."
+    });
+    if (!approved) {
+      return;
+    }
+    try {
+      await onDeletePermanently(attachment);
+      showToast({ tone: "success", title: "Datei endgültig gelöscht" });
+    } catch (deleteError) {
+      showToast({
+        tone: "error",
+        title: "Datei konnte nicht endgültig gelöscht werden",
+        message: await errorMessageAsync(deleteError)
       });
     }
   };
@@ -83,14 +111,16 @@ export function AttachmentPreview({
             disabled={opening}
             onClick={() => void openLocally()}
           />
-          <Button
-            aria-label="Löschen"
-            title="Löschen"
-            className="h-10 w-10"
-            icon={<Trash2 size={18} />}
-            variant="ghost"
-            onClick={() => onDelete(attachment)}
-          />
+          {onDeletePermanently ? (
+            <Button
+              aria-label="Endgültig löschen"
+              title="Endgültig löschen"
+              className="h-10 w-10"
+              icon={<Trash2 size={18} />}
+              variant="ghost"
+              onClick={() => void deletePermanently()}
+            />
+          ) : null}
         </div>
       </div>
 

@@ -11,6 +11,7 @@ import {
   invalidateCatalogs,
   invalidateDashboards,
   invalidateDayPlan,
+  invalidateDocuments,
   invalidateEvents,
   invalidateFeatureScope,
   invalidateMilestones,
@@ -77,6 +78,9 @@ async function invalidateRealtimeScope(queryClient: ReturnType<typeof useQueryCl
       return;
     case "attachments":
       await invalidateAllAttachments(queryClient);
+      return;
+    case "documents":
+      await invalidateDocuments(queryClient);
       return;
     case "dayPlans":
       await invalidateDayPlan(queryClient);

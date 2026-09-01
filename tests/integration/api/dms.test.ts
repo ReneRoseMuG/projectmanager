@@ -1,6 +1,6 @@
 /**
  * Test Scope:
- * Document Management System (MS-75) - API, Berechtigungen und geaendertes Orphan-Verhalten.
+ * Globales Document Management System - API, Berechtigungen, Sammlungen, Tags und explizite Parent-Links.
  *
  * Test-Ebene:
  * - Integration
@@ -18,22 +18,20 @@
  * - Temp-DB pro Lauf (createTestDb), truncateAll in beforeEach, Temp-UPLOAD_DIR unter os.tmpdir().
  *
  * Abgedeckte Regeln:
- * - Alle DMS-Routen laufen unter der Ressource attachments (401 ohne Session, 403 ohne Recht).
- * - Kategorie-CRUD mit Namens-Eindeutigkeit (409) und Versionskonflikt (409).
+ * - Alle DMS-Routen laufen unter der eigenständigen Ressource documents (401 ohne Session, 403 ohne Recht).
  * - Sammlung-CRUD mit Zyklusschutz (400) und Loeschschutz bei Unter-Sammlungen (409 -> recursive).
- * - Persistente, versionsgepruefte Reihenfolge fuer Kategorien sowie Sammlungen derselben Ebene.
  * - Dokument in Sammlung einsortieren/entfernen + gefilterte Bibliotheks-Abfrage (mit Gegenbeispiel).
  * - Owner-loser Direktupload landet unter Nicht einsortiert.
- * - Fachobjekt-gebundenes, aber sammlungsloses Dokument erscheint ebenfalls unter Nicht einsortiert (nur die Sammlung entscheidet).
+ * - Importvertrag akzeptiert ohne Sammlung oder genau eine Sammlung plus DMS-Tags und lehnt
+ *   unbekannte Ziele, Mehrfachsammlungen sowie Kategorieparameter vor der Dateianlage ab.
+ * - Ein explizit mit einem Fachobjekt verknüpftes, sammlungsloses Dokument erscheint weiterhin unter Nicht einsortiert.
  * - Geschuetzte System-Labels sind ueber setDocumentTags nicht setzbar (400).
- * - Orphan-Verhalten: Anhaenge werden beim Loeschen des Fachobjekts NICHT geloescht, sondern Nicht einsortiert.
- * - Verwaister Owner-Link (Fachobjekt bereits geloescht) blockiert das Loeschen des Dokuments nicht (204 statt 404).
- * - Upload-Kontext: singulaere sowie mehrfache Sammlungen/Kategorien und mehrere Tags werden nach vorheriger
- *   Zielvalidierung zugeordnet (mit Gegenbeispiel ohne Query); der Upload bleibt schreibgeschuetzt (403 fuer Leser).
+ * - Bulk-Tag-Ergaenzung bewahrt vorhandene Tags, ist idempotent und rollt bei Versionskonflikten atomar zurueck.
+ * - Manueller SHA-256-Duplikat-Check mit sichtbarem Scope, Dateifehlern, stabilen Gruppen und Schreibrecht.
+ * - Das Löschen eines Fachobjekts entfernt nur dessen DMS-Link; das globale Dokument bleibt bestehen.
  *
  * Fehlerfaelle:
  * - 401 ohne Session, 403 Reader-Negativfall, 409 Dublette/Versionskonflikt/Loeschschutz, 400 Zyklus/System-Label.
- * - Unbekannte Sammlung/Kategorie: 404 ohne Dateianlage; unbekannte oder fachfremde Tags: 400 ohne Dateianlage.
  *
  * Ziel:
  * Die neue DMS-Oberflaeche und die geaenderte Aufraeum-Semantik gegen Regressionen absichern.
@@ -46,8 +44,6 @@ import path from "node:path";
 import supertest from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
-import { config } from "../../../apps/api/src/config.js";
-import { thumbnailFilename } from "../../../apps/api/src/services/attachment-preview.service.js";
 
 const uploadDir = path.join(os.tmpdir(), `taskmanager-api-dms-${process.pid}`);
 
@@ -96,156 +92,305 @@ describe("DMS API", () => {
     return reader;
   }
 
-  async function uploadDocument(admin: ReturnType<typeof supertest.agent>, name: string, folderId?: number, content = `Inhalt ${name}`) {
+  async function uploadDocument(
+    admin: ReturnType<typeof supertest.agent>,
+    name: string,
+    folderId?: number,
+    content: string | Buffer = `Inhalt ${name}`
+  ) {
     const url = folderId !== undefined ? `/api/documents?folder=${folderId}` : "/api/documents";
-    const res = await admin.post(url).attach("file", Buffer.from(content), { filename: name, contentType: "text/plain" }).expect(201);
-    return res.body as { id: number; filename: string };
+    const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+    const res = await admin.post(url).attach("file", buffer, { filename: name, contentType: "text/plain" }).expect(201);
+    return res.body as { id: number; filename: string; version: number };
+  }
+
+  async function setDocumentFolder(
+    admin: ReturnType<typeof supertest.agent>,
+    document: { id: number; version: number },
+    folderId: number | null
+  ) {
+    const response = await admin
+      .put(`/api/documents/${document.id}/folder`)
+      .send({ folderId, expectedVersion: document.version })
+      .expect(200);
+    return response.body as { id: number; version: number; folder: { id: number } | null; folders: Array<{ id: number }> };
+  }
+
+  async function waitForDuplicateCheck(admin: ReturnType<typeof supertest.agent>) {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const response = await admin.get("/api/documents/duplicate-check").expect(200);
+      if (response.body.status !== "running") {
+        return response.body as {
+          status: string;
+          total: number;
+          processed: number;
+          groups: Array<{ documents: Array<{ id: number; folder: { id: number } | null; owners: unknown[] }> }>;
+          issues: Array<{ attachmentId: number; kind: string }>;
+        };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error("Die Duplikatprüfung wurde nicht rechtzeitig abgeschlossen.");
   }
 
   // --- Berechtigungen ---
 
   it("lehnt Zugriff ohne Session ab (401)", async () => {
     await supertest(app.server).get("/api/documents").expect(401);
-    await supertest(app.server).post("/api/attachment-categories").send({ name: "X" }).expect(401);
+    await supertest(app.server).post("/api/attachment-folders").send({ name: "X" }).expect(401);
   });
 
   it("lehnt einen Leser beim Schreiben ab, erlaubt aber Lesen (403 / 200)", async () => {
     const reader = await loginReader();
-    await reader.post("/api/attachment-categories").send({ name: "Verboten" }).expect(403);
     await reader.post("/api/attachment-folders").send({ name: "Verboten" }).expect(403);
     await reader.get("/api/documents").expect(200);
-    await reader.get("/api/attachment-categories").expect(200);
   });
 
-  // --- Kategorien ---
-
-  it("Kategorie: anlegen, Dublette 409, umbenennen, Versionskonflikt 409, loeschen", async () => {
+  it("erzwingt read, write und delete für eine benutzerdefinierte Nur-Lesen-Rolle getrennt", async () => {
     const admin = await loginAdmin();
-    const created = await admin.post("/api/attachment-categories").send({ name: "Rechnung", color: "#ff0000" }).expect(201);
-    expect(created.body).toMatchObject({ name: "Rechnung", color: "#ff0000", version: 1 });
+    const document = await uploadDocument(admin, "custom-role.txt");
+    const folder = await admin.post("/api/attachment-folders").send({ name: "Custom Role" }).expect(201);
+    const tag = await admin.post("/api/tags").send({ name: "Custom Role Tag", domain: "dms" }).expect(201);
+    const role = await admin
+      .post("/api/admin/roles")
+      .send({ key: "dms_read_only", label: "DMS nur lesen", permissions: [{ resource: "documents", action: "read" }] })
+      .expect(201);
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "DMS", lastName: "Reader", email: "dms-custom-reader@example.test", roleId: role.body.id, password: "password123", isActive: true })
+      .expect(201);
+    const custom = supertest.agent(app.server);
+    await custom.post("/api/auth/login").send({ email: "dms-custom-reader@example.test", password: "password123" }).expect(200);
 
-    await admin.post("/api/attachment-categories").send({ name: "Rechnung" }).expect(409);
-
-    const renamed = await admin
-      .patch(`/api/attachment-categories/${created.body.id}`)
-      .send({ name: "Eingangsrechnung", expectedVersion: 1 })
-      .expect(200);
-    expect(renamed.body).toMatchObject({ name: "Eingangsrechnung", version: 2 });
-
-    const conflict = await admin
-      .patch(`/api/attachment-categories/${created.body.id}`)
-      .send({ name: "Nochmal", expectedVersion: 1 })
-      .expect(409);
-    expect(conflict.body).toMatchObject({ error: "CONFLICT", statusCode: 409 });
-
-    await admin.delete(`/api/attachment-categories/${created.body.id}`).expect(204);
-    const list = await admin.get("/api/attachment-categories").expect(200);
-    expect(list.body).toEqual([]);
+    await custom.get("/api/documents").expect(200);
+    await custom.get(`/api/documents/${document.id}`).expect(200);
+    await custom.get(`/api/documents/${document.id}/content`).expect(200);
+    const scan = await custom.post("/api/documents/duplicate-check").expect(403);
+    const move = await custom.put(`/api/documents/${document.id}/folder`).send({ folderId: folder.body.id, expectedVersion: document.version }).expect(403);
+    const tags = await custom.put(`/api/documents/${document.id}/tags`).send({ tagIds: [tag.body.id], expectedVersion: document.version }).expect(403);
+    const permanent = await custom.delete(`/api/documents/${document.id}?expectedVersion=${document.version}`).expect(403);
+    for (const response of [scan, move, tags, permanent]) {
+      expect(response.body).toMatchObject({ error: "FORBIDDEN", statusCode: 403 });
+    }
+    expect((await admin.get(`/api/documents/${document.id}`).expect(200)).body).toMatchObject({ version: document.version, folders: [], tags: [] });
   });
 
-  it("Kategorie: speichert die Reihenfolge persistent und rollt veraltete Versionen vollstaendig zurueck", async () => {
+  it("stellt keine Kategorie-API und keine Kategorie-Felder mehr bereit", async () => {
     const admin = await loginAdmin();
-    const first = await admin.post("/api/attachment-categories").send({ name: "Zuerst angelegt" }).expect(201);
-    const second = await admin.post("/api/attachment-categories").send({ name: "Danach angelegt" }).expect(201);
+    const document = await uploadDocument(admin, "ohne-kategorien.txt");
 
-    const reordered = await admin.put("/api/attachment-categories/order").send({ items: [
-      { id: second.body.id, expectedVersion: second.body.version },
-      { id: first.body.id, expectedVersion: first.body.version }
-    ] }).expect(200);
-    expect(reordered.body.map((category: { id: number }) => category.id)).toEqual([second.body.id, first.body.id]);
-    expect(reordered.body.map((category: { sortOrder: number }) => category.sortOrder)).toEqual([0, 1024]);
-
-    const persisted = await admin.get("/api/attachment-categories").expect(200);
-    expect(persisted.body.map((category: { id: number }) => category.id)).toEqual([second.body.id, first.body.id]);
-
-    const stale = await admin.put("/api/attachment-categories/order").send({ items: [
-      { id: first.body.id, expectedVersion: first.body.version },
-      { id: second.body.id, expectedVersion: second.body.version }
-    ] }).expect(409);
-    expect(stale.body).toMatchObject({ error: "CONFLICT", statusCode: 409 });
-    const afterConflict = await admin.get("/api/attachment-categories").expect(200);
-    expect(afterConflict.body.map((category: { id: number }) => category.id)).toEqual([second.body.id, first.body.id]);
-
-    const reader = await loginReader();
-    await reader.put("/api/attachment-categories/order").send({
-      items: reordered.body.map((category: { id: number; version: number }) => ({ id: category.id, expectedVersion: category.version }))
-    }).expect(403);
+    await admin.get("/api/attachment-categories").expect(404);
+    await admin.post("/api/attachment-categories").send({ name: "Alt" }).expect(404);
+    await admin.post(`/api/documents/${document.id}/categories/1`).expect(404);
+    expect((await admin.get(`/api/documents/${document.id}`).expect(200)).body).not.toHaveProperty("categories");
   });
 
   // --- Sammlungen ---
 
-  it("Sammlung: verschachteln, Zyklus verhindern 400, Loeschschutz bei Kindern 409 und rekursiv loeschen", async () => {
+  it("Sammlung: bildet drei Ebenen ab, verhindert ungültige Parents und schützt nicht leere Sammlungen", async () => {
     const admin = await loginAdmin();
-    const parent = await admin.post("/api/attachment-folders").send({ name: "Projekte" }).expect(201);
-    const child = await admin.post("/api/attachment-folders").send({ name: "2026", parentId: parent.body.id }).expect(201);
+    const reader = await loginReader();
+    const parent = await admin.post("/api/attachment-folders").send({ name: "Sauna" }).expect(201);
+    const child = await admin.post("/api/attachment-folders").send({ name: "Oval Sauna", parentId: parent.body.id }).expect(201);
+    const grandchild = await admin.post("/api/attachment-folders").send({ name: "Details", parentId: child.body.id }).expect(201);
     expect(child.body.parentId).toBe(parent.body.id);
 
-    // Zyklus: Elternteil unter sein eigenes Kind haengen -> 400
+    await admin.post("/api/attachment-folders").send({ name: "Ungültig", parentId: 999999 }).expect(404);
     await admin
       .patch(`/api/attachment-folders/${parent.body.id}`)
-      .send({ parentId: child.body.id, expectedVersion: parent.body.version })
+      .send({ parentId: grandchild.body.id, expectedVersion: parent.body.version })
       .expect(400);
 
-    // Loeschen mit Kindern ohne recursive -> 409
-    await admin.delete(`/api/attachment-folders/${parent.body.id}`).expect(409);
+    const moved = await admin
+      .patch(`/api/attachment-folders/${grandchild.body.id}`)
+      .send({ parentId: parent.body.id, expectedVersion: grandchild.body.version })
+      .expect(200);
+    expect(moved.body).toMatchObject({ parentId: parent.body.id, version: grandchild.body.version + 1 });
+    await admin
+      .patch(`/api/attachment-folders/${grandchild.body.id}`)
+      .send({ name: "Veraltet", expectedVersion: grandchild.body.version })
+      .expect(409);
 
-    // recursive loescht Eltern + Kind
-    await admin.delete(`/api/attachment-folders/${parent.body.id}?recursive=true`).expect(204);
+    const folders = await admin.get("/api/attachment-folders").expect(200);
+    expect(folders.body.find((folder: { id: number }) => folder.id === parent.body.id)).toMatchObject({ childCount: 2 });
+    await admin.delete(`/api/attachment-folders/${parent.body.id}?expectedVersion=${parent.body.version}`).expect(409);
+
+    const empty = await admin.post("/api/attachment-folders").send({ name: "Leer" }).expect(201);
+    await reader.delete(`/api/attachment-folders/${empty.body.id}?expectedVersion=${empty.body.version}`).expect(403);
+    await admin.delete(`/api/attachment-folders/${empty.body.id}?expectedVersion=${empty.body.version}`).expect(204);
     const list = await admin.get("/api/attachment-folders").expect(200);
-    expect(list.body).toEqual([]);
-  });
-
-  it("Sammlung: sortiert nur vollstaendige Reihenfolgen derselben Ebene und liefert den Baum persistent", async () => {
-    const admin = await loginAdmin();
-    const firstRoot = await admin.post("/api/attachment-folders").send({ name: "Erste Wurzel" }).expect(201);
-    const secondRoot = await admin.post("/api/attachment-folders").send({ name: "Zweite Wurzel" }).expect(201);
-    const firstChild = await admin.post("/api/attachment-folders").send({ name: "Erstes Kind", parentId: firstRoot.body.id }).expect(201);
-    const secondChild = await admin.post("/api/attachment-folders").send({ name: "Zweites Kind", parentId: firstRoot.body.id }).expect(201);
-
-    await admin.put("/api/attachment-folders/order").send({ parentId: null, items: [
-      { id: secondRoot.body.id, expectedVersion: secondRoot.body.version },
-      { id: firstRoot.body.id, expectedVersion: firstRoot.body.version }
-    ] }).expect(200);
-    const childrenReordered = await admin.put("/api/attachment-folders/order").send({ parentId: firstRoot.body.id, items: [
-      { id: secondChild.body.id, expectedVersion: secondChild.body.version },
-      { id: firstChild.body.id, expectedVersion: firstChild.body.version }
-    ] }).expect(200);
-
-    expect(childrenReordered.body.map((folder: { id: number }) => folder.id)).toEqual([
-      secondRoot.body.id, firstRoot.body.id, secondChild.body.id, firstChild.body.id
-    ]);
-    const persisted = await admin.get("/api/attachment-folders").expect(200);
-    expect(persisted.body.map((folder: { id: number }) => folder.id)).toEqual([
-      secondRoot.body.id, firstRoot.body.id, secondChild.body.id, firstChild.body.id
-    ]);
-
-    const invalidLevel = await admin.put("/api/attachment-folders/order").send({ parentId: null, items: [
-      { id: firstRoot.body.id, expectedVersion: 2 },
-      { id: firstChild.body.id, expectedVersion: 2 }
-    ] }).expect(400);
-    expect(invalidLevel.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
+    expect(list.body.map((folder: { id: number }) => folder.id)).not.toContain(empty.body.id);
   });
 
   // --- Dokument-Organisation & Bibliotheks-Filter ---
 
-  it("Dokument einsortieren und Bibliotheks-Filter grenzt korrekt ein (mit Gegenbeispiel)", async () => {
+  it("ordnet atomar genau eine direkte Sammlung zu und filtert rekursiv über beliebig tiefe Nachfahren", async () => {
     const admin = await loginAdmin();
-    const folder = await admin.post("/api/attachment-folders").send({ name: "Vertraege" }).expect(201);
-    const inFolder = await uploadDocument(admin, "vertrag.txt");
+    const sauna = await admin.post("/api/attachment-folders").send({ name: "Sauna" }).expect(201);
+    const oval = await admin.post("/api/attachment-folders").send({ name: "Oval Sauna", parentId: sauna.body.id }).expect(201);
+    const details = await admin.post("/api/attachment-folders").send({ name: "Details", parentId: oval.body.id }).expect(201);
+    const other = await admin.post("/api/attachment-folders").send({ name: "Andere" }).expect(201);
+    const inFolder = await uploadDocument(admin, "oval-sauna.txt");
     const outside = await uploadDocument(admin, "sonstiges.txt");
 
-    await admin.post(`/api/attachment-folders/${folder.body.id}/documents/${inFolder.id}`).expect(204);
+    const assigned = await setDocumentFolder(admin, inFolder, details.body.id);
+    expect(assigned).toMatchObject({ version: inFolder.version + 1, folder: { id: details.body.id } });
+    expect(assigned.folders).toHaveLength(1);
 
-    const filtered = await admin.get(`/api/documents?folder=${folder.body.id}`).expect(200);
-    const filteredIds = (filtered.body as Array<{ id: number }>).map((doc) => doc.id);
-    expect(filteredIds).toContain(inFolder.id);
-    expect(filteredIds).not.toContain(outside.id); // Gegenbeispiel: nicht einsortiertes Dokument ausgeschlossen
+    for (const folderId of [details.body.id, oval.body.id, sauna.body.id]) {
+      const filtered = await admin.get(`/api/documents?folder=${folderId}`).expect(200);
+      const filteredIds = (filtered.body as Array<{ id: number }>).map((doc) => doc.id);
+      expect(filteredIds).toEqual([inFolder.id]);
+      expect(filteredIds).not.toContain(outside.id);
+    }
+    await admin.delete(`/api/attachment-folders/${details.body.id}?expectedVersion=${details.body.version}`).expect(409);
 
-    // wieder herausnehmen -> verschwindet aus der Sammlung
-    await admin.delete(`/api/attachment-folders/${folder.body.id}/documents/${inFolder.id}`).expect(204);
-    const afterRemoval = await admin.get(`/api/documents?folder=${folder.body.id}`).expect(200);
-    expect((afterRemoval.body as Array<{ id: number }>).map((doc) => doc.id)).not.toContain(inFolder.id);
+    const moved = await setDocumentFolder(admin, assigned, other.body.id);
+    expect(moved).toMatchObject({ version: assigned.version + 1, folder: { id: other.body.id } });
+    expect(moved.folders).toHaveLength(1);
+    await admin.put(`/api/documents/${inFolder.id}/folder`).send({ folderId: null, expectedVersion: assigned.version }).expect(409);
+
+    const unassigned = await setDocumentFolder(admin, moved, null);
+    expect(unassigned).toMatchObject({ version: moved.version + 1, folder: null, folders: [] });
+    const unsorted = await admin.get("/api/documents?folder=unsorted").expect(200);
+    expect((unsorted.body as Array<{ id: number }>).map((doc) => doc.id)).toContain(inFolder.id);
   });
+
+  it("schützt Sammlung und Tags gegen veraltete Versionen und journalisiert die DMS-Lebenszyklen unterscheidbar", async () => {
+    const admin = await loginAdmin();
+    const folder = await admin.post("/api/attachment-folders").send({ name: "Journal Sammlung" }).expect(201);
+    const otherFolder = await admin.post("/api/attachment-folders").send({ name: "Andere Sammlung" }).expect(201);
+    const tag = await admin.post("/api/tags").send({ name: "Journal Tag", domain: "dms" }).expect(201);
+    const otherTag = await admin.post("/api/tags").send({ name: "Anderer Tag", domain: "dms" }).expect(201);
+    const upload = await admin
+      .post("/api/documents")
+      .attach("file", Buffer.from("Journal"), { filename: "journal.txt", contentType: "text/plain" })
+      .expect(201);
+
+    const moved = await admin
+      .put(`/api/documents/${upload.body.id}/folder`)
+      .send({ folderId: folder.body.id, expectedVersion: upload.body.version })
+      .expect(200);
+    const staleMove = await admin
+      .put(`/api/documents/${upload.body.id}/folder`)
+      .send({ folderId: otherFolder.body.id, expectedVersion: upload.body.version })
+      .expect(409);
+    expect(staleMove.body).toMatchObject({ error: "CONFLICT", statusCode: 409 });
+
+    const tagged = await admin
+      .put(`/api/documents/${upload.body.id}/tags`)
+      .send({ tagIds: [tag.body.id], expectedVersion: moved.body.version })
+      .expect(200);
+    const staleTags = await admin
+      .put(`/api/documents/${upload.body.id}/tags`)
+      .send({ tagIds: [otherTag.body.id], expectedVersion: moved.body.version })
+      .expect(409);
+    expect(staleTags.body).toMatchObject({ error: "CONFLICT", statusCode: 409 });
+    expect((await admin.get(`/api/documents/${upload.body.id}`).expect(200)).body).toMatchObject({
+      folder: expect.objectContaining({ id: folder.body.id }),
+      tags: [expect.objectContaining({ id: tag.body.id })],
+      version: tagged.body.version
+    });
+
+    await admin.delete(`/api/documents/${upload.body.id}?expectedVersion=${tagged.body.version}`).expect(204);
+
+    const firstJournal = await admin.get(`/api/journal/objects/attachment/${upload.body.id}`).expect(200);
+    const summaries = firstJournal.body.entries.map((entry: { summary: string }) => entry.summary);
+    expect(summaries).toEqual(expect.arrayContaining([
+      expect.stringContaining("wurde von Nicht einsortiert nach Journal Sammlung verschoben"),
+      expect.stringContaining("erhielt eine neue Tag-Zuordnung"),
+      expect.stringContaining("wurde gelöscht")
+    ]));
+    expect(firstJournal.body.entries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ operation: "update", changes: [expect.objectContaining({ fieldKey: "folderId" })] }),
+      expect.objectContaining({ operation: "update", changes: [expect.objectContaining({ fieldKey: "tags" })] }),
+      expect.objectContaining({ operation: "delete" })
+    ]));
+
+    await admin.delete(`/api/documents/${upload.body.id}/library?expectedVersion=${tagged.body.version}`).expect(404);
+  });
+
+  it("filtert und paginiert vollständig in SQL mit UND-Semantik für mehrere Tags", async () => {
+    const admin = await loginAdmin();
+    const sauna = await admin.post("/api/attachment-folders").send({ name: "Filter Sauna" }).expect(201);
+    const oval = await admin.post("/api/attachment-folders").send({ name: "Filter Oval", parentId: sauna.body.id }).expect(201);
+    const other = await admin.post("/api/attachment-folders").send({ name: "Filter Andere" }).expect(201);
+    const tagA = await admin.post("/api/tags").send({ name: "Filter A", domain: "dms" }).expect(201);
+    const tagB = await admin.post("/api/tags").send({ name: "Filter B", domain: "dms" }).expect(201);
+    const first = await uploadDocument(admin, "filter-sauna.txt");
+    const second = await uploadDocument(admin, "filter-frei.txt");
+    const third = await uploadDocument(admin, "filter-andere.txt");
+
+    const firstInFolder = await setDocumentFolder(admin, first, oval.body.id);
+    const thirdInFolder = await setDocumentFolder(admin, third, other.body.id);
+    await admin.put(`/api/documents/${first.id}/tags`).send({ tagIds: [tagA.body.id, tagB.body.id], expectedVersion: firstInFolder.version }).expect(200);
+    await admin.put(`/api/documents/${second.id}/tags`).send({ tagIds: [tagA.body.id], expectedVersion: second.version }).expect(200);
+    await admin.put(`/api/documents/${third.id}/tags`).send({ tagIds: [tagB.body.id], expectedVersion: thirdInFolder.version }).expect(200);
+
+    const firstTagPage = await admin
+      .get(`/api/documents?page=1&pageSize=1&tags=${tagA.body.id}`)
+      .expect(200);
+    expect(firstTagPage.body).toMatchObject({ total: 2, page: 1, pageSize: 1 });
+    expect(firstTagPage.body.data).toHaveLength(1);
+    const secondTagPage = await admin
+      .get(`/api/documents?page=2&pageSize=1&tags=${tagA.body.id}`)
+      .expect(200);
+    expect(secondTagPage.body).toMatchObject({ total: 2, page: 2, pageSize: 1 });
+    expect(secondTagPage.body.data).toHaveLength(1);
+    expect([firstTagPage.body.data[0].id, secondTagPage.body.data[0].id].sort()).toEqual([first.id, second.id].sort());
+
+    const andResult = await admin
+      .get(`/api/documents?page=1&pageSize=25&tags=${tagA.body.id},${tagB.body.id}`)
+      .expect(200);
+    expect(andResult.body.total).toBe(1);
+    expect(andResult.body.data.map((document: { id: number }) => document.id)).toEqual([first.id]);
+
+    const parentFolder = await admin.get(`/api/documents?page=1&pageSize=25&folder=${sauna.body.id}`).expect(200);
+    expect(parentFolder.body).toMatchObject({ total: 1 });
+    expect(parentFolder.body.data[0].id).toBe(first.id);
+    const unsorted = await admin.get("/api/documents?page=1&pageSize=25&folder=unsorted").expect(200);
+    expect(unsorted.body).toMatchObject({ total: 1 });
+    expect(unsorted.body.data[0].id).toBe(second.id);
+    const typeResult = await admin.get("/api/documents?page=1&pageSize=25&type=text%2F").expect(200);
+    expect(typeResult.body).toMatchObject({ total: 3 });
+    const searchResult = await admin.get("/api/documents?page=1&pageSize=25&q=sauna").expect(200);
+    expect(searchResult.body).toMatchObject({ total: 1 });
+
+    const emptyCombination = await admin
+      .get(`/api/documents?page=1&pageSize=25&folder=${other.body.id}&tags=${tagA.body.id}`)
+      .expect(200);
+    expect(emptyCombination.body).toMatchObject({ total: 0, data: [] });
+
+    await admin.get("/api/documents?page=1&tags=1,abc").expect(400);
+    await admin.get("/api/documents?page=1&tags=999999").expect(400);
+    await admin.get("/api/documents?page=1&type=invalid").expect(400);
+  });
+
+  it("liefert bei 100, 1.000 und 3.000 Dokumenten nur die angeforderte Seite bei korrektem total", async () => {
+    const admin = await loginAdmin();
+    let inserted = 0;
+    for (const target of [100, 1_000, 3_000]) {
+      while (inserted < target) {
+        const batchSize = Math.min(500, target - inserted);
+        const now = new Date().toISOString();
+        const placeholders = Array.from({ length: batchSize }, () => "(?, ?, 'text/plain', 1, 'document', ?, ?)").join(", ");
+        const values: Array<string | number> = [];
+        for (let offset = 0; offset < batchSize; offset += 1) {
+          const index = inserted + offset;
+          values.push(`last-${index}.txt`, `last-${index}.txt`, now, now);
+        }
+        await testDb.pool.query(
+          `INSERT INTO attachments (original_name, filename, mimetype, size, kind, created_at, updated_at) VALUES ${placeholders}`,
+          values
+        );
+        inserted += batchSize;
+      }
+
+      const response = await admin.get("/api/documents?page=1&pageSize=25&type=text%2F").expect(200);
+      expect(response.body).toMatchObject({ total: target, page: 1, pageSize: 25 });
+      expect(response.body.data).toHaveLength(25);
+    }
+  }, 120_000);
 
   it("Direktupload ohne Fachobjekt landet unter Nicht einsortiert", async () => {
     const admin = await loginAdmin();
@@ -254,193 +399,274 @@ describe("DMS API", () => {
     expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(doc.id);
   });
 
-  it("streamt ein einzelnes Dokument als berechtigten Download", async () => {
+  it("prüft sichtbare Dokumente manuell nach Inhalt und weist Dateifehler getrennt aus", async () => {
     const admin = await loginAdmin();
-    const doc = await uploadDocument(admin, "einzel.txt", undefined, "Einzelinhalt");
+    const reader = await loginReader();
+    await reader.post("/api/documents/duplicate-check").expect(403);
+    await reader.get("/api/documents/duplicate-check").expect(200);
 
-    const res = await admin.get(`/api/documents/${doc.id}/download`).responseType("blob").expect(200);
-    expect(res.headers["content-type"]).toContain("text/plain");
-    expect(res.headers["content-disposition"]).toContain("einzel.txt");
-    expect((res.body as Buffer).toString("utf8")).toBe("Einzelinhalt");
+    const folder = await admin.post("/api/attachment-folders").send({ name: "Duplikate" }).expect(201);
+    const first = await uploadDocument(admin, "inhalt-a.txt", undefined, "identischer Inhalt");
+    const second = await uploadDocument(admin, "anderer-name.txt", undefined, "identischer Inhalt");
+    const sameNameDifferentContent = await uploadDocument(admin, "inhalt-a.txt", undefined, "abweichender Inhalt");
+    const hiddenProject = await admin.post("/api/projects").send({ name: "Verstecktes Duplikat", status: "active", color: "#6366f1" }).expect(201);
+    const hiddenUpload = await admin
+      .post(`/api/projects/${hiddenProject.body.id}/attachments`)
+      .attach("file", Buffer.from("identischer Inhalt"), { filename: "versteckt.txt", contentType: "text/plain" })
+      .expect(201);
+    const hidden = hiddenUpload.body as { id: number };
+    const missing = await uploadDocument(admin, "fehlt.txt", undefined, "nicht mehr vorhanden");
+    await setDocumentFolder(admin, first, folder.body.id);
+    await fs.rm(path.join(uploadDir, missing.filename));
+
+    const started = await admin.post("/api/documents/duplicate-check").expect(202);
+    if (started.body.status === "running") {
+      await admin.post("/api/documents/duplicate-check").expect(409);
+    }
+    const result = await waitForDuplicateCheck(admin);
+
+    expect(result.status).toBe("completed");
+    expect(result.processed).toBe(result.total);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]?.documents.map((document) => document.id)).toEqual([first.id, second.id]);
+    expect(result.groups[0]?.documents[0]?.folder?.id).toBe(folder.body.id);
+    expect(result.groups[0]?.documents[0]?.owners).toEqual([]);
+    expect(result.groups[0]?.documents.map((document) => document.id)).not.toContain(hidden.id);
+    expect(result.groups[0]?.documents.map((document) => document.id)).not.toContain(sameNameDifferentContent.id);
+    expect(result.issues).toContainEqual(expect.objectContaining({ attachmentId: missing.id, kind: "missing" }));
+
+    await admin.post("/api/documents/duplicate-check").expect(202);
+    const repeated = await waitForDuplicateCheck(admin);
+    expect(repeated.groups[0]?.documents.map((document) => document.id)).toEqual([first.id, second.id]);
+    await admin.get(`/api/documents/${hidden.id}`).expect(404);
+    const hiddenOwnerAttachments = await admin.get(`/api/projects/${hiddenProject.body.id}/attachments`).expect(200);
+    expect(hiddenOwnerAttachments.body).toContainEqual(expect.objectContaining({ id: hidden.id, kind: "parent_attachment", isInDocumentLibrary: false }));
   });
 
-  it("lehnt einen DMS-Direktupload mit bereits vorhandenem Dateiinhalt ab", async () => {
-    const admin = await loginAdmin();
-    const original = await uploadDocument(admin, "original.txt", undefined, "gleicher Inhalt");
-
-    await admin
-      .post("/api/documents")
-      .attach("file", Buffer.from("gleicher Inhalt"), { filename: "kopie.txt", contentType: "text/plain" })
-      .expect(409);
-
-    const [rows] = await testDb.pool.execute("SELECT COUNT(*) AS count FROM attachments");
-    expect((rows as Array<{ count: number }>)[0].count).toBe(1);
-    await expect(fs.stat(path.join(config.uploadDir, original.filename))).resolves.toBeDefined();
-  });
-
-  it("erkennt bestehende Legacy-Dokumente ohne Hash beim naechsten Upload und zieht den Hash nach", async () => {
-    const admin = await loginAdmin();
-    const content = "legacy Inhalt";
-    const filename = "legacy-storage.txt";
-    const now = new Date().toISOString();
-    await fs.mkdir(config.uploadDir, { recursive: true });
-    await fs.writeFile(path.join(config.uploadDir, filename), content, "utf8");
-    await testDb.pool.execute(
-      "INSERT INTO attachments (original_name, filename, mimetype, size, version, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)",
-      ["legacy.txt", filename, "text/plain", Buffer.byteLength(content), now, now]
-    );
-
-    await admin
-      .post("/api/documents")
-      .attach("file", Buffer.from(content), { filename: "legacy-kopie.txt", contentType: "text/plain" })
-      .expect(409);
-
-    const [rows] = await testDb.pool.execute("SELECT content_hash FROM attachments WHERE filename = ?", [filename]);
-    expect((rows as Array<{ content_hash: string | null }>)[0].content_hash).toMatch(/^[a-f0-9]{64}$/);
-  });
-
-  it("fuehrt ein an ein Fachobjekt gebundenes, sammlungsloses Dokument als Nicht einsortiert", async () => {
+  it("führt ein explizit verknüpftes, sammlungsloses DMS-Dokument weiterhin als Nicht einsortiert", async () => {
     const admin = await loginAdmin();
     const project = await admin.post("/api/projects").send({ name: "DMS-Projekt", status: "active", color: "#6366f1" }).expect(201);
-    const upload = await admin
-      .post(`/api/projects/${project.body.id}/attachments`)
-      .attach("file", Buffer.from("gebunden, aber ohne Sammlung"), { filename: "gebunden.txt", contentType: "text/plain" })
+    const upload = await uploadDocument(admin, "gebunden.txt", undefined, "verknüpft, aber ohne Sammlung");
+    await admin
+      .post(`/api/projects/${project.body.id}/document-links`)
+      .send({ documentId: upload.id })
       .expect(201);
 
-    // Owner-gebunden, aber in keiner Sammlung -> erscheint unter Nicht einsortiert.
+    // Parent-verknüpft, aber in keiner globalen Sammlung -> erscheint unter Nicht einsortiert.
     const unsorted = await admin.get("/api/documents?folder=unsorted").expect(200);
-    expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(upload.body.id);
+    expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(upload.id);
 
-    // Sobald es in eine Sammlung einsortiert wird, verschwindet es dort -> die Sammlung entscheidet, nicht der Owner.
+    // Sobald es in eine Sammlung einsortiert wird, verschwindet es dort -> die Sammlung entscheidet, nicht der Parent-Link.
     const folder = await admin.post("/api/attachment-folders").send({ name: "Vertraege" }).expect(201);
-    await admin.post(`/api/attachment-folders/${folder.body.id}/documents/${upload.body.id}`).expect(204);
+    await setDocumentFolder(admin, upload, folder.body.id);
     const afterSort = await admin.get("/api/documents?folder=unsorted").expect(200);
-    expect((afterSort.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(upload.body.id);
+    expect((afterSort.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(upload.id);
   });
 
-  // --- Upload-Kontext (Sammlung + Kategorie + Tags) ---
-
-  it("Upload übernimmt mehrere Sammlungen, Kategorien und DMS-Tags aus der Query", async () => {
+  it("wendet für Web, Windows-Importer und MCP denselben singulären DMS-Importvertrag an", async () => {
     const admin = await loginAdmin();
-    const firstFolder = await admin.post("/api/attachment-folders").send({ name: "Rechnungen" }).expect(201);
-    const secondFolder = await admin.post("/api/attachment-folders").send({ name: "Eingang" }).expect(201);
-    const firstCategory = await admin.post("/api/attachment-categories").send({ name: "Wichtig" }).expect(201);
-    const secondCategory = await admin.post("/api/attachment-categories").send({ name: "Finanzen" }).expect(201);
-    const firstTag = await admin.post("/api/tags").send({ name: "Eingang", domain: "dms" }).expect(201);
-    const secondTag = await admin.post("/api/tags").send({ name: "Prüfen", domain: "dms" }).expect(201);
+    const folder = await admin.post("/api/attachment-folders").send({ name: "Import Sauna" }).expect(201);
+    const dmsTag = await admin.post("/api/tags").send({ name: "Import Oval", domain: "dms" }).expect(201);
+    const pmTag = await admin.post("/api/tags").send({ name: "Import Projekt", domain: "pm" }).expect(201);
 
-    const withContext = await admin
-      .post(`/api/documents?folders=${firstFolder.body.id},${secondFolder.body.id}&categories=${firstCategory.body.id},${secondCategory.body.id}&tags=${firstTag.body.id},${secondTag.body.id}`)
-      .attach("file", Buffer.from("Inhalt"), { filename: "mit-kontext.txt", contentType: "text/plain" })
+    const imported = await admin
+      .post(`/api/documents?folder=${folder.body.id}&tags=${dmsTag.body.id}`)
+      .attach("file", Buffer.from("gemeinsamer Importvertrag"), { filename: "importiert.txt", contentType: "text/plain" })
       .expect(201);
+    expect(imported.body).toMatchObject({
+      isInDocumentLibrary: true,
+      folders: [expect.objectContaining({ id: folder.body.id })],
+      tags: [expect.objectContaining({ id: dmsTag.body.id, domain: "dms" })],
+      version: expect.any(Number)
+    });
 
-    const created = await admin.get(`/api/documents/${withContext.body.id}`).expect(200);
-    expect(created.body.folders.map((folder: { id: number }) => folder.id).sort()).toEqual([firstFolder.body.id, secondFolder.body.id].sort());
-    expect(created.body.categories.map((category: { id: number }) => category.id).sort()).toEqual([firstCategory.body.id, secondCategory.body.id].sort());
-    expect(created.body.tags.map((tag: { id: number }) => tag.id).sort()).toEqual([firstTag.body.id, secondTag.body.id].sort());
+    const withoutFolder = await admin
+      .post("/api/documents")
+      .attach("file", Buffer.from("ohne Sammlung"), { filename: "ohne-sammlung.txt", contentType: "text/plain" })
+      .expect(201);
+    expect(withoutFolder.body).toMatchObject({ isInDocumentLibrary: true, folders: [], tags: [], version: expect.any(Number) });
 
-    // Gegenbeispiel: ohne Query bleibt das Dokument ohne Sammlung und ohne Kategorie.
-    const plain = await uploadDocument(admin, "ohne-kontext.txt");
-    const fetched = await admin.get(`/api/documents/${plain.id}`).expect(200);
-    expect(fetched.body.folders).toEqual([]);
-    expect(fetched.body.categories).toEqual([]);
-    expect(fetched.body.tags).toEqual([]);
-  });
-
-  it("validiert unbekannte Sammlung und Kategorie vor der Dateianlage", async () => {
-    const admin = await loginAdmin();
-    const categoryResponse = await admin
-      .post("/api/documents?category=999999")
-      .attach("file", Buffer.from("Inhalt"), { filename: "unbekannt.txt", contentType: "text/plain" })
+    const storedFileCount = (await fs.readdir(uploadDir)).length;
+    const storedDocumentCount = ((await admin.get("/api/documents").expect(200)).body as Array<unknown>).length;
+    await admin
+      .post("/api/documents?folder=999999")
+      .attach("file", Buffer.from("unbekannte Sammlung"), { filename: "unbekannt.txt", contentType: "text/plain" })
       .expect(404);
-    expect(categoryResponse.body).toMatchObject({ error: "NOT_FOUND", statusCode: 404 });
-
-    const folderResponse = await admin
-      .post("/api/documents?folders=999998,999999")
-      .attach("file", Buffer.from("Inhalt"), { filename: "unbekannte-sammlung.txt", contentType: "text/plain" })
-      .expect(404);
-    expect(folderResponse.body).toMatchObject({ error: "NOT_FOUND", statusCode: 404 });
-
-    const list = await admin.get("/api/documents").expect(200);
-    expect(list.body).toEqual([]);
-  });
-
-  it("lehnt unbekannte und fachfremde Tags vor der Dateianlage ab", async () => {
-    const admin = await loginAdmin();
-    const pmTag = await admin.post("/api/tags").send({ name: "PM-Tag", domain: "pm" }).expect(201);
-
-    const unknown = await admin
+    await admin
       .post("/api/documents?tags=999999")
-      .attach("file", Buffer.from("Inhalt"), { filename: "unbekanntes-tag.txt", contentType: "text/plain" })
+      .attach("file", Buffer.from("unbekannter Tag"), { filename: "unbekannter-tag.txt", contentType: "text/plain" })
       .expect(400);
-    expect(unknown.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
-
-    const wrongDomain = await admin
+    await admin
       .post(`/api/documents?tags=${pmTag.body.id}`)
-      .attach("file", Buffer.from("Inhalt"), { filename: "pm-tag.txt", contentType: "text/plain" })
+      .attach("file", Buffer.from("falsche Domäne"), { filename: "pm-tag.txt", contentType: "text/plain" })
       .expect(400);
-    expect(wrongDomain.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
-
-    const list = await admin.get("/api/documents").expect(200);
-    expect(list.body).toEqual([]);
+    const legacyListResponse = await admin.get("/api/documents?category=1").expect(400);
+    expect(legacyListResponse.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
+    expect(legacyListResponse.body.message).toContain("Kategorien werden seit MS-80 nicht mehr unterstützt");
+    const legacyUploadResponse = await admin
+      .post("/api/documents?category=1")
+      .attach("file", Buffer.from("alte Kategorie"), { filename: "kategorie.txt", contentType: "text/plain" })
+      .expect(400);
+    expect(legacyUploadResponse.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
+    expect(legacyUploadResponse.body.message).toContain("Kategorien werden seit MS-80 nicht mehr unterstützt");
+    const multiFolderResponse = await admin
+      .post(`/api/documents?folders=${folder.body.id},999999`)
+      .attach("file", Buffer.from("mehrere Sammlungen"), { filename: "mehrfach.txt", contentType: "text/plain" })
+      .expect(400);
+    expect(multiFolderResponse.body.message).toContain("Mehrfachsammlungen werden seit MS-80 nicht mehr unterstützt");
+    expect((await fs.readdir(uploadDir)).length).toBe(storedFileCount);
+    expect((await admin.get("/api/documents").expect(200)).body as Array<unknown>).toHaveLength(storedDocumentCount);
   });
 
-  it("Upload mit Kontext bleibt schreibgeschützt: Leser erhält 403", async () => {
+  it("ergänzt DMS-Tags für mehrere Dokumente gebündelt und idempotent", async () => {
     const admin = await loginAdmin();
-    const category = await admin.post("/api/attachment-categories").send({ name: "Gesperrt" }).expect(201);
+    const existingTag = await admin.post("/api/tags").send({ name: "Bulk Bestand", domain: "dms" }).expect(201);
+    const addedTag = await admin.post("/api/tags").send({ name: "Bulk Neu", domain: "dms" }).expect(201);
+    const first = await uploadDocument(admin, "bulk-tag-a.txt");
+    const second = await uploadDocument(admin, "bulk-tag-b.txt");
+    const firstTagged = await admin
+      .put(`/api/documents/${first.id}/tags`)
+      .send({ tagIds: [existingTag.body.id], expectedVersion: first.version })
+      .expect(200);
+
+    const bulkResponse = await admin
+      .post("/api/documents/bulk/tags")
+      .send({
+        attachments: [
+          { id: first.id, expectedVersion: firstTagged.body.version },
+          { id: second.id, expectedVersion: second.version },
+        ],
+        tagIds: [addedTag.body.id],
+      })
+      .expect(200);
+    expect(bulkResponse.body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: first.id, tags: expect.arrayContaining([expect.objectContaining({ id: addedTag.body.id })]) }),
+      expect.objectContaining({ id: second.id, tags: expect.arrayContaining([expect.objectContaining({ id: addedTag.body.id })]) }),
+    ]));
+
+    const firstUpdated = await admin.get(`/api/documents/${first.id}`).expect(200);
+    const secondUpdated = await admin.get(`/api/documents/${second.id}`).expect(200);
+    expect(firstUpdated.body.tags.map((tag: { id: number }) => tag.id).sort((left: number, right: number) => left - right)).toEqual(
+      [existingTag.body.id, addedTag.body.id].sort((left: number, right: number) => left - right),
+    );
+    expect(secondUpdated.body.tags).toEqual([expect.objectContaining({ id: addedTag.body.id })]);
+    expect(firstUpdated.body.version).toBe(firstTagged.body.version + 1);
+    expect(secondUpdated.body.version).toBe(second.version + 1);
+
+    await admin
+      .post("/api/documents/bulk/tags")
+      .send({
+        attachments: [
+          { id: first.id, expectedVersion: firstUpdated.body.version },
+          { id: second.id, expectedVersion: secondUpdated.body.version },
+        ],
+        tagIds: [addedTag.body.id],
+      })
+      .expect(200);
+
+    expect((await admin.get(`/api/documents/${first.id}`).expect(200)).body.version).toBe(firstUpdated.body.version);
+    expect((await admin.get(`/api/documents/${second.id}`).expect(200)).body.version).toBe(secondUpdated.body.version);
+  });
+
+  it("schützt die Bulk-Tag-Ergänzung und rollt Versionskonflikte vollständig zurück", async () => {
+    const admin = await loginAdmin();
     const reader = await loginReader();
+    const tag = await admin.post("/api/tags").send({ name: "Bulk Geschützt", domain: "dms" }).expect(201);
+    const first = await uploadDocument(admin, "bulk-conflict-a.txt");
+    const second = await uploadDocument(admin, "bulk-conflict-b.txt");
+    const body = {
+      attachments: [
+        { id: first.id, expectedVersion: first.version + 1 },
+        { id: second.id, expectedVersion: second.version },
+      ],
+      tagIds: [tag.body.id],
+    };
+
+    await supertest(app.server).post("/api/documents/bulk/tags").send(body).expect(401);
+    await reader.post("/api/documents/bulk/tags").send(body).expect(403);
+    const conflict = await admin.post("/api/documents/bulk/tags").send(body).expect(409);
+    expect(conflict.body).toMatchObject({ error: "CONFLICT", statusCode: 409 });
+
+    for (const document of [first, second]) {
+      expect((await admin.get(`/api/documents/${document.id}`).expect(200)).body).toMatchObject({
+        tags: [],
+        version: document.version,
+      });
+    }
+
+    await testDb.pool.execute("UPDATE tags SET is_system = 1 WHERE id = ?", [tag.body.id]);
+    await admin
+      .post("/api/documents/bulk/tags")
+      .send({ attachments: [{ id: first.id, expectedVersion: first.version }], tagIds: [tag.body.id] })
+      .expect(400);
+  });
+
+  it("speichert Owner-Uploads immer exklusiv und importiert DMS-Dokumente nur über /documents", async () => {
+    const admin = await loginAdmin();
+    const project = await admin.post("/api/projects").send({ name: "Upload-Sichtbarkeit", status: "active", color: "#6366f1" }).expect(201);
+
+    const parentAttachment = await admin
+      .post(`/api/projects/${project.body.id}/attachments`)
+      .attach("file", Buffer.from("exklusiver Anhang"), { filename: "nur-anhang.txt", contentType: "text/plain" })
+      .expect(201);
+    expect(parentAttachment.body).toMatchObject({ kind: "parent_attachment", isInDocumentLibrary: false });
+    expect(parentAttachment.body.contentHash).toMatch(/^[a-f0-9]{64}$/);
+
+    const ownerAttachments = await admin.get(`/api/projects/${project.body.id}/attachments`).expect(200);
+    expect((ownerAttachments.body as Array<{ id: number }>).map((item) => item.id)).toContain(parentAttachment.body.id);
+    const libraryAfterParentUpload = await admin.get("/api/documents").expect(200);
+    expect((libraryAfterParentUpload.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(parentAttachment.body.id);
+    await admin.get(`/api/documents/${parentAttachment.body.id}`).expect(404);
+
+    const legacyQueryUpload = await admin
+      .post(`/api/projects/${project.body.id}/attachments?libraryVisibility=document-library`)
+      .attach("file", Buffer.from("bleibt Parent"), { filename: "legacy-query.txt", contentType: "text/plain" })
+      .expect(201);
+    expect(legacyQueryUpload.body).toMatchObject({ kind: "parent_attachment", isInDocumentLibrary: false });
+    expect((await admin.get("/api/documents").expect(200)).body).not.toContainEqual(expect.objectContaining({ id: legacyQueryUpload.body.id }));
+
+    const direct = await uploadDocument(admin, "direkt.txt");
+    const directDetail = await admin.get(`/api/documents/${direct.id}`).expect(200);
+    expect(directDetail.body).toMatchObject({ kind: "document", isInDocumentLibrary: true, url: `/api/documents/${direct.id}/content` });
+    await admin.delete(`/api/documents/${direct.id}/library?expectedVersion=${directDetail.body.version}`).expect(404);
+    await admin.get(`/api/documents/${direct.id}`).expect(200);
+  });
+
+  it("trennt DMS-Link-Lösen und endgültiges Dokumentlöschen versionsgesichert", async () => {
+    const admin = await loginAdmin();
+    const reader = await loginReader();
+    const project = await admin.post("/api/projects").send({ name: "Link Owner", status: "active", color: "#6366f1" }).expect(201);
+    const document = await uploadDocument(admin, "verknuepft.txt", undefined, "DMS bleibt erhalten");
+    const linked = await admin
+      .post(`/api/projects/${project.body.id}/document-links`)
+      .send({ documentId: document.id })
+      .expect(201);
 
     await reader
-      .post(`/api/documents?category=${category.body.id}`)
-      .attach("file", Buffer.from("Inhalt"), { filename: "verboten.txt", contentType: "text/plain" })
+      .delete(`/api/projects/${project.body.id}/document-links/${linked.body.id}?expectedVersion=${linked.body.version}`)
       .expect(403);
-  });
+    await admin
+      .delete(`/api/projects/${project.body.id}/document-links/${linked.body.id}?expectedVersion=${linked.body.version + 1}`)
+      .expect(409);
+    await admin
+      .delete(`/api/projects/${project.body.id}/document-links/${linked.body.id}?expectedVersion=${linked.body.version}`)
+      .expect(204);
+    await admin.get(`/api/projects/${project.body.id}/document-links`).expect(200, []);
+    const surviving = await admin.get(`/api/documents/${document.id}`).expect(200);
+    expect(surviving.body).toMatchObject({ id: document.id, kind: "document", version: document.version });
+    await admin.get(`/api/documents/${document.id}/content`).expect(200, "DMS bleibt erhalten");
+    await fs.access(path.join(uploadDir, document.filename));
 
-  // --- Kachel-Vorschaubild (Thumbnail) ---
-
-  // Der Cache-Treffer wird vorab hergestellt. So pruefen diese Tests Routing, Berechtigung, Header und
-  // Auslieferung real, ohne einen LibreOffice-Prozess zu starten. Die Rasterung selbst ist nicht
-  // portabel testbar (LibreOffice ist nicht auf jeder Maschine vorhanden) und wurde manuell verifiziert.
-  const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
-
-  async function seedThumbnail(admin: ReturnType<typeof supertest.agent>, documentId: number) {
-    const detail = await admin.get(`/api/documents/${documentId}`).expect(200);
-    const cachedName = thumbnailFilename({ id: documentId, filename: detail.body.filename });
-    await fs.mkdir(config.previewCacheDir, { recursive: true });
-    await fs.writeFile(path.join(config.previewCacheDir, cachedName), pngBytes);
-  }
-
-  it("Thumbnail: liefert das gecachte PNG mit Bild-Header aus", async () => {
-    const admin = await loginAdmin();
-    const created = await uploadDocument(admin, "vorschau.pdf");
-    await seedThumbnail(admin, created.id);
-
-    const res = await admin.get(`/api/documents/${created.id}/thumbnail`).responseType("blob").expect(200);
-    expect(res.headers["content-type"]).toContain("image/png");
-    expect(res.headers["cache-control"]).toContain("private");
-    expect(Buffer.from(res.body as Buffer)).toEqual(pngBytes);
-  });
-
-  it("Thumbnail: ein Leser darf es sehen (read), ohne Session nicht (401)", async () => {
-    const admin = await loginAdmin();
-    const created = await uploadDocument(admin, "vorschau.pdf");
-    await seedThumbnail(admin, created.id);
-
-    await supertest(app.server).get(`/api/documents/${created.id}/thumbnail`).expect(401);
-
-    const reader = await loginReader();
-    await reader.get(`/api/documents/${created.id}/thumbnail`).expect(200);
-  });
-
-  it("Thumbnail: 404 fuer Dateitypen ohne Vorschaubild und fuer unbekannte Dokumente", async () => {
-    const admin = await loginAdmin();
-    // Gegenbeispiel: Eine Textdatei hat kein Seitenlayout — die Route antwortet sofort, ohne Konvertierung.
-    const text = await uploadDocument(admin, "notiz.txt");
-
-    const missing = await admin.get(`/api/documents/${text.id}/thumbnail`).expect(404);
-    expect(missing.body).toMatchObject({ error: "NOT_FOUND", statusCode: 404 });
-
-    await admin.get("/api/documents/999999/thumbnail").expect(404);
+    await reader
+      .delete(`/api/documents/${document.id}?expectedVersion=${surviving.body.version}`)
+      .expect(403);
+    await admin
+      .delete(`/api/documents/${document.id}?expectedVersion=${surviving.body.version + 1}`)
+      .expect(409);
+    await admin
+      .delete(`/api/documents/${document.id}?expectedVersion=${surviving.body.version}`)
+      .expect(204);
+    await expect(fs.access(path.join(uploadDir, document.filename))).rejects.toThrow();
   });
 
   // --- System-Label-Schutz ---
@@ -451,50 +677,45 @@ describe("DMS API", () => {
     await testDb.pool.execute("UPDATE tags SET is_system = 1 WHERE id = ?", [tag.body.id]);
     const doc = await uploadDocument(admin, "label.txt");
 
-    await admin.put(`/api/documents/${doc.id}/tags`).send({ tagIds: [tag.body.id] }).expect(400);
+    await admin.put(`/api/documents/${doc.id}/tags`).send({ tagIds: [tag.body.id], expectedVersion: doc.version }).expect(400);
   });
 
-  // --- Orphan-Verhalten (Kernnachweis der Verhaltensaenderung) ---
+  // --- Parent-Link-Lebenszyklus ---
 
-  it("behaelt Anhaenge beim Loeschen des Fachobjekts und fuehrt sie als Nicht einsortiert", async () => {
+  it("behält ein DMS-Dokument beim Löschen des verknüpften Fachobjekts als Nicht einsortiert", async () => {
     const admin = await loginAdmin();
     const project = await admin.post("/api/projects").send({ name: "DMS-Projekt", status: "active", color: "#6366f1" }).expect(201);
-    const upload = await admin
-      .post(`/api/projects/${project.body.id}/attachments`)
-      .attach("file", Buffer.from("bleibt erhalten"), { filename: "anhang.txt", contentType: "text/plain" })
-      .expect(201);
+    const upload = await uploadDocument(admin, "dms-link.txt", undefined, "bleibt erhalten");
+    await admin.post(`/api/projects/${project.body.id}/document-links`).send({ documentId: upload.id }).expect(201);
 
-    // Projekt loeschen
     await admin.delete(`/api/projects/${project.body.id}`).expect(204);
 
-    // Anhang existiert weiterhin (frueher waere er hier geloescht worden)
-    const stillThere = await admin.get(`/api/documents/${upload.body.id}`).expect(200);
-    expect(stillThere.body.id).toBe(upload.body.id);
+    const stillThere = await admin.get(`/api/documents/${upload.id}`).expect(200);
+    expect(stillThere.body.id).toBe(upload.id);
     expect(stillThere.body.owners).toEqual([]);
 
-    // und er erscheint als Nicht einsortiert
     const unsorted = await admin.get("/api/documents?folder=unsorted").expect(200);
-    expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(upload.body.id);
+    expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(upload.id);
   });
 
-  it("loescht ein Dokument trotz verwaistem Owner-Link (kein 404)", async () => {
-    // Reproduziert den Produktionsfehler: Wird das Fachobjekt eines Owner-Links geloescht, ohne
-    // dass die Junction-Zeile mitentfernt wird (in der Prod-DB mangels FK-Cascade beobachtet),
-    // darf das Loeschen des Dokuments NICHT mit 404 abbrechen. Der verwaiste Link wird technisch
-    // injiziert (FK-Checks kurz aus), da die Test-DB die Cascade korrekt anwendet.
+  it("löscht ein Dokument trotz technisch verwaistem Parent-Dokumentlink", async () => {
     const admin = await loginAdmin();
     const doc = await uploadDocument(admin, "verwaist.txt");
 
     const conn = await testDb.pool.getConnection();
     try {
       await conn.query("SET FOREIGN_KEY_CHECKS=0");
-      await conn.execute("INSERT INTO wiki_page_attachments (wiki_page_id, attachment_id) VALUES (?, ?)", [999999, doc.id]);
-      await conn.query("SET FOREIGN_KEY_CHECKS=1");
+      const now = new Date().toISOString();
+      await conn.execute(
+        "INSERT INTO project_document_links (owner_id, document_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+        [999999, doc.id, now, now]
+      );
     } finally {
+      await conn.query("SET FOREIGN_KEY_CHECKS=1");
       conn.release();
     }
 
-    await admin.delete(`/api/documents/${doc.id}`).expect(204);
+    await admin.delete(`/api/documents/${doc.id}?expectedVersion=${doc.version}`).expect(204);
     await admin.get(`/api/documents/${doc.id}`).expect(404);
   });
 });

@@ -16,11 +16,12 @@
  * - Ein eindeutiges Verzeichnis unter os.tmpdir() je Test, vollständige Bereinigung in afterEach.
  *
  * Abgedeckte Regeln:
- * - Maximal 100 reguläre Dateien bis 25 MB, Unicode-/Leerzeichenpfade, gemeinsame Zuordnungen,
- *   DMS-Optionen, Tag-Erstellung, sequenzielle Verarbeitung, Kopieren und sicheres Verschieben.
+ * - Maximal 100 reguläre Dateien bis 25 MB, Unicode-/Leerzeichenpfade, höchstens eine Sammlung,
+ *   DMS-Tags, vollständiger Rückgabevertrag, sequenzielle Verarbeitung, Kopieren und sicheres Verschieben.
  *
  * Fehlerfälle:
- * - Doppelte Pfade, zu große Datei, HTTP-Konflikt, Netzwerkfehler und lokale Löschfehler.
+ * - Doppelte Pfade, zu große Datei, alte Kategorie-/Mehrfachsammlungsangaben, HTTP-Konflikt,
+ *   Netzwerkfehler und lokale Löschfehler.
  *
  * Ziel:
  * - Nachweisen, dass Quelldateien ausschließlich nach erfolgreichem 201-Import gelöscht werden.
@@ -66,6 +67,27 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
+function importedDocument(id: number, folderId: number | null = null) {
+  return {
+    id,
+    originalName: `document-${id}.txt`,
+    filename: `${id}.txt`,
+    mimetype: "text/plain",
+    size: 7,
+    url: `/api/documents/${id}/content`,
+    displayName: null,
+    description: null,
+    contentHash: "a".repeat(64),
+    isInDocumentLibrary: true,
+    tags: [{ id: 9, name: "DMS", color: "#fff", isSystem: false, domain: "dms", version: 1 }],
+    folders: folderId === null ? [] : [{ id: folderId, parentId: null, projectId: null, name: "Rechnungen", version: 1 }],
+    owners: [],
+    version: 1,
+    createdAt: "2026-07-19T00:00:00.000Z",
+    updatedAt: "2026-07-19T00:00:00.000Z"
+  };
+}
+
 describe("windows document importer", () => {
   it("lädt sortierte DMS-Optionen und bildet vollständige Sammlungspfade", async () => {
     const fetchMock = vi.fn<typeof fetch>()
@@ -73,7 +95,6 @@ describe("windows document importer", () => {
         { id: 2, parentId: 1, projectId: null, name: "2026", version: 1 },
         { id: 1, parentId: null, projectId: null, name: "Rechnungen", version: 1 }
       ]))
-      .mockResolvedValueOnce(jsonResponse([{ id: 3, name: "Wichtig", color: null, version: 1 }]))
       .mockResolvedValueOnce(jsonResponse([
         { id: 5, name: "DMS", color: "#fff", isSystem: false, domain: "dms", version: 1 },
         { id: 7, name: "System", color: "#f00", isSystem: true, domain: "dms", version: 1 },
@@ -83,9 +104,8 @@ describe("windows document importer", () => {
     const options = await loadImportOptions(config, dependencies(fetchMock));
 
     expect(options.folders.map((folder) => folder.label)).toEqual(["Rechnungen", "Rechnungen / 2026"]);
-    expect(options.categories.map((category) => category.name)).toEqual(["Wichtig"]);
     expect(options.tags.map((tag) => tag.name)).toEqual(["DMS"]);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ headers: { "x-api-key": "test-key" } });
   });
 
@@ -125,7 +145,14 @@ describe("windows document importer", () => {
     await expect(validateImportRequest({ mode: "copy", filePaths: [filePath] })).rejects.toThrow("25 MB");
   });
 
-  it("kopiert sequenziell mit gemeinsamer Sammlung, Kategorie und Tags", async () => {
+  it("lehnt Kategorie- und Mehrfachsammlungsfelder mit Migrationshinweis ab", async () => {
+    const filePath = await tempFile("legacy.txt");
+
+    await expect(validateImportRequest({ mode: "copy", filePaths: [filePath], categoryIds: [8] } as never)).rejects.toThrow("Kategorien werden seit MS-80 nicht mehr unterstützt");
+    await expect(validateImportRequest({ mode: "copy", filePaths: [filePath], folderIds: [7, 11] } as never)).rejects.toThrow("Mehrfachsammlungen werden seit MS-80 nicht mehr unterstützt");
+  });
+
+  it("kopiert sequenziell mit genau einer gemeinsamen Sammlung und Tags", async () => {
     const first = await tempFile("eins.txt", "eins");
     const second = await tempFile("zwei.txt", "zwei");
     let activeRequests = 0;
@@ -138,7 +165,7 @@ describe("windows document importer", () => {
       maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
       await new Promise((resolve) => setTimeout(resolve, 5));
       activeRequests -= 1;
-      return jsonResponse({ id: urls.length }, 201);
+      return jsonResponse(importedDocument(urls.length, 7), 201);
     });
 
     const importerDependencies = dependencies(fetchMock);
@@ -147,16 +174,17 @@ describe("windows document importer", () => {
     };
     const summary = await importBatch(
       config,
-      { mode: "copy", filePaths: [first, second], folderIds: [7, 11, 7], categoryIds: [8, 12, 8], tagIds: [9, 10, 9] },
+      { mode: "copy", filePaths: [first, second], folderId: 7, tagIds: [9, 10, 9] },
       importerDependencies
     );
 
     expect(summary.results.map((result) => result.status)).toEqual(["copied", "copied"]);
     expect(maxActiveRequests).toBe(1);
     expect(urls).toHaveLength(2);
-    expect(urls[0]).toContain("folders=7%2C11");
-    expect(urls[0]).toContain("categories=8%2C12");
+    expect(urls[0]).toContain("folder=7");
+    expect(urls[0]).not.toContain("categor");
     expect(urls[0]).toContain("tags=9%2C10");
+    expect(summary.results[0]?.document).toMatchObject({ isInDocumentLibrary: true, version: 1, folders: [{ id: 7 }], tags: [{ id: 9 }] });
     expect(progress[0]).toMatchObject({ phase: "ready", completed: 0, total: 2 });
     expect(progress).toContainEqual(expect.objectContaining({ phase: "uploading", completed: 0, currentFilePath: first }));
     expect(progress).toContainEqual(expect.objectContaining({ phase: "uploading", completed: 1, currentFilePath: second }));
@@ -170,7 +198,7 @@ describe("windows document importer", () => {
     const success = await tempFile("erfolg.txt");
     const conflict = await tempFile("dublette.txt");
     const fetchMock = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({ id: 42 }, 201))
+      .mockResolvedValueOnce(jsonResponse(importedDocument(42), 201))
       .mockResolvedValueOnce(jsonResponse({ error: "CONFLICT", message: "Bereits vorhanden", statusCode: 409 }, 409));
 
     const summary = await importBatch(config, { mode: "move", filePaths: [success, conflict] }, dependencies(fetchMock));
@@ -185,7 +213,7 @@ describe("windows document importer", () => {
 
   it("meldet einen Löschfehler als importiert, aber nicht verschoben", async () => {
     const filePath = await tempFile("gesperrt.txt");
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ id: 23 }, 201));
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(importedDocument(23), 201));
     const removeFile = vi.fn<ImporterDependencies["removeFile"]>().mockRejectedValue(new Error("Datei wird verwendet"));
 
     const summary = await importBatch(config, { mode: "move", filePaths: [filePath] }, dependencies(fetchMock, removeFile));

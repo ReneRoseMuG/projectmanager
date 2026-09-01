@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Test Scope:
  *
  * Abgedeckte Regeln:

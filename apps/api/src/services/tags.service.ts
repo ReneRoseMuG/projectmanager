@@ -2,7 +2,7 @@ import type { JsonValue, Tag, TagDomain } from "@taskmanager/shared-types";
 import { inArray, eq, sql } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { firstRow } from "../db/query-utils.js";
-import { milestoneTags, milestones, projectTags, projects, tags, taskTags, tasks, ticketTags, tickets } from "../db/schema.js";
+import { attachmentTags, milestoneTags, milestones, projectTags, projects, tags, taskTags, tasks, ticketTags, tickets } from "../db/schema.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { tagRepository, type TagRecord, type TagUpdateData } from "../repositories/tag.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
@@ -144,7 +144,8 @@ export async function listTags(database: DbClient, domain?: TagDomain): Promise<
       projectCount: sql<number>`(SELECT COUNT(*) FROM ${projectTags} WHERE ${projectTags.tagId} = ${tags.id})`,
       milestoneCount: sql<number>`(SELECT COUNT(*) FROM ${milestoneTags} WHERE ${milestoneTags.tagId} = ${tags.id})`,
       taskCount: sql<number>`(SELECT COUNT(*) FROM ${taskTags} WHERE ${taskTags.tagId} = ${tags.id})`,
-      ticketCount: sql<number>`(SELECT COUNT(*) FROM ${ticketTags} WHERE ${ticketTags.tagId} = ${tags.id})`
+      ticketCount: sql<number>`(SELECT COUNT(*) FROM ${ticketTags} WHERE ${ticketTags.tagId} = ${tags.id})`,
+      documentCount: sql<number>`(SELECT COUNT(*) FROM ${attachmentTags} WHERE ${attachmentTags.tagId} = ${tags.id})`
     })
     .from(tags);
   const rows = await (domain ? base.where(eq(tags.domain, domain)) : base);
@@ -160,7 +161,8 @@ export async function listTags(database: DbClient, domain?: TagDomain): Promise<
       projects: Number(row.projectCount),
       milestones: Number(row.milestoneCount),
       tasks: Number(row.taskCount),
-      tickets: Number(row.ticketCount)
+      tickets: Number(row.ticketCount),
+      documents: Number(row.documentCount)
     }
   }));
 }
@@ -351,13 +353,14 @@ export async function getTicketTagsMap(database: DbClient, ticketIds: number[]):
 
 export async function createTag(database: DbClient, input: { name?: string; color?: string; domain?: TagDomain }, actor?: JournalActor | null): Promise<Tag> {
   const name = requireNonEmpty(input.name, "name");
-  const existing = await tagRepository.findByName(database, name);
+  const domain = input.domain ?? "pm";
+  const existing = await tagRepository.findByName(database, name, domain);
   if (existing) {
-    throw conflict(`Tag "${name}" already exists`);
+    throw conflict(`Tag "${name}" already exists in domain "${domain}"`);
   }
 
   const created = await database.transaction(async (tx) => {
-    const tag = await tagRepository.create(tx, { name, color: input.color ?? "#94a3b8", domain: input.domain ?? "pm" }, actor?.actorUserId ?? undefined);
+    const tag = await tagRepository.create(tx, { name, color: input.color ?? "#94a3b8", domain }, actor?.actorUserId ?? undefined);
     const journalObject = tagJournalObject(tag);
     await recordJournalEntry(tx, {
       operation: "create",
@@ -388,6 +391,12 @@ export async function updateTag(database: DbClient, id: number, input: { name?: 
     const current = await tagRepository.findById(tx, id);
     if (!current) {
       throw notFound(`Tag with id ${id} not found`);
+    }
+    if (values.name !== undefined && values.name !== current.name) {
+      const duplicate = await tagRepository.findByName(tx, values.name, current.domain);
+      if (duplicate && duplicate.id !== id) {
+        throw conflict(`Tag "${values.name}" already exists in domain "${current.domain}"`);
+      }
     }
     const tag = await tagRepository.update(tx, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
     if (!tag) {

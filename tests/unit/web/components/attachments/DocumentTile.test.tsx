@@ -4,10 +4,10 @@
  *
  * Abgedeckte Regeln:
  * - Bilder zeigen das Asset direkt, Typen ohne Seitenlayout ein Typ-Icon mit Badge.
- * - PDF, Office und ODF fordern zusätzlich ein serverseitig gerendertes Vorschaubild an; das
+ * - PDF, Office, ODF und ausschließlich `.af` fordern ein serverseitiges Vorschaubild an; das
  *   Typ-Icon bleibt darunter liegen und ist damit Platzhalter wie Rückfall.
  * - Die Auswahl-Checkbox togglet die Mehrfachauswahl.
- * - Einfachklick auf die Kachel togglet die Auswahl, Doppelklick öffnet die Datei.
+ * - Einfach- und Doppelklick auf die Kachel öffnen die Datei, ohne die Mehrfachauswahl zu verändern.
  * - Der Löschen-Button löscht, ohne zu öffnen oder auszuwählen (stopPropagation).
  *
  * Fehlerfälle:
@@ -48,8 +48,10 @@ function doc(overrides: Partial<Attachment> = {}): Attachment {
     mimetype: "application/pdf",
     size: 2048,
     url: "/uploads/stored-1.pdf",
-    categories: [],
+    contentHash: null,
+    isInDocumentLibrary: true,
     tags: [],
+    folder: null,
     folders: [],
     createdAt: "2026-07-07T08:00:00.000Z",
     updatedAt: "2026-07-07T08:00:00.000Z",
@@ -61,6 +63,7 @@ function doc(overrides: Partial<Attachment> = {}): Attachment {
 function renderTile(props: Partial<ComponentProps<typeof DocumentTile>> = {}) {
   const merged: ComponentProps<typeof DocumentTile> = {
     document: doc(),
+    isActive: false,
     isSelected: false,
     onToggleSelect: vi.fn(),
     onOpen: vi.fn(),
@@ -132,12 +135,30 @@ describe("DocumentTile", () => {
     const props = renderTile();
     fireEvent.click(screen.getByRole("checkbox"));
     expect(props.onToggleSelect).toHaveBeenCalledTimes(1);
+    expect(props.onOpen).not.toHaveBeenCalled();
   });
 
-  it("togglet die Auswahl bei Einfachklick auf die Kachel", () => {
+  it("fordert für .af ein Vorschaubild an und fällt bei Fehler auf das AF-Icon zurück", () => {
+    renderTile({
+      document: doc({
+        id: 12,
+        originalName: "entwurf.af",
+        mimetype: "application/octet-stream",
+      }),
+    });
+
+    const preview = screen.getByRole("img", { name: "Vorschau von entwurf" });
+    expect(preview).toHaveAttribute("src", "http://api.test/api/documents/12/thumbnail");
+    fireEvent.error(preview);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("AF")).toBeInTheDocument();
+  });
+
+  it("öffnet bei Einfachklick die Details ohne die Mehrfachauswahl zu ändern", () => {
     const props = renderTile();
     fireEvent.click(screen.getByText("Rechnung"));
-    expect(props.onToggleSelect).toHaveBeenCalledTimes(1);
+    expect(props.onOpen).toHaveBeenCalledTimes(1);
+    expect(props.onToggleSelect).not.toHaveBeenCalled();
   });
 
   it("öffnet die Datei bei Doppelklick", () => {
@@ -165,6 +186,19 @@ describe("DocumentTile", () => {
   it("bietet ohne Löschrecht keinen Löschen-Button", () => {
     renderTile({ canDelete: false });
     expect(screen.queryByRole("button", { name: "Endgültig löschen" })).not.toBeInTheDocument();
+  });
+
+  it("zeigt MS-80-Tags und trennt Bibliotheksentfernung vom endgültigen Löschen", () => {
+    const onRemoveFromLibrary = vi.fn();
+    renderTile({
+      canRemoveFromLibrary: true,
+      onRemoveFromLibrary,
+      pills: <span>Wichtig</span>,
+    });
+
+    expect(screen.getByText("Wichtig")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Aus der Dokumentenbibliothek entfernen" }));
+    expect(onRemoveFromLibrary).toHaveBeenCalledTimes(1);
   });
 });
 

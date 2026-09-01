@@ -2,7 +2,7 @@
 import type { CommentInput, NoteInput, TicketInput, TicketPositionInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
 import type { TicketMoveInput } from "@taskmanager/shared-types";
 import { TICKET_RELATION_TYPES, TICKET_RESOLUTIONS } from "../db/schema.js";
-import { createTicketAttachment, deleteAttachment, listTicketAttachments } from "../services/attachments.service.js";
+import { createTicketAttachment, deleteParentAttachment, listTicketAttachments } from "../services/attachments.service.js";
 import { createEntityComment, deleteEntityComment, listEntityComments } from "../services/comments.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { createTicketNote, deleteTicketNote, listTicketNotes } from "../services/notes.service.js";
@@ -209,6 +209,15 @@ const uploadBodySchema = {
     properties: {
       file: { $ref: "#multipartFile" }
     }
+  }
+} as const;
+
+const attachmentLifecycleQuerySchema = {
+  type: "object",
+  required: ["expectedVersion"],
+  additionalProperties: false,
+  properties: {
+    expectedVersion: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -507,11 +516,23 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     }
   );
 
-  app.delete<{ Params: { id: number; childId: number } }>(
+  app.delete<{
+    Params: { id: number; childId: number };
+    Querystring: { expectedVersion: number };
+  }>(
     "/tickets/:id/attachments/:childId",
-    { schema: { params: idAndChildIdParamSchema, response: { 204: { type: "null" } } } },
+    {
+      config: { auth: { resource: "attachments", action: "delete" } },
+      schema: { params: idAndChildIdParamSchema, querystring: attachmentLifecycleQuerySchema, response: { 204: { type: "null" } } }
+    },
     async (request, reply) => {
-      await deleteAttachment(app.db, request.params.childId, createJournalActor(request.currentUser));
+      await deleteParentAttachment(
+        app.db,
+        { type: "ticket", id: request.params.id },
+        request.params.childId,
+        request.query,
+        createJournalActor(request.currentUser)
+      );
       return reply.status(204).send();
     }
   );

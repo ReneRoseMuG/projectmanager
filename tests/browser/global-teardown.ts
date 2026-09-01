@@ -22,19 +22,21 @@ function dbConfig() {
  *
  * Each worker drops its own database and storage in the fixture's finally block.
  * This sweep only removes leftovers from a previously crashed run: any database
- * matching taskmanager_e2e_w<n> and the per-worker storage roots under
+ * matching taskmanager_test_e2e_w<n> and the per-worker storage roots under
  * tests/.runtime/e2e/w<n>.
  */
 export default async function globalTeardown(): Promise<void> {
   const conn = await mysql.createConnection(dbConfig());
   try {
-    const [rows] = await conn.query("SHOW DATABASES LIKE ?", ["taskmanager\\_e2e\\_w%"]);
-    for (const row of rows as Array<Record<string, string>>) {
-      const dbName = Object.values(row)[0];
-      // Defense in depth: only ever drop databases that match the worker pattern.
-      if (dbName && /^taskmanager_e2e_w\d+$/.test(dbName)) {
-        await conn.query(`DROP DATABASE IF EXISTS \`${dbName}\``);
-        console.log(`[e2e] Swept leftover database ${dbName}`);
+    for (const pattern of ["taskmanager\\_test\\_e2e\\_w%", "taskmanager\\_e2e\\_w%"]) {
+      const [rows] = await conn.query("SHOW DATABASES LIKE ?", [pattern]);
+      for (const row of rows as Array<Record<string, string>>) {
+        const dbName = Object.values(row)[0];
+        // Defense in depth: only ever drop databases that match the worker pattern.
+        if (dbName && /^taskmanager_(?:test_e2e|e2e)_w\d+$/.test(dbName)) {
+          await conn.query(`DROP DATABASE IF EXISTS \`${dbName}\``);
+          console.log(`[e2e] Swept leftover database ${dbName}`);
+        }
       }
     }
   } finally {

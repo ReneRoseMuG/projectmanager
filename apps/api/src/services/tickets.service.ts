@@ -21,7 +21,7 @@ import { featureTickets, features, milestoneTickets, milestones, projectTickets,
 import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { ticketRepository, type TicketListFilter, type TicketRecord } from "../repositories/ticket.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
-import { listTicketAttachments } from "./attachments.service.js";
+import { deleteParentAttachmentsForOwners, listTicketAttachments } from "./attachments.service.js";
 import { ensureCatalogEntryExists, isCatalogEntryClosed, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { deleteTicketCommentsForIds, listEntityComments } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
@@ -1216,6 +1216,10 @@ export async function deleteTicket(database: DbClient, id: number, actor?: Journ
 
   const ticketIds = await collectTicketSubtreeIds(database, id);
 
+  await deleteParentAttachmentsForOwners(
+    database,
+    ticketIds.map((ticketId) => ({ type: "ticket" as const, id: ticketId }))
+  );
   await deleteTicketNotesForIds(database, ticketIds);
   await deleteTicketCommentsForIds(database, ticketIds);
 

@@ -851,38 +851,8 @@ export function TaskForm({
           <Section>
             {task ? (
               <div className="grid gap-4">
-                <AttachmentUploader size="sm" onUpload={uploadAttachment} />
-                <AttachmentList
-                  attachments={attachments.attachments}
-                  onDelete={(attachment) => {
-                    void confirm({
-                      title: "Datei löschen?",
-                      body: attachment.originalName,
-                      severity: "danger",
-                      confirmLabel: "Löschen",
-                    }).then((approved) => {
-                      if (approved) {
-                        void attachments
-                          .removeAttachment(attachment.id)
-                          .then(() =>
-                            showToast({
-                              tone: "success",
-                              title: "Datei gelöscht",
-                            }),
-                          )
-                          .catch((attachmentError: unknown) =>
-                            showToast({
-                              tone: "error",
-                              title: "Datei konnte nicht gelöscht werden",
-                              message: errorMessage(attachmentError),
-                            }),
-                          );
-                      }
-                    });
-                  }}
-                  onOpen={(attachment) => attachments.openAttachment(attachment.id)}
-                  openingAttachmentId={attachments.openingAttachmentId}
-                />
+                <AttachmentUploader visibilityMode="owner" size="sm" onUpload={uploadAttachment} />
+                <AttachmentList manager={attachments} />
               </div>
             ) : (
               <PendingFileList

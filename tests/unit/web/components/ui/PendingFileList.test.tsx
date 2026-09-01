@@ -2,9 +2,23 @@
 
 /**
  * Test Scope:
+ *
+ * Test-Ebene:
+ * - Unit/Komponente
+ *
+ * Realitätsgrad:
+ * - Reales Rendering, echte File-Objekte und Eingabeereignisse; keine API.
+ *
+ * Mock-Entscheidung:
+ * - Nur URL.createObjectURL wird als Browser-Ressource kontrolliert.
+ *
+ * Isolation:
+ * - JSDOM mit Cleanup nach jedem Test.
+ *
  * Abgedeckte Regeln:
  * - EmptyState wenn keine Dateien pending.
  * - Footer-Hinweis „Dateien werden nach dem Speichern hochgeladen." immer sichtbar.
+ * - Vorgemerkte Dateien sind immer exklusive Parent-Anhänge; eine DMS-Auswahl existiert nicht.
  * - Datei auswählen (≤ 25 MB) → onAdd() mit korrekten DraftFiles aufgerufen.
  * - Datei > 25 MB → onAdd() nicht aufgerufen, Fehlermeldung sichtbar.
  * - Dateiname und formatierte Dateigröße sichtbar.
@@ -63,7 +77,9 @@ describe("PendingFileList", () => {
 
     fireEvent.change(getFileInput(container), { target: { files: [imageFile] } });
 
-    expect(onAdd).toHaveBeenCalledWith([{ file: imageFile, previewUrl: "blob:test-preview" }]);
+    expect(onAdd).toHaveBeenCalledWith([
+      { file: imageFile, previewUrl: "blob:test-preview" }
+    ]);
   });
 
   it("lehnt Dateien größer als 25 MB ab und zeigt eine Fehlermeldung", () => {
@@ -91,9 +107,26 @@ describe("PendingFileList", () => {
     const firstFile = new File(["a"], "erstes.txt", { type: "text/plain" });
     const secondFile = new File(["b"], "zweites.txt", { type: "text/plain" });
 
-    render(<PendingFileList files={[{ file: firstFile }, { file: secondFile }]} onAdd={vi.fn()} onRemove={onRemove} />);
+    render(
+      <PendingFileList
+        files={[
+          { file: firstFile },
+          { file: secondFile }
+        ]}
+        onAdd={vi.fn()}
+        onRemove={onRemove}
+      />
+    );
     fireEvent.click(screen.getByRole("button", { name: "zweites.txt entfernen" }));
 
     expect(onRemove).toHaveBeenCalledWith(1);
+  });
+
+  it("erlaubt die Dateiauswahl ohne DMS-Sichtbarkeitsentscheidung", () => {
+    render(<PendingFileList files={[]} onAdd={vi.fn()} onRemove={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Dateien auswählen" })).toBeEnabled();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getByText(/ausschließlich als Anhänge des neuen Elements/)).toBeInTheDocument();
   });
 });

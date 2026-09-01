@@ -1,4 +1,4 @@
-import type { AttachmentCategory, AttachmentFolder, Tag } from "@taskmanager/shared-types";
+import type { Attachment, AttachmentFolder, Tag } from "@taskmanager/shared-types";
 import { readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -11,15 +11,13 @@ export interface FolderOption extends AttachmentFolder {
 
 export interface ImportOptions {
   folders: FolderOption[];
-  categories: AttachmentCategory[];
   tags: Tag[];
 }
 
 export interface ImportRequest {
   mode: "copy" | "move";
   filePaths: string[];
-  folderIds?: number[];
-  categoryIds?: number[];
+  folderId?: number | null;
   tagIds?: number[];
 }
 
@@ -30,6 +28,7 @@ export interface ImportResult {
   status: ImportResultStatus;
   message: string;
   documentId?: number;
+  document?: Attachment;
 }
 
 export interface ImportSummary {
@@ -106,11 +105,9 @@ export async function loadImportOptions(
   dependencies: ImporterDependencies = defaultDependencies
 ): Promise<ImportOptions> {
   const folders = await apiJson<AttachmentFolder[]>(config, "attachment-folders", dependencies);
-  const categories = await apiJson<AttachmentCategory[]>(config, "attachment-categories", dependencies);
   const tags = await apiJson<Tag[]>(config, "tags?domain=dms", dependencies);
   return {
     folders: buildFolderLabels(folders),
-    categories: [...categories].sort((a, b) => a.name.localeCompare(b.name, "de")),
     tags: tags.filter((tag) => tag.domain === "dms" && !tag.isSystem).sort((a, b) => a.name.localeCompare(b.name, "de"))
   };
 }
@@ -148,8 +145,27 @@ export async function validateImportRequest(
   request: ImportRequest,
   dependencies: Pick<ImporterDependencies, "stat"> = defaultDependencies
 ): Promise<void> {
+  const legacyRequest = request as ImportRequest & {
+    folderIds?: unknown;
+    category?: unknown;
+    categories?: unknown;
+    categoryId?: unknown;
+    categoryIds?: unknown;
+  };
+  if (legacyRequest.category !== undefined || legacyRequest.categories !== undefined || legacyRequest.categoryId !== undefined || legacyRequest.categoryIds !== undefined) {
+    throw new Error("Kategorien werden seit MS-80 nicht mehr unterstützt. Bitte DMS-Tags verwenden.");
+  }
+  if (legacyRequest.folderIds !== undefined) {
+    throw new Error("Mehrfachsammlungen werden seit MS-80 nicht mehr unterstützt. Bitte höchstens eine folderId angeben.");
+  }
   if (request.mode !== "copy" && request.mode !== "move") {
     throw new Error("Der Importmodus muss 'copy' oder 'move' sein.");
+  }
+  if (request.folderId !== undefined && request.folderId !== null && (!Number.isInteger(request.folderId) || request.folderId < 1)) {
+    throw new Error("folderId muss eine positive Sammlungs-ID oder null sein.");
+  }
+  if ((request.tagIds?.length ?? 0) > 20 || request.tagIds?.some((tagId) => !Number.isInteger(tagId) || tagId < 1)) {
+    throw new Error("tagIds darf höchstens 20 positive DMS-Tag-IDs enthalten.");
   }
   const uniquePaths = new Set(request.filePaths.map((filePath) => path.resolve(filePath)));
   if (uniquePaths.size === 0) {
@@ -203,8 +219,7 @@ function contentTypeFor(filePath: string): string {
 
 function buildUploadUrl(config: ImporterConfig, request: ImportRequest): string {
   const url = new URL(apiUrl(config, "documents"));
-  if ((request.folderIds?.length ?? 0) > 0) url.searchParams.set("folders", [...new Set(request.folderIds)].join(","));
-  if ((request.categoryIds?.length ?? 0) > 0) url.searchParams.set("categories", [...new Set(request.categoryIds)].join(","));
+  if (request.folderId !== undefined && request.folderId !== null) url.searchParams.set("folder", String(request.folderId));
   if ((request.tagIds?.length ?? 0) > 0) url.searchParams.set("tags", [...new Set(request.tagIds)].join(","));
   return url.toString();
 }
@@ -236,19 +251,23 @@ async function importFile(
     if (response.status !== 201) {
       return { filePath, status: "failed", message: await responseMessage(response) };
     }
-    const document = await response.json() as { id: number };
+    const document = await response.json() as Attachment;
+    if (!document.isInDocumentLibrary) {
+      return { filePath, status: "failed", message: "Die API hat das importierte Dokument nicht für die Bibliothek freigegeben." };
+    }
     if (request.mode === "copy") {
-      return { filePath, status: "copied", message: "Kopiert", documentId: document.id };
+      return { filePath, status: "copied", message: "Kopiert", documentId: document.id, document };
     }
     try {
       await dependencies.removeFile(filePath);
-      return { filePath, status: "moved", message: "Verschoben", documentId: document.id };
+      return { filePath, status: "moved", message: "Verschoben", documentId: document.id, document };
     } catch (error) {
       return {
         filePath,
         status: "imported_not_moved",
         message: `Importiert, aber Quelldatei konnte nicht gelöscht werden: ${error instanceof Error ? error.message : String(error)}`,
-        documentId: document.id
+        documentId: document.id,
+        document
       };
     }
   } catch (error) {

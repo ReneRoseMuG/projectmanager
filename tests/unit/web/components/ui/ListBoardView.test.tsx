@@ -3,8 +3,21 @@
 /**
  * Test Scope:
  *
+ * Test-Ebene:
+ * - Unit
+ *
+ * Realitätsgrad:
+ * - Echte React-Komponenten in jsdom; keine API-, DB- oder Dateisystemzugriffe.
+ *
+ * Mock-Entscheidung:
+ * - Nur Callback-Spies für beobachtbare UI-Ereignisse, keine gemockten Komponenten.
+ *
+ * Isolation:
+ * - jsdom-DOM und nach jedem Test geleerter localStorage.
+ *
  * Abgedeckte Regeln:
  * - ListBoardView rendert Board- und Listenmodus, Toolbar-Aktionen und Ladezustand.
+ * - Die gemeinsame Steuerzeile bleibt als sticky Kopfbereich im Scrollcontainer sichtbar.
  * - ItemCard und ItemRow geben Öffnen-, Bearbeiten- und Löschen-Events korrekt weiter.
  *
  * Fehlerfälle:
@@ -93,6 +106,21 @@ afterEach(() => {
 });
 
 describe("ListBoardView", () => {
+  it("hält Suche, Filter und Ansichtssteuerung als sticky Steuerzeile sichtbar", () => {
+    renderListBoardView({
+      toolbarFilters: <div>Statusfilter</div>,
+      filters: <div>Projektfilter</div>,
+    });
+
+    const toolbar = screen.getByTestId("list-board-toolbar");
+    expect(toolbar).toHaveClass("sticky", "top-0", "z-20", "bg-white");
+    expect(toolbar).toContainElement(screen.getByPlaceholderText("Suchen"));
+    expect(toolbar).toContainElement(screen.getByText("Statusfilter"));
+    expect(toolbar).toContainElement(screen.getByText("Projektfilter"));
+    expect(toolbar).toContainElement(screen.getByRole("button", { name: "Liste" }));
+    expect(toolbar).toContainElement(screen.getByRole("button", { name: "Kanban" }));
+  });
+
   it("rendert Toolbar-Filter in derselben Zeile wie Suche und Aktionen", () => {
     const { container } = renderListBoardView({
       toolbarFilters: <div data-testid="status-filters">Statusfilter</div>,

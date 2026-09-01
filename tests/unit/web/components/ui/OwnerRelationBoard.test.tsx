@@ -262,7 +262,9 @@ describe("PendingFileList", () => {
 
     fireEvent.change(input, { target: { files: [file] } });
 
-    expect(onAdd).toHaveBeenCalledWith([{ file, previewUrl: "blob:preview" }]);
+    expect(onAdd).toHaveBeenCalledWith([
+      { file, previewUrl: "blob:preview" }
+    ]);
     expect(URL.createObjectURL).toHaveBeenCalledWith(file);
   });
 

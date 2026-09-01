@@ -1,5 +1,6 @@
 ﻿import { eq, inArray } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
+import { and } from "drizzle-orm";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { tags } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
@@ -17,8 +18,11 @@ export const tagRepository = {
     return firstRow(await database.select().from(tags).where(eq(tags.id, id)));
   },
 
-  async findByName(database: DbSession, name: string): Promise<TagRecord | undefined> {
-    return firstRow(await database.select().from(tags).where(eq(tags.name, name)));
+  async findByName(database: DbSession, name: string, domain?: string): Promise<TagRecord | undefined> {
+    const condition = domain === undefined
+      ? eq(tags.name, name)
+      : and(eq(tags.domain, domain), eq(tags.name, name));
+    return firstRow(await database.select().from(tags).where(condition));
   },
 
   async findByIds(database: DbSession, ids: number[]): Promise<TagRecord[]> {

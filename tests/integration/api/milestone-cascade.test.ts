@@ -1,10 +1,26 @@
 /**
- * Test Scope: Milestone-Kaskade
+ * Test Scope:
+ * Milestone- und Projekt-Kaskaden für meilenstein-eigene Supportobjekte.
+ *
+ * Test-Ebene:
+ * - Integration
+ *
+ * Realitätsgrad:
+ * - Echte Fastify-App, echte MySQL-Testdatenbank und echte Upload-Dateien im Temp-Verzeichnis.
+ *
+ * Mock-Entscheidung:
+ * - Keine Mocks.
+ *
+ * Isolation:
+ * - Zufällig benannte MySQL-Testdatenbank und eigener Upload-/Preview-Temp-Root.
  *
  * Abgedeckte Regeln:
- * - Meilenstein-Löschung entfernt eigene Notes und Comments vollständig; Attachments bleiben als DMS-Dokumente erhalten.
+ * - Meilenstein-Löschung entfernt eigene Notes, Comments und exklusive Parent-Anhänge vollständig.
  * - Meilenstein-Löschung bereinigt alle Join-Tabellen: Tasks, Tickets, Features, Tags, Events.
  * - Projekt-Löschung löscht Meilensteine (DB-Kaskade) und deren Support-Objekte transitiv.
+ *
+ * Fehlerfälle:
+ * - Verwaiste Support- und Join-Datensätze sowie zurückbleibende Upload-Dateien nach direkten und transitiven Löschungen.
  *
  * Ziel:
  * Die vollständige Bereinigung aller Meilenstein-Abhängigkeiten absichern.
@@ -58,18 +74,12 @@ async function postCommentForMilestone(app: FastifyInstance, milestoneId: number
   return (res.body as { id: number }).id;
 }
 
-async function insertAttachmentForMilestone(testDb: TestDb, milestoneId: number): Promise<number> {
-  const now = new Date().toISOString();
-  const [result] = await testDb.pool.execute(
-    "INSERT INTO attachments (original_name, filename, mimetype, size, version, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)",
-    ["milestone-test.txt", `ms-${Date.now()}.txt`, "text/plain", 50, now, now]
-  );
-  const attachmentId = (result as { insertId: number }).insertId;
-  await testDb.pool.execute(
-    "INSERT INTO milestone_attachments (milestone_id, attachment_id) VALUES (?, ?)",
-    [milestoneId, attachmentId]
-  );
-  return attachmentId;
+async function uploadAttachmentForMilestone(app: FastifyInstance, milestoneId: number): Promise<{ id: number; filename: string }> {
+  const response = await supertest(app.server)
+    .post(`/api/milestones/${milestoneId}/attachments`)
+    .attach("file", Buffer.from("Milestone-Anhang"), { filename: "milestone-test.txt", contentType: "text/plain" })
+    .expect(201);
+  return { id: response.body.id, filename: response.body.filename };
 }
 
 // ---------------------------------------------------------------------------
@@ -93,11 +103,13 @@ describe("Milestone-Cascade: vollständige Bereinigung aller Meilenstein-Abhäng
     await fs.mkdir(uploadDir, { recursive: true });
     await fs.mkdir(previewCacheDir, { recursive: true });
     testDb = await createTestDb();
-    app = await buildTestApp(testDb);
+    app = await buildTestApp(testDb, { enableMultipart: true });
   });
 
   beforeEach(async () => {
     await truncateAll(testDb.pool);
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.mkdir(uploadDir, { recursive: true });
   });
 
   afterAll(async () => {
@@ -180,10 +192,10 @@ describe("Milestone-Cascade: vollständige Bereinigung aller Meilenstein-Abhäng
   });
 
   describe("deleteMilestone – Attachment-Verknüpfungen werden bereinigt", () => {
-    it("entfernt milestone_attachments-Join und behält Attachment-Datensatz", async () => {
+    it("entfernt milestone_attachments-Join, Attachment-Datensatz und Upload-Datei", async () => {
       const project = await createProject(app);
       const milestone = await createMilestone(app, project.id);
-      const attachmentId = await insertAttachmentForMilestone(testDb, milestone.id);
+      const attachment = await uploadAttachmentForMilestone(app, milestone.id);
 
       await supertest(app.server).delete(`/api/milestones/${milestone.id}`).expect(204);
 
@@ -196,16 +208,17 @@ describe("Milestone-Cascade: vollständige Bereinigung aller Meilenstein-Abhäng
       const remaining = await testDb.db
         .select()
         .from(attachments)
-        .where(eq(attachments.id, attachmentId));
+        .where(eq(attachments.id, attachment.id));
 
-      expect(remaining).toHaveLength(1);
+      expect(remaining).toHaveLength(0);
+      await expect(fs.stat(path.join(uploadDir, attachment.filename))).rejects.toThrow();
     });
 
     it("bereinigt alle milestone_attachments-Join-Einträge", async () => {
       const project = await createProject(app);
       const milestone = await createMilestone(app, project.id);
-      await insertAttachmentForMilestone(testDb, milestone.id);
-      await insertAttachmentForMilestone(testDb, milestone.id);
+      await uploadAttachmentForMilestone(app, milestone.id);
+      await uploadAttachmentForMilestone(app, milestone.id);
 
       await supertest(app.server).delete(`/api/milestones/${milestone.id}`).expect(204);
 
@@ -373,10 +386,10 @@ describe("Milestone-Cascade: vollständige Bereinigung aller Meilenstein-Abhäng
       expect(remaining).toHaveLength(0);
     });
 
-    it("entfernt Meilenstein-Attachment-Joins transitiv beim Löschen des Projekts und behält Attachment-Datensatz", async () => {
+    it("entfernt Meilenstein-Anhänge transitiv samt Upload-Datei beim Löschen des Projekts", async () => {
       const project = await createProject(app);
       const milestone = await createMilestone(app, project.id);
-      const attachmentId = await insertAttachmentForMilestone(testDb, milestone.id);
+      const attachment = await uploadAttachmentForMilestone(app, milestone.id);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
@@ -389,8 +402,9 @@ describe("Milestone-Cascade: vollständige Bereinigung aller Meilenstein-Abhäng
       const remaining = await testDb.db
         .select()
         .from(attachments)
-        .where(eq(attachments.id, attachmentId));
-      expect(remaining).toHaveLength(1);
+        .where(eq(attachments.id, attachment.id));
+      expect(remaining).toHaveLength(0);
+      await expect(fs.stat(path.join(uploadDir, attachment.filename))).rejects.toThrow();
     });
 
     it("Löschen von Projekt A beeinflusst Meilensteine von Projekt B nicht", async () => {

@@ -1,6 +1,6 @@
 /**
  * Test Scope:
- * DMS Bulk-Operationen (MS-75) — Mehrfachauswahl: Sammlung/Kategorie zuweisen + Zip-Download.
+ * DMS Bulk-Operationen (MS-80) — Mehrfachauswahl: Sammlung/Tags zuweisen + Zip-Download.
  *
  * Test-Ebene:
  * - Integration
@@ -16,9 +16,9 @@
  * - Temp-DB pro Lauf (createTestDb), truncateAll in beforeEach, Temp-UPLOAD_DIR unter os.tmpdir().
  *
  * Abgedeckte Regeln:
- * - Bulk-Zuweisung (Sammlung/Kategorie) laeuft unter Ressource attachments (401 ohne Session,
+ * - Bulk-Zuweisung (Sammlung/Tags) läuft unter Ressource documents (401 ohne Session,
  *   403 Reader), Bulk-Download nur lesend (Reader erlaubt).
- * - Mehrere Dokumente werden gebuendelt einer Sammlung bzw. Kategorie zugewiesen (mit Gegenbeispiel).
+ * - Mehrere Dokumente werden gebündelt einer globalen DMS-Sammlung bzw. DMS-Tags zugewiesen (mit Gegenbeispiel).
  * - Doppelte Zuweisung ist idempotent; leere Auswahl ist ungueltig (400); unbekannte Sammlung 404.
  * - Bulk-Download liefert ein echtes Zip (PK-Signatur) mit den Originalnamen der Dokumente.
  *
@@ -86,12 +86,12 @@ describe("DMS Bulk-Operationen API", () => {
 
   async function uploadDocument(admin: ReturnType<typeof supertest.agent>, name: string) {
     const res = await admin.post("/api/documents").attach("file", Buffer.from(`Inhalt ${name}`), { filename: name, contentType: "text/plain" }).expect(201);
-    return res.body as { id: number };
+    return res.body as { id: number; version: number };
   }
 
   it("lehnt Bulk-Endpunkte ohne Session ab (401)", async () => {
-    await supertest(app.server).post("/api/documents/bulk/folders/1").send({ attachmentIds: [1] }).expect(401);
-    await supertest(app.server).post("/api/documents/bulk/categories/1").send({ attachmentIds: [1] }).expect(401);
+    await supertest(app.server).post("/api/documents/bulk/folders/1").send({ attachments: [{ id: 1, expectedVersion: 1 }] }).expect(401);
+    await supertest(app.server).post("/api/documents/bulk/tags").send({ attachments: [{ id: 1, expectedVersion: 1 }], tagIds: [1] }).expect(401);
     await supertest(app.server).post("/api/documents/download").send({ attachmentIds: [1] }).expect(401);
   });
 
@@ -99,11 +99,11 @@ describe("DMS Bulk-Operationen API", () => {
     const admin = await loginAdmin();
     const doc = await uploadDocument(admin, "reader-dl.txt");
     const folder = await admin.post("/api/attachment-folders").send({ name: "F" }).expect(201);
-    const category = await admin.post("/api/attachment-categories").send({ name: "C" }).expect(201);
+    const tag = await admin.post("/api/tags").send({ name: "C", domain: "dms" }).expect(201);
 
     const reader = await loginReader();
-    await reader.post(`/api/documents/bulk/folders/${folder.body.id}`).send({ attachmentIds: [doc.id] }).expect(403);
-    await reader.post(`/api/documents/bulk/categories/${category.body.id}`).send({ attachmentIds: [doc.id] }).expect(403);
+    await reader.post(`/api/documents/bulk/folders/${folder.body.id}`).send({ attachments: [{ id: doc.id, expectedVersion: doc.version }] }).expect(403);
+    await reader.post("/api/documents/bulk/tags").send({ attachments: [{ id: doc.id, expectedVersion: doc.version }], tagIds: [tag.body.id] }).expect(403);
 
     const download = await reader.post("/api/documents/download").send({ attachmentIds: [doc.id] }).responseType("blob").expect(200);
     expect((download.body as Buffer).subarray(0, 2).toString("latin1")).toBe("PK");
@@ -116,7 +116,12 @@ describe("DMS Bulk-Operationen API", () => {
     const b = await uploadDocument(admin, "bulk-b.txt");
     const c = await uploadDocument(admin, "bulk-c.txt"); // bewusst nicht zugewiesen
 
-    await admin.post(`/api/documents/bulk/folders/${folder.body.id}`).send({ attachmentIds: [a.id, b.id] }).expect(204);
+    await admin.post(`/api/documents/bulk/folders/${folder.body.id}`).send({
+      attachments: [
+        { id: a.id, expectedVersion: a.version },
+        { id: b.id, expectedVersion: b.version }
+      ]
+    }).expect(200);
 
     const inFolder = await admin.get(`/api/documents?folder=${folder.body.id}`).expect(200);
     const ids = (inFolder.body as Array<{ id: number }>).map((doc) => doc.id);
@@ -125,15 +130,21 @@ describe("DMS Bulk-Operationen API", () => {
     expect(ids).not.toContain(c.id);
   });
 
-  it("weist mehrere Dokumente gebuendelt einer Kategorie zu", async () => {
+  it("weist mehrere Dokumente gebündelt einem DMS-Tag zu", async () => {
     const admin = await loginAdmin();
-    const category = await admin.post("/api/attachment-categories").send({ name: "Wichtig" }).expect(201);
+    const tag = await admin.post("/api/tags").send({ name: "Wichtig", domain: "dms" }).expect(201);
     const a = await uploadDocument(admin, "cat-a.txt");
     const b = await uploadDocument(admin, "cat-b.txt");
 
-    await admin.post(`/api/documents/bulk/categories/${category.body.id}`).send({ attachmentIds: [a.id, b.id] }).expect(204);
+    await admin.post("/api/documents/bulk/tags").send({
+      attachments: [
+        { id: a.id, expectedVersion: a.version },
+        { id: b.id, expectedVersion: b.version }
+      ],
+      tagIds: [tag.body.id]
+    }).expect(200);
 
-    const filtered = await admin.get(`/api/documents?category=${category.body.id}`).expect(200);
+    const filtered = await admin.get(`/api/documents?tags=${tag.body.id}`).expect(200);
     const ids = (filtered.body as Array<{ id: number }>).map((doc) => doc.id);
     expect(ids).toContain(a.id);
     expect(ids).toContain(b.id);
@@ -144,17 +155,18 @@ describe("DMS Bulk-Operationen API", () => {
     const folder = await admin.post("/api/attachment-folders").send({ name: "Idem" }).expect(201);
     const a = await uploadDocument(admin, "idem.txt");
 
-    // Zweimal zuweisen -> kein Fehler (INSERT IGNORE), keine Dublette in der Sammlung.
-    await admin.post(`/api/documents/bulk/folders/${folder.body.id}`).send({ attachmentIds: [a.id] }).expect(204);
-    await admin.post(`/api/documents/bulk/folders/${folder.body.id}`).send({ attachmentIds: [a.id] }).expect(204);
+    // Zweimal zuweisen -> kein Fehler, keine Dublette in der Sammlung.
+    const first = await admin.post(`/api/documents/bulk/folders/${folder.body.id}`).send({ attachments: [{ id: a.id, expectedVersion: a.version }] }).expect(200);
+    const updated = (first.body as Array<{ id: number; version: number }>)[0];
+    await admin.post(`/api/documents/bulk/folders/${folder.body.id}`).send({ attachments: [{ id: a.id, expectedVersion: updated.version }] }).expect(200);
     const inFolder = await admin.get(`/api/documents?folder=${folder.body.id}`).expect(200);
     expect((inFolder.body as Array<{ id: number }>).filter((doc) => doc.id === a.id)).toHaveLength(1);
 
     // Leere Auswahl -> 400 (Schema minItems 1).
-    await admin.post(`/api/documents/bulk/folders/${folder.body.id}`).send({ attachmentIds: [] }).expect(400);
+    await admin.post(`/api/documents/bulk/folders/${folder.body.id}`).send({ attachments: [] }).expect(400);
 
     // Unbekannte Sammlung -> 404.
-    await admin.post("/api/documents/bulk/folders/999999").send({ attachmentIds: [a.id] }).expect(404);
+    await admin.post("/api/documents/bulk/folders/999999").send({ attachments: [{ id: a.id, expectedVersion: updated.version }] }).expect(404);
   });
 
   it("buendelt die Auswahl zu einem Zip und lehnt leere/unbekannte Auswahl ab", async () => {

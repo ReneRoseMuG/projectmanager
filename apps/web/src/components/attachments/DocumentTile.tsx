@@ -1,19 +1,21 @@
 import type { Attachment } from "@taskmanager/shared-types";
-import { Download, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Download, Trash2, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { assetUrl } from "../../api/client";
 import { documentThumbnailUrl } from "../../api/documents";
 import { describeAttachmentType, type AttachmentFamily } from "./attachmentTypes";
 
 // Kachel der Dokumente-Grid-Ansicht (MS-75). Quadratischer Thumbnail-Bereich (bei Bildern das
 // skalierte Bild, sonst ein großes Typ-Icon + Badge) mit Dateinamen darunter. Einfachklick
-// togglet die Auswahl, Doppelklick öffnet die Datei groß (Lightbox). Die volle Detail- und
-// Metadatenpflege liegt in der Großansicht; hier bleiben nur schnelle Datei-Aktionen.
+// öffnet die Details. Die Checkbox steuert davon getrennt die Mehrfachauswahl. Die volle
+// Detail- und Metadatenpflege liegt in der Großansicht; hier bleiben nur schnelle Datei-Aktionen.
 
-// Dokumente, aus denen der Server die erste Seite als Vorschaubild rendern kann (PDF direkt,
-// Office/ODF über die PDF-Fassung). Das Typ-Icon bleibt darunter liegen: Es ist der Platzhalter,
+// Dokumente, aus denen der Server ein Vorschaubild rendern kann (PDF direkt, Office/ODF über die
+// PDF-Fassung und `.af` über den Windows-Thumbnail-Handler). Das Typ-Icon bleibt darunter liegen:
+// Es ist der Platzhalter,
 // solange das Bild lädt, und der Rückfall, wenn es keins gibt (404) oder die Erzeugung scheitert.
 const THUMBNAIL_FAMILIES: ReadonlySet<AttachmentFamily> = new Set([
+  "affinity",
   "pdf",
   "word",
   "spreadsheet",
@@ -45,22 +47,30 @@ export function fileExtension(name: string): string {
 
 interface DocumentTileProps {
   document: Attachment;
+  isActive: boolean;
   isSelected: boolean;
   onToggleSelect: () => void;
   onOpen: () => void;
   onDownload: () => void;
+  canRemoveFromLibrary?: boolean;
+  onRemoveFromLibrary?: () => void;
   canDelete: boolean;
   onDelete: () => void;
+  pills?: ReactNode;
 }
 
 export function DocumentTile({
   document,
+  isActive,
   isSelected,
   onToggleSelect,
   onOpen,
   onDownload,
+  canRemoveFromLibrary = false,
+  onRemoveFromLibrary,
   canDelete,
   onDelete,
+  pills,
 }: DocumentTileProps) {
   const meta = describeAttachmentType(document);
   const Icon = meta.Icon;
@@ -70,13 +80,15 @@ export function DocumentTile({
 
   return (
     <article
-      onClick={onToggleSelect}
+      onClick={onOpen}
       onDoubleClick={onOpen}
       title={document.displayName ?? document.originalName}
       className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-lg border bg-white transition ${
         isSelected
           ? "border-steel-400 shadow-panel ring-2 ring-steel-300"
-          : "border-line shadow-sm hover:border-steel-300 hover:shadow-panel"
+          : isActive
+            ? "border-steel-400 shadow-panel"
+            : "border-line shadow-sm hover:border-steel-300 hover:shadow-panel"
       }`}
     >
       <div className="relative aspect-square w-full overflow-hidden bg-shell">
@@ -134,6 +146,21 @@ export function DocumentTile({
             <Download size={14} />
           </button>
 
+          {canRemoveFromLibrary && onRemoveFromLibrary ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemoveFromLibrary();
+              }}
+              className="rounded-md bg-white/90 p-1 text-steel-500 shadow-sm transition hover:bg-tangerine/10 hover:text-tangerine"
+              title="Aus der Dokumentenbibliothek entfernen"
+              aria-label="Aus der Dokumentenbibliothek entfernen"
+            >
+              <X size={14} />
+            </button>
+          ) : null}
+
           {canDelete ? (
             <button
               type="button"
@@ -153,6 +180,7 @@ export function DocumentTile({
 
       <div className="min-w-0 px-2 py-1.5">
         <p className="truncate text-center text-xs font-medium text-ink">{title}</p>
+        {pills ? <div className="mt-1 flex min-h-5 justify-center">{pills}</div> : null}
       </div>
     </article>
   );

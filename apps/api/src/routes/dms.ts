@@ -1,43 +1,38 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import type { AttachmentCategoryOrderInput, AttachmentFolderOrderInput } from "@taskmanager/shared-types";
-import { deleteAttachment } from "../services/attachments.service.js";
+import type { AttachmentVersionInput } from "@taskmanager/shared-types";
+import { createReadStream } from "node:fs";
+import { deleteAttachment, getAttachmentFile, openAttachment } from "../services/attachments.service.js";
 import {
-  assignCategoryToAttachment,
-  assignCategoryToAttachments,
-  createAttachmentCategory,
-  deleteAttachmentCategory,
-  listAttachmentCategories,
-  removeCategoryFromAttachment,
-  reorderAttachmentCategories,
-  updateAttachmentCategory
-} from "../services/attachment-category.service.js";
-import {
-  addAttachmentsToFolder,
-  addAttachmentToFolder,
   createAttachmentFolder,
   deleteAttachmentFolder,
   listAttachmentFolders,
-  moveAttachmentBetweenFolders,
-  removeAttachmentFromFolder,
-  reorderAttachmentFolders,
+  setAttachmentFolder,
   updateAttachmentFolder
 } from "../services/attachment-folder.service.js";
-import { getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
+import { addDocumentTagsBulk, getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentFolderBulk, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
 import { importDocument } from "../services/document-import.service.js";
-import { buildDocumentsArchive, getDocumentDownloadFile } from "../services/document-download.service.js";
-import { getAttachmentThumbnail } from "../services/attachment-preview.service.js";
+import { buildDocumentsArchive } from "../services/document-download.service.js";
+import { getDocumentDuplicateCheck, startDocumentDuplicateCheck } from "../services/document-duplicate-check.service.js";
+import { getAttachmentPreview, getAttachmentPreviewFile, getAttachmentThumbnail } from "../services/attachment-preview.service.js";
 import { createJournalActor } from "../services/journal.service.js";
-import { createReadStream } from "node:fs";
 import { badRequest, notFound } from "../utils/errors.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema, tagIdsBodySchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema } from "../utils/route-schemas.js";
 
-// MS-75 (DMS): Alle Routen laufen unter der bestehenden Ressource "attachments" (kein
-// eigener Auth-Katalogeintrag). Da die Pfade (/documents, /attachment-categories,
-// /attachment-folders) nicht das Segment "/attachments" tragen, wird die Berechtigung
-// hier EXPLIZIT je Endpunkt gesetzt — sonst greift der Default "projects".
-function attachmentsAuth(action: "read" | "write" | "delete") {
-  return { auth: { resource: "attachments" as const, action } };
+function documentsAuth(action: "read" | "write" | "delete") {
+  return { auth: { resource: "documents" as const, action } };
 }
+
+function contentDisposition(filename: string, download: boolean): string {
+  const fallback = filename.replace(/["\\\r\n]/g, "_");
+  const mode = download ? "attachment" : "inline";
+  return `${mode}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
+const documentContentQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: { download: { type: "boolean" } }
+} as const;
 
 interface MultipartFileField {
   filename?: string;
@@ -61,35 +56,13 @@ const uploadBodySchema = {
   }
 } as const;
 
-const categoryBodySchema = {
-  type: "object",
-  required: ["name"],
-  additionalProperties: false,
-  properties: {
-    name: { type: "string", minLength: 1 },
-    color: { type: "string" }
-  }
-} as const;
-
-const categoryPatchSchema = {
-  type: "object",
-  required: ["expectedVersion"],
-  additionalProperties: false,
-  properties: {
-    name: { type: "string", minLength: 1 },
-    color: { type: "string" },
-    expectedVersion: { type: "integer", minimum: 1 }
-  }
-} as const;
-
 const folderBodySchema = {
   type: "object",
   required: ["name"],
   additionalProperties: false,
   properties: {
     name: { type: "string", minLength: 1 },
-    parentId: { type: ["integer", "null"], minimum: 1 },
-    projectId: { type: ["integer", "null"], minimum: 1 }
+    parentId: { type: ["integer", "null"], minimum: 1 }
   }
 } as const;
 
@@ -100,39 +73,7 @@ const folderPatchSchema = {
   properties: {
     name: { type: "string", minLength: 1 },
     parentId: { type: ["integer", "null"], minimum: 1 },
-    projectId: { type: ["integer", "null"], minimum: 1 },
     expectedVersion: { type: "integer", minimum: 1 }
-  }
-} as const;
-
-const orderItemsSchema = {
-  type: "array",
-  minItems: 1,
-  items: {
-    type: "object",
-    required: ["id", "expectedVersion"],
-    additionalProperties: false,
-    properties: {
-      id: { type: "integer", minimum: 1 },
-      expectedVersion: { type: "integer", minimum: 1 }
-    }
-  }
-} as const;
-
-const categoryOrderBodySchema = {
-  type: "object",
-  required: ["items"],
-  additionalProperties: false,
-  properties: { items: orderItemsSchema }
-} as const;
-
-const folderOrderBodySchema = {
-  type: "object",
-  required: ["parentId", "items"],
-  additionalProperties: false,
-  properties: {
-    parentId: { type: ["integer", "null"], minimum: 1 },
-    items: orderItemsSchema
   }
 } as const;
 
@@ -152,10 +93,11 @@ const documentLibraryQuerySchema = {
   additionalProperties: false,
   properties: {
     folder: { type: "string" },
-    category: { type: "integer", minimum: 1 },
+    category: {},
     tag: { type: "integer", minimum: 1 },
-    type: { type: "string" },
-    q: { type: "string" },
+    tags: { type: "string", minLength: 1, maxLength: 220, pattern: "^[0-9]+(,[0-9]+)*$" },
+    type: { type: "string", enum: ["image/", "application/pdf", "text/", "video/", "audio/"] },
+    q: { type: "string", maxLength: 200 },
     // Opt-in-Pagination: ist `page` gesetzt, liefert die Route Paginated<Attachment>,
     // sonst weiterhin das nackte Array (Rückwärtskompatibilität für MCP/interne Aufrufer).
     ...paginationQuerySchema
@@ -167,51 +109,87 @@ const uploadQuerySchema = {
   additionalProperties: false,
   properties: {
     folder: { type: "integer", minimum: 1 },
-    category: { type: "integer", minimum: 1 },
-    folders: { type: "string", pattern: "^[1-9][0-9]*(,[1-9][0-9]*)*$" },
-    categories: { type: "string", pattern: "^[1-9][0-9]*(,[1-9][0-9]*)*$" },
-    tags: { type: "string", pattern: "^[1-9][0-9]*(,[1-9][0-9]*)*$" }
+    tags: { type: "string", minLength: 1, maxLength: 220, pattern: "^[0-9]+(,[0-9]+)*$" },
+    folders: {},
+    category: {}
   }
 } as const;
 
-const folderDeleteQuerySchema = {
+const expectedVersionQuerySchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
   properties: {
-    recursive: { type: "boolean" }
+    expectedVersion: { type: "integer", minimum: 1 }
   }
 } as const;
 
-const documentCategoryParamSchema = {
+const documentFolderBodySchema = {
   type: "object",
-  required: ["id", "categoryId"],
-  properties: {
-    id: { type: "integer", minimum: 1 },
-    categoryId: { type: "integer", minimum: 1 }
-  }
-} as const;
-
-const folderDocumentParamSchema = {
-  type: "object",
-  required: ["folderId", "attachmentId"],
-  properties: {
-    folderId: { type: "integer", minimum: 1 },
-    attachmentId: { type: "integer", minimum: 1 }
-  }
-} as const;
-
-const moveDocumentBodySchema = {
-  type: "object",
-  required: ["fromFolderId", "toFolderId"],
+  required: ["folderId", "expectedVersion"],
   additionalProperties: false,
   properties: {
-    fromFolderId: { type: "integer", minimum: 1 },
-    toFolderId: { type: "integer", minimum: 1 }
+    folderId: { type: ["integer", "null"], minimum: 1 },
+    expectedVersion: { type: "integer", minimum: 1 }
   }
 } as const;
 
-// Mehrfachauswahl-Body: mindestens eine gültige Dokument-ID.
-const bulkAttachmentIdsBodySchema = {
+const documentTagsBodySchema = {
+  type: "object",
+  required: ["tagIds", "expectedVersion"],
+  additionalProperties: false,
+  properties: {
+    tagIds: { type: "array", maxItems: 20, uniqueItems: true, items: { type: "integer", minimum: 1 } },
+    expectedVersion: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+const bulkDocumentTagsBodySchema = {
+  type: "object",
+  required: ["attachments", "tagIds"],
+  additionalProperties: false,
+  properties: {
+    attachments: {
+      type: "array",
+      minItems: 1,
+      maxItems: 100,
+      items: {
+        type: "object",
+        required: ["id", "expectedVersion"],
+        additionalProperties: false,
+        properties: {
+          id: { type: "integer", minimum: 1 },
+          expectedVersion: { type: "integer", minimum: 1 }
+        }
+      }
+    },
+    tagIds: { type: "array", minItems: 1, maxItems: 20, uniqueItems: true, items: { type: "integer", minimum: 1 } }
+  }
+} as const;
+
+const bulkDocumentFolderBodySchema = {
+  type: "object",
+  required: ["attachments"],
+  additionalProperties: false,
+  properties: {
+    attachments: {
+      type: "array",
+      minItems: 1,
+      maxItems: 100,
+      items: {
+        type: "object",
+        required: ["id", "expectedVersion"],
+        additionalProperties: false,
+        properties: {
+          id: { type: "integer", minimum: 1 },
+          expectedVersion: { type: "integer", minimum: 1 }
+        }
+      }
+    }
+  }
+} as const;
+
+const documentArchiveBodySchema = {
   type: "object",
   required: ["attachmentIds"],
   additionalProperties: false,
@@ -219,24 +197,10 @@ const bulkAttachmentIdsBodySchema = {
     attachmentIds: {
       type: "array",
       minItems: 1,
+      maxItems: 100,
+      uniqueItems: true,
       items: { type: "integer", minimum: 1 }
     }
-  }
-} as const;
-
-const folderIdParamSchema = {
-  type: "object",
-  required: ["folderId"],
-  properties: {
-    folderId: { type: "integer", minimum: 1 }
-  }
-} as const;
-
-const categoryIdParamSchema = {
-  type: "object",
-  required: ["categoryId"],
-  properties: {
-    categoryId: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -256,111 +220,47 @@ function currentUserId(request: FastifyRequest): number | undefined {
   return request.currentUser?.id;
 }
 
-function downloadContentDisposition(filename: string): string {
-  const fallback = filename.replace(/["\\\r\n]/g, "_");
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
-}
-
 export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
-  // --- Kategorien ---
-  app.get(
-    "/attachment-categories",
-    { config: attachmentsAuth("read"), schema: { response: { 200: arrayResponseSchema } } },
-    async () => listAttachmentCategories(app.db)
-  );
-
-  app.post<{ Body: { name: string; color?: string } }>(
-    "/attachment-categories",
-    { config: attachmentsAuth("write"), schema: { body: categoryBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => {
-      const category = await createAttachmentCategory(app.db, request.body, currentUserId(request));
-      return reply.status(201).send(category);
-    }
-  );
-
-  app.put<{ Body: AttachmentCategoryOrderInput }>(
-    "/attachment-categories/order",
-    { config: attachmentsAuth("write"), schema: { body: categoryOrderBodySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => reorderAttachmentCategories(app.db, request.body, currentUserId(request))
-  );
-
-  app.patch<{ Params: { id: number }; Body: { name?: string; color?: string; expectedVersion: number } }>(
-    "/attachment-categories/:id",
-    { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: categoryPatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateAttachmentCategory(app.db, request.params.id, request.body, currentUserId(request))
-  );
-
-  app.delete<{ Params: { id: number } }>(
-    "/attachment-categories/:id",
-    { config: attachmentsAuth("delete"), schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await deleteAttachmentCategory(app.db, request.params.id);
-      return reply.status(204).send();
-    }
-  );
-
   // --- Sammlungen (virtuelle Ordner) ---
   app.get(
     "/attachment-folders",
-    { config: attachmentsAuth("read"), schema: { response: { 200: arrayResponseSchema } } },
+    { config: documentsAuth("read"), schema: { response: { 200: arrayResponseSchema } } },
     async () => listAttachmentFolders(app.db)
   );
 
-  app.post<{ Body: { name: string; parentId?: number | null; projectId?: number | null } }>(
+  app.post<{ Body: { name: string; parentId?: number | null } }>(
     "/attachment-folders",
-    { config: attachmentsAuth("write"), schema: { body: folderBodySchema, response: { 201: objectResponseSchema } } },
+    { config: documentsAuth("write"), schema: { body: folderBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
       const folder = await createAttachmentFolder(app.db, request.body, currentUserId(request));
       return reply.status(201).send(folder);
     }
   );
 
-  app.put<{ Body: AttachmentFolderOrderInput }>(
-    "/attachment-folders/order",
-    { config: attachmentsAuth("write"), schema: { body: folderOrderBodySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => reorderAttachmentFolders(app.db, request.body, currentUserId(request))
-  );
-
-  app.patch<{ Params: { id: number }; Body: { name?: string; parentId?: number | null; projectId?: number | null; expectedVersion: number } }>(
+  app.patch<{ Params: { id: number }; Body: { name?: string; parentId?: number | null; expectedVersion: number } }>(
     "/attachment-folders/:id",
-    { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: folderPatchSchema, response: { 200: objectResponseSchema } } },
+    { config: documentsAuth("write"), schema: { params: idParamSchema, body: folderPatchSchema, response: { 200: objectResponseSchema } } },
     async (request) => updateAttachmentFolder(app.db, request.params.id, request.body, currentUserId(request))
   );
 
-  app.delete<{ Params: { id: number }; Querystring: { recursive?: boolean } }>(
+  app.delete<{ Params: { id: number }; Querystring: { expectedVersion: number } }>(
     "/attachment-folders/:id",
-    { config: attachmentsAuth("delete"), schema: { params: idParamSchema, querystring: folderDeleteQuerySchema, response: { 204: { type: "null" } } } },
+    { config: documentsAuth("delete"), schema: { params: idParamSchema, querystring: expectedVersionQuerySchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      await deleteAttachmentFolder(app.db, request.params.id, { recursive: request.query.recursive === true });
-      return reply.status(204).send();
-    }
-  );
-
-  // --- Dokument-Sammlung-Zuordnung ---
-  app.post<{ Params: { folderId: number; attachmentId: number } }>(
-    "/attachment-folders/:folderId/documents/:attachmentId",
-    { config: attachmentsAuth("write"), schema: { params: folderDocumentParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await addAttachmentToFolder(app.db, request.params.folderId, request.params.attachmentId);
-      return reply.status(204).send();
-    }
-  );
-
-  app.delete<{ Params: { folderId: number; attachmentId: number } }>(
-    "/attachment-folders/:folderId/documents/:attachmentId",
-    { config: attachmentsAuth("write"), schema: { params: folderDocumentParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await removeAttachmentFromFolder(app.db, request.params.folderId, request.params.attachmentId);
+      await deleteAttachmentFolder(app.db, request.params.id, request.query.expectedVersion);
       return reply.status(204).send();
     }
   );
 
   // --- Dokumentenbibliothek ---
-  app.get<{ Querystring: { folder?: string; category?: number; tag?: number; type?: string; q?: string; page?: number; pageSize?: number } }>(
+  app.get<{ Querystring: { folder?: string; category?: unknown; tag?: number; tags?: string; type?: string; q?: string; page?: number; pageSize?: number } }>(
     "/documents",
-    { config: attachmentsAuth("read"), schema: { querystring: documentLibraryQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
+    { config: documentsAuth("read"), schema: { querystring: documentLibraryQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
     async (request) => {
-      const { folder: folderParam, category, tag, type, q, page, pageSize } = request.query;
+      if (request.query.category !== undefined) {
+        throw badRequest("Kategorien werden seit MS-80 nicht mehr unterstützt. Bitte DMS-Tags verwenden.");
+      }
+      const { folder: folderParam, tag, tags: tagsParam, type, q, page, pageSize } = request.query;
       let folder: number | "unsorted" | undefined;
       if (folderParam === "unsorted") {
         folder = "unsorted";
@@ -371,7 +271,15 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
         }
         folder = parsed;
       }
-      const documentFilter = { folder, category, tag, type, q };
+      const tagIds = [
+        ...(tag !== undefined ? [tag] : []),
+        ...(tagsParam ? tagsParam.split(",").map(Number) : [])
+      ];
+      const tags = [...new Set(tagIds)];
+      if (tags.length > 20) {
+        throw badRequest("Höchstens 20 Tags können gleichzeitig gefiltert werden.");
+      }
+      const documentFilter = { folder, tags, type, q };
       // Opt-in: nur wenn `page` gesetzt ist, paginiert antworten — sonst Array-Alt-Verhalten.
       if (page !== undefined) {
         return listDocumentLibraryPaginated(app.db, documentFilter, page, pageSize ?? 25);
@@ -380,107 +288,98 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  // Die singulären Parameter bleiben für die Web-Oberfläche kompatibel; der Windows-Importer
-  // verwendet die kommaseparierten Mehrfachparameter `folders`, `categories` und `tags`.
-  app.post<{ Querystring: { folder?: number; category?: number; folders?: string; categories?: string; tags?: string } }>(
+  app.post<{ Querystring: { folder?: number; tags?: string; folders?: unknown; category?: unknown } }>(
     "/documents",
-    { config: attachmentsAuth("write"), schema: { ...uploadBodySchema, querystring: uploadQuerySchema, response: { 201: objectResponseSchema } } },
+    { config: documentsAuth("write"), schema: { ...uploadBodySchema, querystring: uploadQuerySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
+      if (request.query.folders !== undefined) {
+        throw badRequest("Mehrfachsammlungen werden seit MS-80 nicht mehr unterstützt. Bitte höchstens eine Sammlung über 'folder' angeben.");
+      }
+      if (request.query.category !== undefined) {
+        throw badRequest("Kategorien werden seit MS-80 nicht mehr unterstützt. Bitte DMS-Tags verwenden.");
+      }
       const upload = await readUpload(request);
       const tagIds = request.query.tags?.split(",").map(Number);
-      const folderIds = [request.query.folder, ...(request.query.folders?.split(",").map(Number) ?? [])].filter(
-        (id): id is number => id !== undefined
-      );
-      const categoryIds = [request.query.category, ...(request.query.categories?.split(",").map(Number) ?? [])].filter(
-        (id): id is number => id !== undefined
-      );
       const document = await importDocument(
         app.db,
         upload,
-        { folderIds, categoryIds, tagIds },
+        { folderId: request.query.folder, tagIds },
         createJournalActor(request.currentUser)
       );
       return reply.status(201).send(document);
     }
   );
 
+  app.get(
+    "/documents/duplicate-check",
+    { config: documentsAuth("read"), schema: { response: { 200: objectResponseSchema } } },
+    async () => getDocumentDuplicateCheck(app.db)
+  );
+
+  app.post(
+    "/documents/duplicate-check",
+    { config: documentsAuth("write"), schema: { response: { 202: objectResponseSchema } } },
+    async (_request, reply) => reply.status(202).send(await startDocumentDuplicateCheck(app.db))
+  );
+
+  app.post<{ Body: { attachments: AttachmentVersionInput[]; tagIds: number[] } }>(
+    "/documents/bulk/tags",
+    {
+      config: documentsAuth("write"),
+      schema: { body: bulkDocumentTagsBodySchema, response: { 200: arrayResponseSchema } }
+    },
+    async (request) => {
+      return addDocumentTagsBulk(
+        app.db,
+        request.body.attachments,
+        request.body.tagIds,
+        createJournalActor(request.currentUser)
+      );
+    }
+  );
+
   app.get<{ Params: { id: number } }>(
     "/documents/:id",
-    { config: attachmentsAuth("read"), schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
+    { config: documentsAuth("read"), schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => getDocument(app.db, request.params.id)
   );
 
-  // Einzel-Download: berechtigungspflichtiger Stream statt direkter /uploads-Verlinkung.
-  // Kein Response-Schema, weil die Antwort ein Binär-Stream ist.
-  app.get<{ Params: { id: number } }>(
-    "/documents/:id/download",
-    { config: attachmentsAuth("read"), schema: { params: idParamSchema } },
+  app.post<{ Params: { id: number }; Body: { attachments: AttachmentVersionInput[] } }>(
+    "/documents/bulk/folders/:id",
+    {
+      config: documentsAuth("write"),
+      schema: { params: idParamSchema, body: bulkDocumentFolderBodySchema, response: { 200: arrayResponseSchema } }
+    },
+    async (request) => setDocumentFolderBulk(
+      app.db,
+      request.body.attachments,
+      request.params.id,
+      createJournalActor(request.currentUser)
+    )
+  );
+
+  app.post<{ Body: { attachmentIds: number[] } }>(
+    "/documents/download",
+    {
+      config: documentsAuth("read"),
+      schema: { body: documentArchiveBodySchema }
+    },
     async (request, reply) => {
-      const download = await getDocumentDownloadFile(app.db, request.params.id);
-      return reply
-        .type(download.mimetype)
-        .header("Content-Length", String(download.size))
-        .header("Content-Disposition", downloadContentDisposition(download.originalName))
-        .send(createReadStream(download.diskPath));
+      const archive = await buildDocumentsArchive(app.db, request.body.attachmentIds);
+      archive.on("error", (error) => reply.raw.destroy(error));
+      reply
+        .type("application/zip")
+        .header("Content-Disposition", "attachment; filename=\"dokumente.zip\"");
+      void archive.finalize();
+      return reply.send(archive);
     }
   );
 
-  app.patch<{ Params: { id: number }; Body: { displayName?: string | null; description?: string | null; expectedVersion: number } }>(
-    "/documents/:id",
-    { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: metadataPatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateDocumentMetadata(app.db, request.params.id, request.body, currentUserId(request))
-  );
-
-  app.put<{ Params: { id: number }; Body: { tagIds: number[] } }>(
-    "/documents/:id/tags",
-    { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: tagIdsBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => setDocumentTags(app.db, request.params.id, request.body.tagIds)
-  );
-
-  app.post<{ Params: { id: number }; Body: { fromFolderId: number; toFolderId: number } }>(
-    "/documents/:id/move",
-    { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: moveDocumentBodySchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await moveAttachmentBetweenFolders(app.db, request.params.id, request.body.fromFolderId, request.body.toFolderId);
-      return reply.status(204).send();
-    }
-  );
-
-  app.delete<{ Params: { id: number } }>(
-    "/documents/:id",
-    { config: attachmentsAuth("delete"), schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await deleteAttachment(app.db, request.params.id, createJournalActor(request.currentUser));
-      return reply.status(204).send();
-    }
-  );
-
-  // --- Dokument-Kategorie-Zuordnung ---
-  app.post<{ Params: { id: number; categoryId: number } }>(
-    "/documents/:id/categories/:categoryId",
-    { config: attachmentsAuth("write"), schema: { params: documentCategoryParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await assignCategoryToAttachment(app.db, request.params.id, request.params.categoryId);
-      return reply.status(204).send();
-    }
-  );
-
-  app.delete<{ Params: { id: number; categoryId: number } }>(
-    "/documents/:id/categories/:categoryId",
-    { config: attachmentsAuth("write"), schema: { params: documentCategoryParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await removeCategoryFromAttachment(app.db, request.params.id, request.params.categoryId);
-      return reply.status(204).send();
-    }
-  );
-
-  // Kachel-Vorschaubild: erste Seite als PNG, faul erzeugt und im Vorschau-Cache abgelegt. Für Typen
-  // ohne Vorschaubild (Text, Video, Archiv …) und bei fehlgeschlagener Erzeugung antwortet die Route
-  // 404 — die Kachel behält dann ihr Typ-Icon. Kein Response-Schema (Binär-Stream).
   app.get<{ Params: { id: number } }>(
     "/documents/:id/thumbnail",
-    { config: attachmentsAuth("read"), schema: { params: idParamSchema } },
+    { config: documentsAuth("read"), schema: { params: idParamSchema } },
     async (request, reply) => {
+      await getDocument(app.db, request.params.id);
       const thumbnailPath = await getAttachmentThumbnail(app.db, request.params.id);
       if (!thumbnailPath) {
         throw notFound(`No thumbnail available for attachment with id ${request.params.id}`);
@@ -492,44 +391,94 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  // --- Bulk-Operationen (Mehrfachauswahl) ---
-  app.post<{ Params: { folderId: number }; Body: { attachmentIds: number[] } }>(
-    "/documents/bulk/folders/:folderId",
-    { config: attachmentsAuth("write"), schema: { params: folderIdParamSchema, body: bulkAttachmentIdsBodySchema, response: { 204: { type: "null" } } } },
+  app.get<{ Params: { id: number }; Querystring: { download?: boolean } }>(
+    "/documents/:id/content",
+    { config: documentsAuth("read"), schema: { params: idParamSchema, querystring: documentContentQuerySchema } },
     async (request, reply) => {
-      await addAttachmentsToFolder(app.db, request.params.folderId, request.body.attachmentIds);
+      const file = await getAttachmentFile(app.db, request.params.id, "document");
+      return reply
+        .type(file.mimetype)
+        .header("Content-Length", String(file.size))
+        .header("Content-Disposition", contentDisposition(file.originalName, request.query.download === true))
+        .send(createReadStream(file.diskPath));
+    }
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/documents/:id/preview",
+    { config: documentsAuth("read"), schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
+    async (request) => {
+      await getDocument(app.db, request.params.id);
+      return getAttachmentPreview(app.db, request.params.id);
+    }
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/documents/:id/preview-file",
+    { config: documentsAuth("read"), schema: { params: idParamSchema } },
+    async (request, reply) => {
+      await getDocument(app.db, request.params.id);
+      const file = await getAttachmentPreviewFile(app.db, request.params.id);
+      return reply
+        .type("application/pdf")
+        .header("Content-Length", String(file.size))
+        .header("Content-Disposition", "inline")
+        .send(createReadStream(file.diskPath));
+    }
+  );
+
+  app.post<{ Params: { id: number } }>(
+    "/documents/:id/open",
+    { config: documentsAuth("read"), schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
+      await openAttachment(app.db, request.params.id, app.fileOpener, createJournalActor(request.currentUser), "document");
       return reply.status(204).send();
     }
   );
 
-  app.post<{ Params: { categoryId: number }; Body: { attachmentIds: number[] } }>(
-    "/documents/bulk/categories/:categoryId",
-    { config: attachmentsAuth("write"), schema: { params: categoryIdParamSchema, body: bulkAttachmentIdsBodySchema, response: { 204: { type: "null" } } } },
+  app.patch<{ Params: { id: number }; Body: { displayName?: string | null; description?: string | null; expectedVersion: number } }>(
+    "/documents/:id",
+    { config: documentsAuth("write"), schema: { params: idParamSchema, body: metadataPatchSchema, response: { 200: objectResponseSchema } } },
+    async (request) => updateDocumentMetadata(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
+  );
+
+  app.put<{ Params: { id: number }; Body: { tagIds: number[]; expectedVersion: number } }>(
+    "/documents/:id/tags",
+    { config: documentsAuth("write"), schema: { params: idParamSchema, body: documentTagsBodySchema, response: { 200: objectResponseSchema } } },
+    async (request) => setDocumentTags(
+      app.db,
+      request.params.id,
+      request.body.tagIds,
+      request.body.expectedVersion,
+      createJournalActor(request.currentUser)
+    )
+  );
+
+  app.put<{ Params: { id: number }; Body: { folderId: number | null; expectedVersion: number } }>(
+    "/documents/:id/folder",
+    { config: documentsAuth("write"), schema: { params: idParamSchema, body: documentFolderBodySchema, response: { 200: objectResponseSchema } } },
+    async (request) => {
+      await setAttachmentFolder(app.db, request.params.id, request.body, createJournalActor(request.currentUser));
+      return getDocument(app.db, request.params.id);
+    }
+  );
+
+  app.delete<{ Params: { id: number }; Querystring: { expectedVersion: number } }>(
+    "/documents/:id",
+    {
+      config: documentsAuth("delete"),
+      schema: { params: idParamSchema, querystring: expectedVersionQuerySchema, response: { 204: { type: "null" } } }
+    },
     async (request, reply) => {
-      await assignCategoryToAttachments(app.db, request.params.categoryId, request.body.attachmentIds);
+      await deleteAttachment(
+        app.db,
+        request.params.id,
+        request.query.expectedVersion,
+        createJournalActor(request.currentUser),
+        "document"
+      );
       return reply.status(204).send();
     }
   );
 
-  // Bulk-Download: ausgewählte Dokumente als Zip streamen. Kein Response-Schema (Binär-Stream).
-  // buildDocumentsArchive wirft bei leerer/unbekannter Auswahl VOR dem Hijack — Fastify liefert
-  // dann regulär 400/404. Erst wenn ein Archiv steht, übernehmen wir den rohen Response-Stream.
-  app.post<{ Body: { attachmentIds: number[] } }>(
-    "/documents/download",
-    { config: attachmentsAuth("read"), schema: { body: bulkAttachmentIdsBodySchema } },
-    async (request, reply) => {
-      const archive = await buildDocumentsArchive(app.db, request.body.attachmentIds);
-      reply.hijack();
-      reply.raw.writeHead(200, {
-        "Content-Type": "application/zip",
-        "Content-Disposition": 'attachment; filename="dokumente.zip"'
-      });
-      archive.on("error", (error) => {
-        request.log.error(error, "Bulk-Download-Zip fehlgeschlagen");
-        reply.raw.destroy(error);
-      });
-      archive.pipe(reply.raw);
-      await archive.finalize();
-    }
-  );
 }

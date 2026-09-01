@@ -300,7 +300,8 @@ Für jede neue oder geänderte Beziehung:
 **Kaskaden:**
 - Parent löschen → Junction-Eintrag automatisch entfernt
 - Letzter Parent gelöscht → Support-Objekt-Record gelöscht (bei Attachment: Datei gelöscht)
-- Attachment: wenn ein Parent gelöscht wird, aber ein zweiter noch existiert → Datei bleibt erhalten
+- Exklusiver Parent-Anhang: wird zusammen mit seinem einzigen Parent inklusive Upload-Datei gelöscht
+- Verknüpftes DMS-Dokument: beim Löschen des Parents wird nur der Link entfernt; Dokument und Datei bleiben im DMS erhalten
 
 **Optimistic Locking:**
 - Update mit korrekter Version → erfolgreich, Version inkrementiert

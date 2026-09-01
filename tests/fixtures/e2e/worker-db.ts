@@ -14,7 +14,7 @@ import {
 /**
  * Per-worker E2E database lifecycle.
  *
- * Each Playwright worker owns an isolated database `taskmanager_e2e_w<index>` so that
+ * Each Playwright worker owns an isolated database `taskmanager_test_e2e_w<index>` so that
  * parallel browser workers never share global state (settings, dashboards, catalog,
  * sessions). The same seeding logic as the integration test database is reused, so
  * there is only one source of truth for the default auth + catalog seed.
@@ -29,7 +29,7 @@ export interface WorkerDbHandle {
 }
 
 export function workerDbName(index: number): string {
-  return `taskmanager_e2e_w${index}`;
+  return `taskmanager_test_e2e_w${index}`;
 }
 
 const migrationsFolder = fileURLToPath(

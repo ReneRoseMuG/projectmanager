@@ -30,7 +30,6 @@ export function PendingFileList({ files, onAdd, onRemove }: PendingFileListProps
     if (!selectedFiles) {
       return;
     }
-
     const accepted: DraftFile[] = [];
     const rejected: string[] = [];
     Array.from(selectedFiles).forEach((file) => {
@@ -55,9 +54,16 @@ export function PendingFileList({ files, onAdd, onRemove }: PendingFileListProps
 
   return (
     <div className="grid gap-4">
+      <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs text-steel-600">
+        Diese Dateien werden ausschließlich als Anhänge des neuen Elements gespeichert. DMS-Dokumente werden separat im Dokumentenmanagement importiert und können anschließend verknüpft werden.
+      </p>
       <div className="flex justify-end">
         <input ref={inputRef} className="sr-only" type="file" multiple onChange={(event) => addFiles(event.target.files)} />
-        <Button variant="primary" icon={<FilePlus2 size={17} />} onClick={() => inputRef.current?.click()}>
+        <Button
+          variant="primary"
+          icon={<FilePlus2 size={17} />}
+          onClick={() => inputRef.current?.click()}
+        >
           Dateien auswählen
         </Button>
       </div>
@@ -81,6 +87,7 @@ export function PendingFileList({ files, onAdd, onRemove }: PendingFileListProps
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink">{draftFile.file.name}</p>
                   <p className="text-xs font-semibold text-steel-500">{formatFileSize(draftFile.file.size)}</p>
+                  <p className="text-xs text-steel-500">Exklusiver Parent-Anhang</p>
                 </div>
               </div>
               <Button aria-label={`${draftFile.file.name} entfernen`} title="Entfernen" variant="ghost" icon={<Trash2 size={16} />} onClick={() => onRemove(index)} />

@@ -188,32 +188,23 @@ export function getSettingDefinition(key: string): SettingDefinition | undefined
 export const settingDefinitions = Object.values(settingsRegistry) as SettingDefinition[];
 
 // --- Kalender-Synchronisation: zentrale Server-Konfiguration (MS-79, DB-gestützt) ---
-// Diese Konfiguration wird zentral in der Datenbank gehalten, damit sie nur einmal gepflegt werden
-// muss statt an jedem Arbeitsplatz in der .env. Das Google-Client-Secret wird serverseitig
-// verschlüsselt abgelegt (derselbe Cipher wie für die Kalender-Zugangsdaten) und NIE im Klartext
-// an den Client ausgeliefert — die View meldet nur, ob ein Secret hinterlegt ist.
 export const CALENDAR_SYNC_MIN_INTERVAL_MS = 60_000;
 export const CALENDAR_SYNC_DEFAULT_INTERVAL_MS = 15 * 60_000;
 
 export interface CalendarSyncConfigView {
   googleClientId: string;
-  /** Maskiert: true, sobald ein Client-Secret hinterlegt ist (DB oder .env-Fallback). Nie der Klartext. */
   googleClientSecretSet: boolean;
   googleRedirectUri: string;
   syncEnabled: boolean;
   syncIntervalMs: number;
   googlePushWebhookUrl: string;
-  /** Optimistic-Locking-Version der DB-Zeile; 0, solange noch keine gespeichert wurde. */
   version: number;
-  /** true, wenn noch keine DB-Konfiguration existiert und die Werte aus der .env stammen. */
   usingEnvFallback: boolean;
-  /** true, wenn CALENDAR_ENCRYPTION_KEY gesetzt ist; ohne ihn lässt sich kein Secret speichern. */
   encryptionKeyConfigured: boolean;
 }
 
 export interface UpdateCalendarSyncConfigRequest {
   googleClientId: string;
-  /** Weggelassen/null = Secret unverändert lassen; "" = Secret entfernen; nicht-leer = neu setzen. */
   googleClientSecret?: string | null;
   googleRedirectUri: string;
   syncEnabled: boolean;
@@ -452,7 +443,7 @@ export interface CalendarJournalEntry {
   createdAt: string;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "diary", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "settings", "realtime", "users", "roles", "calendarConnections"] as const;
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "diary", "backlog", "tickets", "comments", "notes", "attachments", "documents", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "settings", "realtime", "users", "roles", "calendarConnections"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";
@@ -507,6 +498,7 @@ export const REALTIME_INVALIDATION_SCOPES = [
   "comments",
   "notes",
   "attachments",
+  "documents",
   "tags",
   "catalogs",
   "events",
@@ -640,6 +632,7 @@ export const JOURNAL_OBJECT_TYPES = [
   "tag",
   "note",
   "attachment",
+  "document",
   "comment"
 ] as const;
 
@@ -693,6 +686,7 @@ export interface TagUsageCounts {
   milestones: number;
   tasks: number;
   tickets: number;
+  documents: number;
 }
 
 export type TagDomain = "pm" | "dms";
@@ -983,39 +977,48 @@ export interface NoteMoveInput {
   target: MoveOwner<NoteMoveTargetType>;
 }
 
-export interface AttachmentCategory {
-  id: number;
-  name: string;
-  color: string;
-  sortOrder: number;
-  version: number;
-}
-
 export interface AttachmentFolder {
   id: number;
   parentId: number | null;
-  projectId: number | null;
   name: string;
-  sortOrder: number;
+  childCount: number;
+  directDocumentCount: number;
   version: number;
 }
 
-export interface AttachmentOrderItem {
+export const ATTACHMENT_OWNER_TYPES = ["project", "milestone", "task", "feature", "wikiPage", "ticket"] as const;
+
+export type AttachmentOwnerType = (typeof ATTACHMENT_OWNER_TYPES)[number];
+
+export const ATTACHMENT_KINDS = ["parent_attachment", "document"] as const;
+
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+
+export interface ParentAttachmentFolder {
   id: number;
-  expectedVersion: number;
-}
-
-export interface AttachmentCategoryOrderInput {
-  items: AttachmentOrderItem[];
-}
-
-export interface AttachmentFolderOrderInput {
+  owner: AttachmentOwner;
   parentId: number | null;
-  items: AttachmentOrderItem[];
+  name: string;
+  childCount: number;
+  directEntryCount: number;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
 }
+
+export interface ParentAttachmentFolderInput {
+  name: string;
+  parentId?: number | null;
+}
+
+export type ParentAttachmentFolderUpdate = WithExpectedVersion<{
+  name?: string;
+  parentId?: number | null;
+}>;
 
 export interface Attachment {
   id: number;
+  kind: AttachmentKind;
   owners: AttachmentOwner[];
   originalName: string;
   displayName: string | null;
@@ -1024,12 +1027,75 @@ export interface Attachment {
   mimetype: string;
   size: number;
   url: string;
-  categories?: AttachmentCategory[];
+  contentHash: string | null;
+  isInDocumentLibrary: boolean;
   tags?: Tag[];
+  folder?: AttachmentFolder | null;
   folders?: AttachmentFolder[];
+  parentFolderId?: number | null;
   createdAt: string;
   updatedAt: string;
   version: number;
+}
+
+export interface ParentDocumentLink {
+  id: number;
+  owner: AttachmentOwner;
+  document: Attachment;
+  folder: ParentAttachmentFolder | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ParentDocumentLinkInput {
+  documentId: number;
+  folderId?: number | null;
+}
+
+export type ParentFileMoveInput = WithExpectedVersion<{
+  folderId: number | null;
+}>;
+
+export type ParentFileEntry =
+  | { kind: "attachment"; attachment: Attachment; folder: ParentAttachmentFolder | null }
+  | { kind: "document_link"; link: ParentDocumentLink; folder: ParentAttachmentFolder | null };
+
+export type DocumentDuplicateCheckStatus = "idle" | "running" | "completed" | "failed";
+export type DocumentDuplicateCheckIssueKind = "missing" | "unreadable" | "changed";
+
+export interface DocumentDuplicateCheckDocument {
+  id: number;
+  originalName: string;
+  displayName: string | null;
+  size: number;
+  createdAt: string;
+  folder: AttachmentFolder | null;
+  owners: AttachmentOwner[];
+}
+
+export interface DocumentDuplicateGroup {
+  hash: string;
+  documents: DocumentDuplicateCheckDocument[];
+}
+
+export interface DocumentDuplicateCheckIssue {
+  attachmentId: number;
+  originalName: string;
+  kind: DocumentDuplicateCheckIssueKind;
+  message: string;
+}
+
+export interface DocumentDuplicateCheck {
+  id: string | null;
+  status: DocumentDuplicateCheckStatus;
+  total: number;
+  processed: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  groups: DocumentDuplicateGroup[];
+  issues: DocumentDuplicateCheckIssue[];
+  error: string | null;
 }
 
 export type AttachmentOwner =
@@ -1039,6 +1105,37 @@ export type AttachmentOwner =
   | { type: "feature"; id: number }
   | { type: "wikiPage"; id: number }
   | { type: "ticket"; id: number };
+
+export interface AttachmentLocalFolder {
+  id: number;
+  owner: AttachmentOwner;
+  name: string;
+  rootPath: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AttachmentLocalEntry {
+  folderId: number;
+  kind: "directory" | "file";
+  name: string;
+  relativePath: string;
+  mimetype: string | null;
+  size: number | null;
+  updatedAt: string;
+  url: string | null;
+}
+
+export interface AttachmentVersionInput {
+  id: number;
+  expectedVersion: number;
+}
+
+export interface AttachmentLocalFileInput {
+  folderId: number;
+  relativePath: string;
+}
 
 export type AttachmentPreviewKind = "image" | "pdf" | "text" | "csv" | "audio" | "video" | "generatedPdf" | "unsupported";
 export type AttachmentPreviewStatus = "available" | "unsupported" | "failed";

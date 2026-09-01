@@ -13,6 +13,7 @@ import { firstRow } from "../db/query-utils.js";
 import { attachments } from "../db/schema.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { badRequest, notFound } from "../utils/errors.js";
+import { extractWindowsShellThumbnail } from "./windows-shell-thumbnail.service.js";
 
 type AttachmentRecord = typeof attachments.$inferSelect;
 
@@ -147,7 +148,8 @@ function isOfficeMimeType(mimetype: string): boolean {
 }
 
 function assetUrl(record: AttachmentRecord): string {
-  return `/uploads/${record.filename.replaceAll("\\", "/")}`;
+  const resource = record.kind === "document" ? "documents" : "attachments";
+  return `/api/${resource}/${record.id}/content`;
 }
 
 async function readTextPreview(filePath: string): Promise<AttachmentTextPreview> {
@@ -172,8 +174,9 @@ function previewFilename(record: AttachmentRecord): string {
   return `attachment-${record.id}-${hash}.pdf`;
 }
 
-function previewUrl(filename: string): string {
-  return `/previews/${filename}`;
+function previewUrl(record: AttachmentRecord): string {
+  const resource = record.kind === "document" ? "documents" : "attachments";
+  return `/api/${resource}/${record.id}/preview-file`;
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
@@ -257,7 +260,7 @@ async function convertOfficePreview(record: AttachmentRecord, filePath: string):
   if (!result.ok) {
     return failedPreview(record, profile, result.message);
   }
-  return availablePreview(record, profile, previewUrl(path.basename(result.path)), null, null);
+  return availablePreview(record, profile, previewUrl(record), null, null);
 }
 
 function availablePreview(record: AttachmentRecord, profile: AttachmentPreviewProfile, url: string | null, text: AttachmentTextPreview | null, message: string | null): AttachmentPreviewInfo {
@@ -327,17 +330,33 @@ export async function getAttachmentPreview(database: DbClient, id: number): Prom
 
 // --- Kachel-Vorschaubild (Thumbnail) ---
 //
-// Erste Seite als PNG, faul beim ersten Anzeigen erzeugt und im Vorschau-Cache abgelegt. Alles läuft
-// über PDF: Ein PDF wird direkt gerastert, Office-/ODF-Dokumente nutzen zuerst die (gecachte)
-// PDF-Fassung. LibreOffice skaliert per FilterOptions selbst — deshalb braucht es keine Bildbibliothek.
+// Erste Seite als PNG, faul beim ersten Anzeigen erzeugt und im Vorschau-Cache abgelegt. PDF- und
+// Office-/ODF-Dokumente laufen über LibreOffice; `.af` nutzt den lokal registrierten Windows-
+// Thumbnail-Handler. Eine separate Vorschaudatei neben dem Upload wird nicht benötigt.
 //
 // Der Dateiname trägt dasselbe Präfix `attachment-<id>-` wie die PDF-Vorschau; `removeAttachmentPreviews`
 // räumt beide beim Löschen des Dokuments ohne Zusatzcode auf.
 
-/** Dateitypen, für die sich ein Vorschaubild erzeugen lässt: PDF direkt, Office/ODF über die PDF-Fassung. */
-export function supportsThumbnail(record: PreviewSource): boolean {
+type ThumbnailSourceKind = "pdf" | "office" | "affinity";
+
+function thumbnailSourceKind(record: PreviewSource): ThumbnailSourceKind | null {
+  if (extensionOf(record.originalName || record.filename) === "af") {
+    return "affinity";
+  }
+
   const kind = previewProfile(record).kind;
-  return kind === "pdf" || kind === "generatedPdf";
+  if (kind === "pdf") {
+    return "pdf";
+  }
+  if (kind === "generatedPdf") {
+    return "office";
+  }
+  return null;
+}
+
+/** Dateitypen, für die sich ein Vorschaubild erzeugen lässt: PDF, Office/ODF und ausschließlich `.af`. */
+export function supportsThumbnail(record: PreviewSource): boolean {
+  return thumbnailSourceKind(record) !== null;
 }
 
 export function thumbnailFilename(record: Pick<AttachmentRecord, "id" | "filename">): string {
@@ -404,6 +423,29 @@ async function rasterizeFirstPage(pdfPath: string, targetPath: string): Promise<
   }
 }
 
+async function createAffinityThumbnail(filePath: string, targetPath: string): Promise<boolean> {
+  const temporaryPath = `${targetPath}.${crypto.randomUUID()}.tmp`;
+  try {
+    const created = await extractWindowsShellThumbnail({
+      sourcePath: filePath,
+      targetPath: temporaryPath,
+      width: config.thumbnailWidth,
+      height: config.thumbnailHeight,
+      timeoutMs: config.previewConversionTimeoutMs
+    });
+    if (!created) {
+      return false;
+    }
+
+    await fs.rename(temporaryPath, targetPath);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+  }
+}
+
 async function createThumbnail(record: AttachmentRecord, targetPath: string): Promise<string | null> {
   const filePath = attachmentDiskPath(record);
   if (!(await fileExists(filePath))) {
@@ -422,8 +464,13 @@ async function createThumbnail(record: AttachmentRecord, targetPath: string): Pr
       return targetPath;
     }
 
+    const sourceKind = thumbnailSourceKind(record);
+    if (sourceKind === "affinity") {
+      return (await createAffinityThumbnail(filePath, targetPath)) ? targetPath : null;
+    }
+
     let pdfPath = filePath;
-    if (previewProfile(record).kind === "generatedPdf") {
+    if (sourceKind === "office") {
       const converted = await ensureOfficePdf(record, filePath);
       if (!converted.ok) {
         return null;
@@ -431,7 +478,8 @@ async function createThumbnail(record: AttachmentRecord, targetPath: string): Pr
       pdfPath = converted.path;
     }
 
-    return (await rasterizeFirstPage(pdfPath, targetPath)) ? targetPath : null;
+    const created = sourceKind === "pdf" && (await rasterizeFirstPage(pdfPath, targetPath));
+    return created ? targetPath : null;
   } finally {
     releaseConversionSlot();
   }
@@ -480,4 +528,21 @@ export async function removeAttachmentPreviews(id: number): Promise<void> {
       await fs.rm(path.join(config.previewCacheDir, entry), { force: true });
     }
   }
+}
+
+export async function getAttachmentPreviewFile(database: DbClient, id: number): Promise<{ diskPath: string; size: number }> {
+  const record = firstRow(await database.select().from(attachments).where(eq(attachments.id, id)));
+  if (!record) {
+    throw notFound(`Attachment with id ${id} not found`);
+  }
+  const preview = await getAttachmentPreview(database, id);
+  if (preview.status !== "available" || preview.kind !== "generatedPdf" || !preview.previewUrl) {
+    throw notFound(`No generated preview available for attachment with id ${id}`);
+  }
+  assertSafeTestDirectoryPath(config.previewCacheDir, "PREVIEW_CACHE_DIR");
+  const diskPath = path.resolve(config.previewCacheDir, previewFilename(record));
+  if (!isSameOrInside(diskPath, config.previewCacheDir) || !(await fileExists(diskPath))) {
+    throw notFound(`No generated preview available for attachment with id ${id}`);
+  }
+  return { diskPath, size: (await fs.stat(diskPath)).size };
 }

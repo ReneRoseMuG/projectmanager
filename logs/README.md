@@ -2,6 +2,53 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 01.09.26 | 09:11:04 | Abschluss | Attachment/DMS-Trennung | ✅ |
+| 01.09.26 | 08:59:51 | Fix | E2E-Auth- und Kalender-Startblocker | ✅ |
+| 31.08.26 | 18:05:41 | Test | Nicht ausgeführte Abnahmeblöcke | ⚠️ |
+| 31.08.26 | 17:16:23 | Fix | DMS-Bulk-Vertrag | ✅ |
+| 31.08.26 | 10:47:22 | Fix | Testdrift und Lint | ✅ |
+| 31.08.26 | 10:43:39 | Fix | E2E-Worker-DB-Rechte | ✅ |
+| 27.08.26 | 15:17:17 | 5 | MCP und Dokumentation | ✅ |
+| 27.08.26 | 15:15:09 | 4 | Parent-Dateiansicht | ✅ |
+| 27.08.26 | 15:14:32 | 3 | Backend und Berechtigungen | ✅ |
+| 27.08.26 | 14:54:17 | 2 | Datenmodell und Migration | ✅ |
+| 27.08.26 | 10:20:35 | 1 | Attachment-Trennungs-Preflight | ✅ |
+| 27.08.26 | 09:28:31 | Feature | `.af`-Thumbnails über Windows Shell | ⚠️ |
+| 06.08.26 | 12:52:22 | Fix | Admin-Tag-Verwendungsstatus | ✅ |
+| 06.08.26 | 12:43:09 | Fix | Admin-Tag-Bereichsfilter | ✅ |
+| 06.08.26 | 11:30:50 | Fix | Dokument-Kachel-Scrollcontainer | ⚠️ |
+| 06.08.26 | 11:24:11 | Feature | Dokument-Mehrfachauswahl und Tags | ⚠️ |
+| 05.08.26 | 16:29:47 | Abschluss | TKT-176 | ✅ |
+| 05.08.26 | 16:28:10 | Fix | TKT-176 Upload-Tag-Zuordnung | ✅ |
+| 05.08.26 | 10:16:08 | Aufgabe | MCP-Referenzauflösung härten | ✅ |
+| 29.07.26 | 16:19:09 | Abschluss | Tickets 164 bis 167 | ✅ |
+| 29.07.26 | 15:42:03 | Feature | Lokale Attachment-Ordnerquelle | ✅ |
+| 29.07.26 | 15:42:02 | Feature | TKT-167 Attachment-Bulk-Operationen | ✅ |
+| 29.07.26 | 15:42:01 | Feature | TKT-165 Attachment-Ansichten | ✅ |
+| 29.07.26 | 15:42:00 | Feature | TKT-164 Virtuelle Attachment-Ordner | ✅ |
+| 29.07.26 | 15:10:57 | Fix | Sticky Sub-Item-Steuerzeile | ✅ |
+| 27.07.26 | 10:17:18 | 2 | Attachment-Regressionstests | ✅ |
+| 27.07.26 | 10:17:17 | 1 | Attachment-FK-Migration | ✅ |
+| 23.07.26 | 10:58:46 | Fix | Sichere Prozessbeendigung | ✅ |
+| 20.07.26 | 10:08:24 | Feature | MS-80 auf Work-Stand wiederhergestellt | ⚠️ |
+| 19.07.26 | 21:02:18 | 18 | Browserabnahme blockiert | 🔴 |
+| 19.07.26 | 21:02:17 | 17 | Gesamttest und Build | ⚠️ |
+| 19.07.26 | 20:44:36 | 16 | Serielle Testorchestrierung | ✅ |
+| 19.07.26 | 20:43:21 | 15 | MCP-MySQL-Testisolation | ⚠️ |
+| 19.07.26 | 20:41:02 | 14 | API-Testnachführung | ✅ |
+| 19.07.26 | 20:41:01 | 13 | Legacy-Kategorievertrag | ✅ |
+| 19.07.26 | 19:31:32 | 12 | Kategorie-Cleanup und Rollout | ⚠️ |
+| 19.07.26 | 19:01:11 | 11 | Berechtigungen, Versionierung und Dateischutz | ⚠️ |
+| 19.07.26 | 18:42:07 | 10 | Importer- und MCP-Verträge | ⚠️ |
+| 19.07.26 | 18:29:01 | 9 | DMS-Navigation und Karten | ⚠️ |
+| 19.07.26 | 18:16:57 | 8 | SQL-Dokumentfilter | ⚠️ |
+| 19.07.26 | 18:02:54 | 7 | Kategorien zu Tags | ⚠️ |
+| 19.07.26 | 17:53:15 | 6 | Sammlungshierarchie | ⚠️ |
+| 19.07.26 | 17:39:11 | 5 | Attachment-Lebenszyklus | ⚠️ |
+| 19.07.26 | 17:23:47 | 4 | Upload-Bibliothekssichtbarkeit | ⚠️ |
+| 19.07.26 | 17:09:45 | 3 | Manueller Duplikat-Check | ⚠️ |
+| 19.07.26 | 16:58:30 | 2 | DMS-Schema und gemeinsame Typen | ⚠️ |
+| 19.07.26 | 16:50:40 | 1 | DMS-Bestandsaufnahme | ⚠️ |
 | 12.07.26 | 04:14:02 | Feature | DMS-Sortierung für Sammlungen und Kategorien | ⚠️ |
 | 12.07.26 | 03:38:33 | Fix | DMS mit eigenem Scrollcontainer | ✅ |
 | 12.07.26 | 03:25:27 | Fix | DMS-Filterzeile sticky | ✅ |

@@ -22,6 +22,7 @@ import { deleteMilestoneCommentsForIds } from "./comments.service.js";
 import { deleteMilestoneNotesForIds } from "./notes.service.js";
 import { getMilestoneTags, getMilestoneTagsMap } from "./tags.service.js";
 import { getUserOption, getUserOptionsMap, normalizeAssignableUserId } from "./users.service.js";
+import { deleteParentAttachmentsForOwners } from "./attachments.service.js";
 
 interface MilestoneCounts {
   taskCount: number;
@@ -392,6 +393,7 @@ export async function deleteMilestone(database: DbClient, id: number, actor?: Jo
   }
   const projectObject = await getProjectJournalObject(database, milestone.projectId);
 
+  await deleteParentAttachmentsForOwners(database, [{ type: "milestone", id }]);
   await deleteMilestoneNotesForIds(database, [id]);
   await deleteMilestoneCommentsForIds(database, [id]);
 
@@ -413,6 +415,10 @@ export async function deleteMilestone(database: DbClient, id: number, actor?: Jo
 export async function deleteMilestoneOwnedSupportForProjectIds(database: DbClient, projectIds: number[]): Promise<void> {
   const rows = await milestoneRepository.findByProjectIds(database, [...new Set(projectIds)]);
   const milestoneIds = rows.map((row) => row.id);
+  await deleteParentAttachmentsForOwners(
+    database,
+    milestoneIds.map((id) => ({ type: "milestone" as const, id }))
+  );
   await deleteMilestoneNotesForIds(database, milestoneIds);
   await deleteMilestoneCommentsForIds(database, milestoneIds);
 }

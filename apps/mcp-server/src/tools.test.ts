@@ -9,11 +9,25 @@ import { htmlDocument } from "./rich-text.js";
 /**
  * Test Scope:
  *
+ * Test-Ebene:
+ * - Unit
+ *
+ * Realitätsgrad:
+ * - Echte MCP-Schemas und Tool-Ausführung mit einem begrenzten API-Client-Testdouble.
+ *
+ * Mock-Entscheidung:
+ * - Unit-Mock nur für den HTTP-Client; Schema, Pfadbildung und Payload-Erzeugung laufen real.
+ *
+ * Isolation:
+ * - Rein im Prozess, ohne Datenbank- oder Dateisystemzugriff.
+ *
  * Abgedeckte Regeln:
  * - MCP-v1 bietet vollständige Create-, Update- und Resolve-Tools an.
  * - Delete-Tools löschen pro Typ über die DELETE-Endpunkte; preview_delete bleibt read-only.
  * - Schreibende Tools befüllen Stammdatenfelder und verwenden Versionsschutz.
  * - Feature-Verknüpfungen erhalten bestehende Links.
+ * - Parent-Attachments sind exklusiv; DMS-Dokumente werden separat importiert und nur explizit verknüpft.
+ * - Das Lösen einer Parent-Dokumentverknüpfung adressiert ausschließlich die Relation.
  *
  * Fehlerfälle:
  * - Ungültige Objekt-Referenzen werden abgelehnt.
@@ -104,6 +118,11 @@ describe("MCP tool definitions", () => {
       "create_milestone",
       "add_attachment_to_parent",
       "add_attachments_to_parent",
+      "list_parent_document_links",
+      "link_document_to_parent",
+      "unlink_document_from_parent",
+      "add_document_to_library",
+      "list_document_library_options",
       "add_comments_to_parent",
       "add_notes_to_parent",
       "list_tags",
@@ -238,7 +257,7 @@ describe("MCP tool definitions", () => {
 
   it("lists all available tags", async () => {
     const client = createMappedClient({
-      tags: [{ id: 1, name: "Bug", color: "#ef4444", version: 1, usageCounts: { projects: 0, milestones: 0, tasks: 1, tickets: 0 } }]
+      tags: [{ id: 1, name: "Bug", color: "#ef4444", version: 1, usageCounts: { projects: 0, milestones: 0, tasks: 1, tickets: 0, documents: 0 } }]
     });
 
     const result = (await tool("list_tags", client).execute({})) as Array<{ name: string }>;
@@ -477,6 +496,98 @@ describe("MCP tool definitions", () => {
     expect(client.postForm).not.toHaveBeenCalled();
   });
 
+  it("rejects the removed libraryVisibility field on parent attachments", () => {
+    const client = createMockClient();
+
+    expect(() => tool("add_attachment_to_parent", client).execute({
+      parentType: "task",
+      parentId: 3,
+      fileName: "unklar.txt",
+      contentBase64: Buffer.from("unklar", "utf8").toString("base64"),
+      libraryVisibility: "document-library"
+    })).toThrow();
+    expect(client.postForm).not.toHaveBeenCalled();
+  });
+
+  it("imports documents without or with exactly one collection and rejects legacy assignment fields", async () => {
+    const client = createMockClient();
+    client.postForm
+      .mockResolvedValueOnce({ id: 21, isInDocumentLibrary: true, folders: [], tags: [], version: 1 })
+      .mockResolvedValueOnce({ id: 22, isInDocumentLibrary: true, folders: [{ id: 7 }], tags: [{ id: 9 }], version: 2 });
+    const contentBase64 = Buffer.from("DMS", "utf8").toString("base64");
+
+    const withoutFolder = await tool("add_document_to_library", client).execute({ fileName: "ohne.txt", contentBase64 });
+    const withFolder = await tool("add_document_to_library", client).execute({
+      fileName: "mit.txt",
+      contentBase64,
+      folderId: 7,
+      tagIds: [9, 9]
+    });
+
+    expect(withoutFolder).toMatchObject({ id: 21, isInDocumentLibrary: true, folders: [], tags: [], version: 1 });
+    expect(withFolder).toMatchObject({ id: 22, isInDocumentLibrary: true, folders: [{ id: 7 }], tags: [{ id: 9 }], version: 2 });
+    expect(client.postForm.mock.calls.map(([path]) => path)).toEqual(["documents", "documents?folder=7&tags=9"]);
+    expect(() => tool("add_document_to_library", client).execute({ fileName: "alt.txt", contentBase64, categoryId: 3 })).toThrow();
+    expect(() => tool("add_document_to_library", client).execute({ fileName: "mehrfach.txt", contentBase64, folderIds: [7, 8] })).toThrow();
+    expect(client.postForm).toHaveBeenCalledTimes(2);
+  });
+
+  it("lists, creates and removes explicit parent document links without document mutation", async () => {
+    const client = createMockClient();
+    const linkedDocument = {
+      id: 31,
+      owner: { type: "task", id: 8 },
+      document: { id: 21, kind: "document" },
+      folderId: 4,
+      version: 2
+    };
+    client.get.mockResolvedValue([linkedDocument]);
+    client.post.mockResolvedValue(linkedDocument);
+    client.del.mockResolvedValue(undefined);
+
+    const links = await tool("list_parent_document_links", client).execute({ parentType: "task", parentId: 8 });
+    const created = await tool("link_document_to_parent", client).execute({
+      parentType: "task",
+      parentId: 8,
+      documentId: 21,
+      folderId: 4
+    });
+    const unlinked = await tool("unlink_document_from_parent", client).execute({
+      parentType: "task",
+      parentId: 8,
+      linkId: 31,
+      expectedVersion: 2
+    });
+
+    expect(links).toEqual([linkedDocument]);
+    expect(created).toEqual(linkedDocument);
+    expect(unlinked).toEqual({ success: true });
+    expect(client.get).toHaveBeenCalledWith("tasks/8/document-links");
+    expect(client.post).toHaveBeenCalledWith("tasks/8/document-links", { documentId: 21, folderId: 4 });
+    expect(client.del).toHaveBeenCalledWith("tasks/8/document-links/31?expectedVersion=2");
+    expect(client.patch).not.toHaveBeenCalled();
+    expect(client.put).not.toHaveBeenCalled();
+  });
+
+  it("lists only assignable DMS tags with the collection hierarchy", async () => {
+    const client = createMockClient();
+    client.get
+      .mockResolvedValueOnce([{ id: 7, name: "Sauna", parentId: null, version: 1 }])
+      .mockResolvedValueOnce([
+        { id: 9, name: "Oval", domain: "dms", isSystem: false },
+        { id: 10, name: "System", domain: "dms", isSystem: true },
+        { id: 11, name: "Projekt", domain: "pm", isSystem: false }
+      ]);
+
+    const result = await tool("list_document_library_options", client).execute({});
+
+    expect(result).toEqual({
+      folders: [{ id: 7, name: "Sauna", parentId: null, version: 1 }],
+      tags: [{ id: 9, name: "Oval", domain: "dms", isSystem: false }]
+    });
+    expect(client.get.mock.calls.map(([path]) => path)).toEqual(["attachment-folders", "tags?domain=dms"]);
+  });
+
   it("creates bulk notes and comments with the expected parent paths", async () => {
     const client = createMockClient();
     client.post
@@ -533,7 +644,10 @@ describe("MCP tool definitions", () => {
     })) as BulkResult<{ id: number }>;
 
     expect(result).toMatchObject({ requested: 2, createdCount: 2, errorCount: 0 });
-    expect(client.postForm.mock.calls.map(([path]) => path)).toEqual(["features/4/attachments", "features/4/attachments"]);
+    expect(client.postForm.mock.calls.map(([path]) => path)).toEqual([
+      "features/4/attachments",
+      "features/4/attachments"
+    ]);
     const uploadedFile = (client.postForm.mock.calls[1]?.[1] as FormData).get("file");
     expect(uploadedFile).toBeInstanceOf(Blob);
     expect((uploadedFile as File).name).toBe("two.txt");
@@ -636,7 +750,10 @@ describe("MCP tool definitions", () => {
         }
       ]
     ]);
-    expect(client.postForm.mock.calls.map(([path]) => path)).toEqual(["tasks/10/attachments", "tickets/20/attachments"]);
+    expect(client.postForm.mock.calls.map(([path]) => path)).toEqual([
+      "tasks/10/attachments",
+      "tickets/20/attachments"
+    ]);
   });
 
   it("rejects invalid bulk item attachment content before creating the task", async () => {

@@ -1,4 +1,11 @@
+import {
+  ATTACHMENT_OWNER_TYPES,
+  type AttachmentLocalFileInput,
+  type AttachmentOwner,
+  type AttachmentVersionInput
+} from "@taskmanager/shared-types";
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { createReadStream } from "node:fs";
 import { requireCurrentUser } from "../plugins/auth.js";
 import {
   createFeatureAttachment,
@@ -6,8 +13,10 @@ import {
   createProjectAttachment,
   createTaskAttachment,
   createWikiPageAttachment,
+  bulkDeleteAttachments,
+  deleteParentAttachment,
   deleteAttachment,
-  deleteWikiPageAttachment,
+  getAttachmentFile,
   listRecentAttachments,
   listFeatureAttachments,
   listMilestoneAttachments,
@@ -16,7 +25,8 @@ import {
   listWikiPageAttachments,
   openAttachment
 } from "../services/attachments.service.js";
-import { getAttachmentPreview } from "../services/attachment-preview.service.js";
+import { getAttachmentPreview, getAttachmentPreviewFile } from "../services/attachment-preview.service.js";
+import { buildAttachmentArchive } from "../services/document-download.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
@@ -43,6 +53,33 @@ const uploadBodySchema = {
   }
 } as const;
 
+const expectedVersionQuerySchema = {
+  type: "object",
+  required: ["expectedVersion"],
+  additionalProperties: false,
+  properties: {
+    expectedVersion: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+const attachmentContentQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    download: { type: "boolean" }
+  }
+} as const;
+
+const ownerAttachmentParamSchema = {
+  type: "object",
+  required: ["id", "attachmentId"],
+  additionalProperties: false,
+  properties: {
+    id: { type: "integer", minimum: 1 },
+    attachmentId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
 const recentAttachmentsQuerySchema = {
   type: "object",
   additionalProperties: false,
@@ -53,6 +90,67 @@ const recentAttachmentsQuerySchema = {
     limit: { type: "integer", minimum: 1, maximum: 50 }
   }
 } as const;
+
+const attachmentOwnerProperties = {
+  ownerType: { type: "string", enum: ATTACHMENT_OWNER_TYPES },
+  ownerId: { type: "integer", minimum: 1 }
+} as const;
+
+const attachmentVersionSelectionSchema = {
+  type: "object",
+  required: ["id", "expectedVersion"],
+  additionalProperties: false,
+  properties: {
+    id: { type: "integer", minimum: 1 },
+    expectedVersion: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+const bulkAttachmentBodySchema = {
+  type: "object",
+  required: ["ownerType", "ownerId", "attachments"],
+  additionalProperties: false,
+  properties: {
+    ...attachmentOwnerProperties,
+    attachments: {
+      type: "array",
+      minItems: 1,
+      maxItems: 100,
+      items: attachmentVersionSelectionSchema
+    }
+  }
+} as const;
+
+const attachmentArchiveBodySchema = {
+  type: "object",
+  required: ["ownerType", "ownerId", "attachmentIds", "localFiles"],
+  additionalProperties: false,
+  properties: {
+    ...attachmentOwnerProperties,
+    attachmentIds: {
+      type: "array",
+      maxItems: 100,
+      items: { type: "integer", minimum: 1 }
+    },
+    localFiles: {
+      type: "array",
+      maxItems: 100,
+      items: {
+        type: "object",
+        required: ["folderId", "relativePath"],
+        additionalProperties: false,
+        properties: {
+          folderId: { type: "integer", minimum: 1 },
+          relativePath: { type: "string", minLength: 1, maxLength: 32767 }
+        }
+      }
+    }
+  }
+} as const;
+
+function attachmentOwner(input: { ownerType: AttachmentOwner["type"]; ownerId: number }): AttachmentOwner {
+  return { type: input.ownerType, id: input.ownerId };
+}
 
 function recentAttachmentOwnerFromQuery(query: { ownerType?: "project" | "milestone" | "task"; ownerId?: number; mine?: boolean }) {
   if (query.ownerType !== undefined || query.ownerId !== undefined) {
@@ -65,6 +163,12 @@ function recentAttachmentOwnerFromQuery(query: { ownerType?: "project" | "milest
     return { type: query.ownerType, id: query.ownerId };
   }
   return undefined;
+}
+
+function contentDisposition(filename: string, download: boolean): string {
+  const fallback = filename.replace(/["\\\r\n]/g, "_");
+  const mode = download ? "attachment" : "inline";
+  return `${mode}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
 async function readUpload(request: FastifyRequest) {
@@ -87,6 +191,61 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     async (request) => {
       const currentUser = await requireCurrentUser(request);
       return listRecentAttachments(app.db, { owner: recentAttachmentOwnerFromQuery(request.query), currentUserId: currentUser.id, limit: request.query.limit, mine: request.query.mine });
+    }
+  );
+
+  app.post<{
+    Body: {
+      ownerType: AttachmentOwner["type"];
+      ownerId: number;
+      attachments: AttachmentVersionInput[];
+    };
+  }>(
+    "/attachments/bulk-delete",
+    {
+      config: { auth: { resource: "attachments", action: "delete" } },
+      schema: {
+        body: bulkAttachmentBodySchema,
+        response: { 204: { type: "null" } }
+      }
+    },
+    async (request, reply) => {
+      await bulkDeleteAttachments(
+        app.db,
+        attachmentOwner(request.body),
+        request.body.attachments,
+        createJournalActor(request.currentUser)
+      );
+      return reply.status(204).send();
+    }
+  );
+
+  app.post<{
+    Body: {
+      ownerType: AttachmentOwner["type"];
+      ownerId: number;
+      attachmentIds: number[];
+      localFiles: AttachmentLocalFileInput[];
+    };
+  }>(
+    "/attachments/archive",
+    {
+      config: { auth: { resource: "attachments", action: "read" } },
+      schema: { body: attachmentArchiveBodySchema }
+    },
+    async (request, reply) => {
+      const archive = await buildAttachmentArchive(
+        app.db,
+        attachmentOwner(request.body),
+        request.body.attachmentIds,
+        request.body.localFiles
+      );
+      archive.on("error", (error) => reply.raw.destroy(error));
+      reply
+        .type("application/zip")
+        .header("Content-Disposition", "attachment; filename=\"attachments.zip\"");
+      void archive.finalize();
+      return reply.send(archive);
     }
   );
 
@@ -124,8 +283,47 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
 
   app.get<{ Params: { id: number } }>(
     "/attachments/:id/preview",
-    { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
-    async (request) => getAttachmentPreview(app.db, request.params.id)
+    {
+      config: { auth: { resource: "attachments", action: "read" } },
+      schema: { params: idParamSchema, response: { 200: objectResponseSchema } }
+    },
+    async (request) => {
+      await getAttachmentFile(app.db, request.params.id, "parent_attachment");
+      return getAttachmentPreview(app.db, request.params.id);
+    }
+  );
+
+  app.get<{ Params: { id: number }; Querystring: { download?: boolean } }>(
+    "/attachments/:id/content",
+    {
+      config: { auth: { resource: "attachments", action: "read" } },
+      schema: { params: idParamSchema, querystring: attachmentContentQuerySchema }
+    },
+    async (request, reply) => {
+      const file = await getAttachmentFile(app.db, request.params.id, "parent_attachment");
+      return reply
+        .type(file.mimetype)
+        .header("Content-Length", String(file.size))
+        .header("Content-Disposition", contentDisposition(file.originalName, request.query.download === true))
+        .send(createReadStream(file.diskPath));
+    }
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/attachments/:id/preview-file",
+    {
+      config: { auth: { resource: "attachments", action: "read" } },
+      schema: { params: idParamSchema }
+    },
+    async (request, reply) => {
+      await getAttachmentFile(app.db, request.params.id, "parent_attachment");
+      const file = await getAttachmentPreviewFile(app.db, request.params.id);
+      return reply
+        .type("application/pdf")
+        .header("Content-Length", String(file.size))
+        .header("Content-Disposition", "inline")
+        .send(createReadStream(file.diskPath));
+    }
   );
 
   app.post<{ Params: { id: number } }>(
@@ -135,7 +333,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
       schema: { params: idParamSchema, response: { 204: { type: "null" } } }
     },
     async (request, reply) => {
-      await openAttachment(app.db, request.params.id, app.fileOpener, createJournalActor(request.currentUser));
+      await openAttachment(app.db, request.params.id, app.fileOpener, createJournalActor(request.currentUser), "parent_attachment");
       return reply.status(204).send();
     }
   );
@@ -186,33 +384,69 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
       }
     );
 
-    app.delete<{ Params: { id: number; attachmentId: number } }>(
+    app.delete<{
+      Params: { id: number; attachmentId: number };
+      Querystring: { expectedVersion: number };
+    }>(
       `${basePath}/:id/attachments/:attachmentId`,
       {
+        config: { auth: { resource: "attachments", action: "delete" } },
         schema: {
-          params: {
-            type: "object",
-            required: ["id", "attachmentId"],
-            properties: {
-              id: { type: "integer", minimum: 1 },
-              attachmentId: { type: "integer", minimum: 1 }
-            }
-          },
+          params: ownerAttachmentParamSchema,
+          querystring: expectedVersionQuerySchema,
           response: { 204: { type: "null" } }
         }
       },
       async (request, reply) => {
-        await deleteWikiPageAttachment(app.db, request.params.id, request.params.attachmentId, createJournalActor(request.currentUser));
+        await deleteParentAttachment(
+          app.db,
+          { type: "wikiPage", id: request.params.id },
+          request.params.attachmentId,
+          request.query,
+          createJournalActor(request.currentUser)
+        );
         return reply.status(204).send();
       }
     );
   }
 
-  app.delete<{ Params: { id: number } }>(
+  const unlinkRoutes = [
+    { path: "/projects/:id/attachments/:attachmentId", ownerType: "project" as const },
+    { path: "/tasks/:id/attachments/:attachmentId", ownerType: "task" as const },
+    { path: "/milestones/:id/attachments/:attachmentId", ownerType: "milestone" as const },
+    { path: "/features/:id/attachments/:attachmentId", ownerType: "feature" as const }
+  ];
+  for (const route of unlinkRoutes) {
+    app.delete<{
+      Params: { id: number; attachmentId: number };
+      Querystring: { expectedVersion: number };
+    }>(
+      route.path,
+      {
+        config: { auth: { resource: "attachments", action: "delete" } },
+        schema: { params: ownerAttachmentParamSchema, querystring: expectedVersionQuerySchema, response: { 204: { type: "null" } } }
+      },
+      async (request, reply) => {
+        await deleteParentAttachment(
+          app.db,
+          { type: route.ownerType, id: request.params.id },
+          request.params.attachmentId,
+          request.query,
+          createJournalActor(request.currentUser)
+        );
+        return reply.status(204).send();
+      }
+    );
+  }
+
+  app.delete<{ Params: { id: number }; Querystring: { expectedVersion: number } }>(
     "/attachments/:id",
-    { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
+    {
+      config: { auth: { resource: "attachments", action: "delete" } },
+      schema: { params: idParamSchema, querystring: expectedVersionQuerySchema, response: { 204: { type: "null" } } }
+    },
     async (request, reply) => {
-      await deleteAttachment(app.db, request.params.id, createJournalActor(request.currentUser));
+      await deleteAttachment(app.db, request.params.id, request.query.expectedVersion, createJournalActor(request.currentUser), "parent_attachment");
       return reply.status(204).send();
     }
   );

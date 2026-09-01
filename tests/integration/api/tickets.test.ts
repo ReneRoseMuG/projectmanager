@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Test Scope: Tickets API
  *
  * Covered rules:

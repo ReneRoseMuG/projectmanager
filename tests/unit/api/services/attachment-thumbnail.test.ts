@@ -16,7 +16,7 @@
  * - Keine (reine Funktionen).
  *
  * Abgedeckte Regeln:
- * - Ein Vorschaubild gibt es fuer PDF (direkt) sowie Office- und ODF-Dokumente (ueber die PDF-Fassung).
+ * - Ein Vorschaubild gibt es für PDF (direkt), Office/ODF (PDF-Fassung) und `.af` (Windows Shell).
  * - Die Endung entscheidet auch dann, wenn der Mimetype nichtssagend ist (Browser liefern oft
  *   application/octet-stream).
  * - Der Cache-Dateiname traegt dasselbe Praefix `attachment-<id>-` wie die PDF-Vorschau, damit
@@ -24,7 +24,7 @@
  * - Der LibreOffice-Aufruf gibt die Zielgroesse ueber FilterOptions vor (deshalb keine Bildbibliothek).
  *
  * Fehlerfaelle:
- * - Text, Bild, Video, Audio und Archiv bekommen KEIN Vorschaubild (Gegenbeispiele).
+ * - Text, Bild, Video, Audio, Archiv und alte Affinity-Endungen bekommen KEIN Vorschaubild.
  * - Zwei Dokumente mit gleicher Id, aber unterschiedlicher Ablagedatei, kollidieren nicht.
  *
  * Ziel:
@@ -57,6 +57,14 @@ describe("supportsThumbnail", () => {
     // Browser liefern beim Upload haeufig application/octet-stream.
     expect(supportsThumbnail(source("rechnung.pdf", "application/octet-stream"))).toBe(true);
     expect(supportsThumbnail(source("notiz.odp", "application/octet-stream"))).toBe(true);
+    expect(supportsThumbnail(source("entwurf.af", "application/octet-stream"))).toBe(true);
+  });
+
+  it("unterstützt ausschließlich die aktuelle Affinity-Endung .af", () => {
+    expect(supportsThumbnail(source("entwurf.af", "application/octet-stream"))).toBe(true);
+    expect(supportsThumbnail(source("entwurf.afdesign", "application/octet-stream"))).toBe(false);
+    expect(supportsThumbnail(source("foto.afphoto", "application/octet-stream"))).toBe(false);
+    expect(supportsThumbnail(source("layout.afpub", "application/octet-stream"))).toBe(false);
   });
 
   it("verweigert ein Vorschaubild fuer Typen ohne Seitenlayout", () => {

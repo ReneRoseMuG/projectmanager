@@ -100,6 +100,7 @@ export default function App() {
   const dashboardAccess = hasPermission(auth.user, "dashboards", "read");
   const dayPlanAccess = hasPermission(auth.user, "dayPlans", "read");
   const notesAccess = hasPermission(auth.user, "notes", "read");
+  const documentsAccess = hasPermission(auth.user, "documents", "read");
   const fullBleedRoute = isFullBleedRoute(location.pathname);
   const standaloneView = isStandaloneSearch(location.search);
   const mainClass = `flex min-h-0 min-w-0 flex-1 flex-col ${fullBleedRoute ? "overflow-hidden p-0" : "overflow-auto p-4 md:p-6"}`;
@@ -129,7 +130,7 @@ export default function App() {
       <Route path="/notes/:id" element={<NoteDetailPage />} />
       <Route path="/wiki" element={<WikiPage />} />
       <Route path="/wiki/:id" element={<WikiPage />} />
-      <Route path="/documents" element={<DocumentsPage />} />
+      <Route path="/documents" element={documentsAccess ? <DocumentsPage /> : <ForbiddenPage />} />
       <Route path="/calendar" element={<CalendarPage />} />
       <Route path="/day-plan" element={dayPlanAccess ? <DayPlanPage /> : <ForbiddenPage />} />
       <Route path="/journal" element={<JournalPage />} />

@@ -4,18 +4,15 @@ import { useRef, useState } from "react";
 import { Button } from "../ui/Button";
 
 interface AttachmentUploaderProps {
-  onUpload: (file: File) => Promise<unknown>;
-  /**
-   * Läuft einmal je Upload-Vorgang, nachdem ALLE Dateien durch sind — nicht je Datei. Der Aufrufer
-   * kann hier gesammelt nachladen, statt nach jeder einzelnen Datei die ganze Liste neu zu holen.
-   * Optional: Aufrufer ohne diese Prop invalidieren wie bisher in ihrer eigenen Mutation.
-   */
-  onBatchComplete?: () => void | Promise<void>;
   size?: "default" | "sm";
   tone?: "light" | "dark";
+  visibilityMode?: "owner" | "library";
+  onUpload: (file: File) => Promise<unknown>;
 }
 
-export function AttachmentUploader({ onUpload, onBatchComplete, size = "default", tone = "light" }: AttachmentUploaderProps) {
+export function AttachmentUploader(props: AttachmentUploaderProps) {
+  const { size = "default", tone = "light" } = props;
+  const visibilityMode = props.visibilityMode ?? "library";
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [active, setActive] = useState(false);
   const [uploading, setUploading] = useState<string[]>([]);
@@ -27,18 +24,11 @@ export function AttachmentUploader({ onUpload, onBatchComplete, size = "default"
     setUploading(fileArray.map((file) => file.name));
     try {
       for (const file of fileArray) {
-        await onUpload(file);
+        await props.onUpload(file);
       }
     } catch {
       // Upload errors are surfaced by the caller via toast feedback.
     } finally {
-      // Auch nach einem Fehler: Bereits hochgeladene Dateien sollen sichtbar werden. Wird abgewartet,
-      // damit die "lädt hoch"-Anzeige bis zum abgeschlossenen Nachladen stehen bleibt.
-      try {
-        await onBatchComplete?.();
-      } catch {
-        // Ein fehlgeschlagenes Nachladen ändert nichts am Ergebnis des Uploads.
-      }
       setUploading([]);
     }
   };
@@ -78,6 +68,11 @@ export function AttachmentUploader({ onUpload, onBatchComplete, size = "default"
           }
         }}
       />
+      {visibilityMode === "owner" ? (
+        <p className={`max-w-xl text-xs ${dark ? "text-white/55" : "text-steel-500"}`}>
+          Uploads hier werden ausschließlich als Anhänge dieses Elements gespeichert. DMS-Dokumente werden separat verknüpft.
+        </p>
+      ) : null}
       <div className={`flex items-center justify-center rounded-lg text-white shadow-steel-icon ${dark ? "border border-white/15 bg-white/10" : "bg-steel-700"} ${compact ? "h-10 w-10" : "h-14 w-14"}`}>
         <Upload size={compact ? 18 : 22} />
       </div>
@@ -86,11 +81,20 @@ export function AttachmentUploader({ onUpload, onBatchComplete, size = "default"
         <p className={`text-sm ${dark ? "text-white/55" : "text-steel-500"}`}>oder über den Button auswählen - max. 25 MB pro Datei</p>
       </div>
       <div>
-        <Button variant="primary" icon={<Upload size={16} />} onClick={() => inputRef.current?.click()}>
+        <Button
+          variant="primary"
+          icon={<Upload size={16} />}
+          onClick={() => inputRef.current?.click()}
+        >
           Auswählen
         </Button>
       </div>
-      {uploading.length > 0 ? <p className={`text-xs ${dark ? "text-white/55" : "text-steel-500"}`}>{uploading.join(", ")}</p> : null}
+      {uploading.length > 0 ? (
+        <div className={`text-xs ${dark ? "text-white/55" : "text-steel-500"}`}>
+          <p>{uploading.join(", ")}</p>
+          {visibilityMode === "owner" ? <p className="mt-1 font-medium">Exklusiver Parent-Anhang</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

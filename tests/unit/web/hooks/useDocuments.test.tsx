@@ -2,7 +2,7 @@
 
 /**
  * Test Scope:
- * DMS-Frontend: useDocumentActions / useFolders / useCategories (MS-75).
+ * DMS-Frontend: useDocumentActions / useFolders (MS-80).
  *
  * Test-Ebene:
  * - Unit
@@ -18,23 +18,24 @@
  * - jsdom ohne Netzwerk; eigener QueryClient pro Test.
  *
  * Abgedeckte Regeln:
- * - Einsortieren/Verschieben/Entfernen rufen den passenden Endpunkt mit den richtigen Argumenten.
- * - Sammlungs-/Kategorie-Verwaltung (umbenennen/loeschen/sortieren) ruft den passenden Endpunkt.
+ * - Uploads geben die direkte Sammlung und aktive DMS-Tags gemeinsam an die API-Schicht weiter.
+ * - Einsortieren/Verschieben und endgültiges Löschen rufen den passenden Endpunkt mit den richtigen Argumenten.
+ * - Tag-Änderungen geben die geladene Dokumentversion für den Konfliktschutz weiter.
+ * - Sammlungsverwaltung (umbenennen/loeschen) ruft den passenden Endpunkt.
  * - Nach jeder Mutation wird die Dokument-Ansicht invalidiert (beobachtbar am QueryClient).
- * - AUSNAHME Upload: Die Upload-Mutation invalidiert bewusst NICHT. Der Uploader laedt mehrere
- *   Dateien sequenziell hoch; nachgeladen wird einmal am Ende ueber refreshDocuments.
  *
  * Ziel:
  * Absichern, dass die Organisier- und Verwaltungs-Bedienung wirklich die richtigen Server-Aktionen
  * ausloest und die Ansicht aktualisiert - nicht nur, dass Knoepfe existieren.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { Attachment, Paginated } from "@taskmanager/shared-types";
+import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as documentsApi from "../../../../apps/web/src/api/documents";
-import { useCategories, useDocumentActions, useFolders } from "../../../../apps/web/src/hooks/useDocuments";
+import { useDocumentActions, useFolders } from "../../../../apps/web/src/hooks/useDocuments";
 import { queryKeys } from "../../../../apps/web/src/queries/queryKeys";
 
 vi.mock("../../../../apps/web/src/api/documents", () => ({
@@ -43,26 +44,13 @@ vi.mock("../../../../apps/web/src/api/documents", () => ({
   uploadDocument: vi.fn().mockResolvedValue({ id: 1 }),
   updateDocumentMetadata: vi.fn().mockResolvedValue({}),
   setDocumentTags: vi.fn().mockResolvedValue({}),
-  moveDocument: vi.fn().mockResolvedValue(undefined),
-  deleteDocument: vi.fn().mockResolvedValue(undefined),
-  assignDocumentCategory: vi.fn().mockResolvedValue(undefined),
-  removeDocumentCategory: vi.fn().mockResolvedValue(undefined),
-  addDocumentToFolder: vi.fn().mockResolvedValue(undefined),
-  removeDocumentFromFolder: vi.fn().mockResolvedValue(undefined),
-  addDocumentsToFolder: vi.fn().mockResolvedValue(undefined),
-  assignDocumentsCategory: vi.fn().mockResolvedValue(undefined),
-  downloadDocument: vi.fn().mockResolvedValue(new Blob(["file"], { type: "text/plain" })),
-  downloadDocumentsZip: vi.fn().mockResolvedValue(new Blob(["zip"], { type: "application/zip" })),
-  getAttachmentCategories: vi.fn().mockResolvedValue([]),
-  createAttachmentCategory: vi.fn().mockResolvedValue({ id: 1 }),
-  updateAttachmentCategory: vi.fn().mockResolvedValue({ id: 1 }),
-  deleteAttachmentCategory: vi.fn().mockResolvedValue(undefined),
-  reorderAttachmentCategories: vi.fn().mockResolvedValue([]),
+  setDocumentFolder: vi.fn().mockResolvedValue({ id: 10 }),
+  deleteDocumentPermanently: vi.fn().mockResolvedValue(undefined),
   getAttachmentFolders: vi.fn().mockResolvedValue([]),
   createAttachmentFolder: vi.fn().mockResolvedValue({ id: 1 }),
   updateAttachmentFolder: vi.fn().mockResolvedValue({ id: 1 }),
   deleteAttachmentFolder: vi.fn().mockResolvedValue(undefined),
-  reorderAttachmentFolders: vi.fn().mockResolvedValue([])
+  addDocumentTagsBulk: vi.fn().mockResolvedValue([])
 }));
 
 let client: QueryClient;
@@ -80,6 +68,81 @@ afterEach(() => {
 });
 
 describe("useDocumentActions", () => {
+  it("ergänzt Tags für eine versionsgebundene Dokumentauswahl und invalidiert die Ansicht", async () => {
+    const firstDocument: Attachment = {
+      id: 10,
+      kind: "document",
+      owners: [],
+      originalName: "eins.pdf",
+      displayName: null,
+      description: null,
+      filename: "eins.pdf",
+      mimetype: "application/pdf",
+      size: 10,
+      url: "/api/documents/10/content",
+      contentHash: null,
+      isInDocumentLibrary: true,
+      tags: [],
+      folder: null,
+      folders: [],
+      createdAt: "2026-08-06T08:00:00.000Z",
+      updatedAt: "2026-08-06T08:00:00.000Z",
+      version: 2,
+    };
+    const secondDocument: Attachment = {
+      ...firstDocument,
+      id: 11,
+      originalName: "zwei.pdf",
+      filename: "zwei.pdf",
+      url: "/api/documents/11/content",
+      version: 4,
+    };
+    const importantTag = {
+      id: 3,
+      name: "Wichtig",
+      color: "#ef4444",
+      isSystem: false,
+      domain: "dms" as const,
+      version: 1,
+    };
+    const updatedDocuments: Attachment[] = [
+      { ...firstDocument, tags: [importantTag], version: 3 },
+      { ...secondDocument, tags: [importantTag], version: 5 },
+    ];
+    vi.mocked(documentsApi.addDocumentTagsBulk).mockResolvedValueOnce(updatedDocuments);
+    const libraryKey = [...queryKeys.documents.library({}), "__progressiveList"] as const;
+    client.setQueryData<InfiniteData<Paginated<Attachment>>>(libraryKey, {
+      pages: [{ data: [firstDocument, secondDocument], total: 2, page: 1, pageSize: 50 }],
+      pageParams: [1],
+    });
+    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.addTagsBulk(
+        [{ id: 10, expectedVersion: 2 }, { id: 11, expectedVersion: 4 }],
+        [3, 4],
+      );
+    });
+
+    expect(documentsApi.addDocumentTagsBulk).toHaveBeenCalledWith(
+      [{ id: 10, expectedVersion: 2 }, { id: 11, expectedVersion: 4 }],
+      [3, 4],
+    );
+    expect(client.getQueryData<InfiniteData<Paginated<Attachment>>>(libraryKey)?.pages[0]?.data).toEqual(updatedDocuments);
+    await waitFor(() => expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(true));
+  });
+
+  it("übergibt Sammlung und DMS-Tags gemeinsam an den Upload", async () => {
+    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
+    const file = new File(["Inhalt"], "beleg.pdf", { type: "application/pdf" });
+
+    await act(async () => {
+      await result.current.uploadDocument(file, 5, [3, 4]);
+    });
+
+    expect(documentsApi.uploadDocument).toHaveBeenCalledWith(file, 5, [3, 4]);
+  });
+
   it("sortiert ein Dokument in eine Sammlung ein und invalidiert die Ansicht", async () => {
     // Ausgangszustand: eine geladene Dokument-Ansicht, die nach der Aktion aktualisiert werden muss.
     const libraryKey = queryKeys.documents.library({});
@@ -88,10 +151,10 @@ describe("useDocumentActions", () => {
     const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
 
     await act(async () => {
-      await result.current.addToFolder(5, 10);
+      await result.current.setDocumentFolder(10, 5, 3);
     });
 
-    expect(documentsApi.addDocumentToFolder).toHaveBeenCalledWith(5, 10);
+    expect(documentsApi.setDocumentFolder).toHaveBeenCalledWith(10, 5, 3);
     await waitFor(() => expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(true));
   });
 
@@ -99,128 +162,35 @@ describe("useDocumentActions", () => {
     const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
 
     await act(async () => {
-      await result.current.moveDocument(10, 1, 2);
-      await result.current.removeFromFolder(3, 10);
-      await result.current.deleteDocument(10);
+      await result.current.setDocumentFolder(10, null, 4);
+      await result.current.deleteDocumentPermanently(10, 5);
     });
 
-    expect(documentsApi.moveDocument).toHaveBeenCalledWith(10, 1, 2);
-    expect(documentsApi.removeDocumentFromFolder).toHaveBeenCalledWith(3, 10);
-    // deleteDocument nutzt die API direkt als mutationFn; TanStack reicht ein Kontext-Objekt als 2. Argument durch.
-    expect(documentsApi.deleteDocument).toHaveBeenCalledWith(10, expect.anything());
+    expect(documentsApi.setDocumentFolder).toHaveBeenCalledWith(10, null, 4);
+    expect(documentsApi.deleteDocumentPermanently).toHaveBeenCalledWith(10, 5);
   });
 
-  it("invalidiert beim Upload NICHT - erst refreshDocuments laedt die Ansicht nach", async () => {
-    const libraryKey = queryKeys.documents.library({});
-    client.setQueryData(libraryKey, [{ id: 10 }]);
-
+  it("setzt Tags mit der erwarteten Dokumentversion", async () => {
     const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
 
     await act(async () => {
-      await result.current.uploadDocument(new File(["x"], "a.txt"), 5, 7);
+      await result.current.setTags(10, [3, 4], 7);
     });
 
-    expect(documentsApi.uploadDocument).toHaveBeenCalledWith(expect.any(File), 5, 7);
-    // Der Kern der Aenderung: Eine Invalidierung je Datei wuerde bei einem Mehrfach-Upload die
-    // gesamte (progressiv geladene) Bibliothek je Datei neu holen - und weil mutateAsync auf
-    // onSuccess wartet, wuerde der naechste Upload darauf blockieren.
-    expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(false);
-
-    // Nachgeladen wird genau einmal, am Ende des Upload-Vorgangs.
-    await act(async () => {
-      await result.current.refreshDocuments();
-    });
-    await waitFor(() => expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(true));
-  });
-
-  it("weist Sammlung und Kategorie gebündelt zu und invalidiert die Ansicht", async () => {
-    const libraryKey = queryKeys.documents.library({});
-    client.setQueryData(libraryKey, [{ id: 10 }]);
-
-    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
-
-    await act(async () => {
-      await result.current.addToFolderBulk(5, [10, 11]);
-      await result.current.assignCategoryBulk(3, [10, 11]);
-    });
-
-    expect(documentsApi.addDocumentsToFolder).toHaveBeenCalledWith(5, [10, 11]);
-    expect(documentsApi.assignDocumentsCategory).toHaveBeenCalledWith(3, [10, 11]);
-    await waitFor(() => expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(true));
-  });
-
-  it("lädt die Auswahl als Zip herunter, ohne die Ansicht zu invalidieren", async () => {
-    const libraryKey = queryKeys.documents.library({});
-    client.setQueryData(libraryKey, [{ id: 10 }]);
-
-    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
-
-    let blob: Blob | undefined;
-    await act(async () => {
-      blob = await result.current.downloadZip([10, 11]);
-    });
-
-    expect(documentsApi.downloadDocumentsZip).toHaveBeenCalledWith([10, 11]);
-    expect(blob).toBeInstanceOf(Blob);
-    // Reiner Download verändert keinen Server-State → Ansicht bleibt gültig.
-    expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(false);
-  });
-
-  it("lÃ¤dt ein einzelnes Dokument herunter, ohne die Ansicht zu invalidieren", async () => {
-    const libraryKey = queryKeys.documents.library({});
-    client.setQueryData(libraryKey, [{ id: 10 }]);
-
-    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
-
-    let blob: Blob | undefined;
-    await act(async () => {
-      blob = await result.current.downloadDocument(10);
-    });
-
-    expect(documentsApi.downloadDocument).toHaveBeenCalledWith(10);
-    expect(blob).toBeInstanceOf(Blob);
-    expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(false);
+    expect(documentsApi.setDocumentTags).toHaveBeenCalledWith(10, [3, 4], 7);
   });
 });
 
-describe("useFolders / useCategories Verwaltung", () => {
+describe("useFolders Verwaltung", () => {
   it("benennt eine Sammlung um und loescht sie ueber die passenden Endpunkte", async () => {
     const { result } = renderHook(() => useFolders(), { wrapper: Wrapper });
 
     await act(async () => {
       await result.current.updateFolder(7, { name: "Neu", expectedVersion: 1 });
-      await result.current.deleteFolder(7, true);
+      await result.current.deleteFolder(7, 2);
     });
 
     expect(documentsApi.updateAttachmentFolder).toHaveBeenCalledWith(7, { name: "Neu", expectedVersion: 1 });
-    expect(documentsApi.deleteAttachmentFolder).toHaveBeenCalledWith(7, true);
-  });
-
-  it("benennt eine Kategorie um und loescht sie ueber die passenden Endpunkte", async () => {
-    const { result } = renderHook(() => useCategories(), { wrapper: Wrapper });
-
-    await act(async () => {
-      await result.current.updateCategory(4, { name: "Umbenannt", expectedVersion: 2 });
-      await result.current.deleteCategory(4);
-    });
-
-    expect(documentsApi.updateAttachmentCategory).toHaveBeenCalledWith(4, { name: "Umbenannt", expectedVersion: 2 });
-    // deleteCategory nutzt die API direkt als mutationFn; TanStack reicht ein Kontext-Objekt als 2. Argument durch.
-    expect(documentsApi.deleteAttachmentCategory).toHaveBeenCalledWith(4, expect.anything());
-  });
-
-  it("speichert die Reihenfolge von Sammlungen und Kategorien ueber die passenden Endpunkte", async () => {
-    const folders = renderHook(() => useFolders(), { wrapper: Wrapper });
-    const categories = renderHook(() => useCategories(), { wrapper: Wrapper });
-    const folderInput = { parentId: null, items: [{ id: 7, expectedVersion: 2 }, { id: 8, expectedVersion: 1 }] };
-    const categoryInput = { items: [{ id: 4, expectedVersion: 3 }, { id: 5, expectedVersion: 1 }] };
-
-    await act(async () => {
-      await folders.result.current.reorderFolders(folderInput);
-      await categories.result.current.reorderCategories(categoryInput);
-    });
-
-    expect(documentsApi.reorderAttachmentFolders).toHaveBeenCalledWith(folderInput, expect.anything());
-    expect(documentsApi.reorderAttachmentCategories).toHaveBeenCalledWith(categoryInput, expect.anything());
+    expect(documentsApi.deleteAttachmentFolder).toHaveBeenCalledWith(7, 2);
   });
 });

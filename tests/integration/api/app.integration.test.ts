@@ -294,8 +294,8 @@ describe("Projekt Manager API integration", () => {
     const projectAttachments = (await api.get(`/api/projects/${createdProject.id}/attachments`).expect(200)).body as Attachment[];
     expect(projectAttachments.map((attachment) => attachment.id)).toContain(projectAttachment.id);
     await api.post(`/api/projects/${createdProject.id}/attachments`).expect(400);
-    await api.delete(`/api/attachments/${projectAttachment.id}`).expect(204);
-    await api.delete(`/api/attachments/${taskAttachment.id}`).expect(204);
+    await api.delete(`/api/attachments/${projectAttachment.id}?expectedVersion=${projectAttachment.version}`).expect(204);
+    await api.delete(`/api/attachments/${taskAttachment.id}?expectedVersion=${taskAttachment.version}`).expect(204);
 
     await api.get("/api/events").expect(200, []);
     const createdEvent = (

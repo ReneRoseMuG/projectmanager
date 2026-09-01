@@ -21,6 +21,7 @@ import {
   type JournalObjectRef
 } from "./journal.service.js";
 import { getUserOption, getUserOptionsMap, normalizeAssignableUserId } from "./users.service.js";
+import { deleteParentAttachmentsForOwners } from "./attachments.service.js";
 
 type FeatureStatus = FeatureRecord["status"];
 
@@ -350,6 +351,7 @@ export async function updateFeature(database: DbClient, id: number, input: Featu
 export async function deleteFeature(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
   const feature = await getFeatureRecord(database, id);
 
+  await deleteParentAttachmentsForOwners(database, [{ type: "feature", id }]);
   await deleteFeatureCommentsForIds(database, [id]);
   // Also delete use case comments since use cases are cascade-deleted with the feature
   const ucRows = await database.select({ id: useCases.id }).from(useCases).where(eq(useCases.featureId, id));

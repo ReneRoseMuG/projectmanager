@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Test Scope: Projects API
  *
  * Covers project CRUD, defaults, card-footer counts, timestamps, and cascade behavior.

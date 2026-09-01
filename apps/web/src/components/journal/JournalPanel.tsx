@@ -20,6 +20,7 @@ export const journalObjectLabels: Record<JournalObjectType, string> = {
   tag: "Tag",
   note: "Notiz",
   attachment: "Datei",
+  document: "Dokument",
   comment: "Kommentar"
 };
 

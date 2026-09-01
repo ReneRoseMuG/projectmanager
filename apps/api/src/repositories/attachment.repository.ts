@@ -1,4 +1,5 @@
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import type { AttachmentKind } from "@taskmanager/shared-types";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { attachments } from "../db/schema.js";
@@ -25,7 +26,6 @@ export const attachmentRepository = {
     return database.select({ id: attachments.id, filename: attachments.filename }).from(attachments).where(inArray(attachments.id, uniqueIds));
   },
 
-  // Für den Bulk-Download benötigte Felder: Ablagename (Platte) + Originalname (Zip-Eintrag).
   async findDownloadRecords(
     database: DbSession,
     ids: number[]
@@ -38,31 +38,6 @@ export const attachmentRepository = {
       .select({ id: attachments.id, filename: attachments.filename, originalName: attachments.originalName })
       .from(attachments)
       .where(inArray(attachments.id, uniqueIds));
-  },
-
-  async findByContentHash(database: DbSession, contentHash: string): Promise<AttachmentRecord[]> {
-    return database
-      .select()
-      .from(attachments)
-      .where(eq(attachments.contentHash, contentHash))
-      .orderBy(asc(attachments.id));
-  },
-
-  async findHashBackfillCandidates(
-    database: DbSession,
-    size: number
-  ): Promise<Array<Pick<AttachmentRecord, "id" | "filename" | "originalName" | "size" | "contentHash">>> {
-    return database
-      .select({
-        id: attachments.id,
-        filename: attachments.filename,
-        originalName: attachments.originalName,
-        size: attachments.size,
-        contentHash: attachments.contentHash
-      })
-      .from(attachments)
-      .where(and(eq(attachments.size, size), isNull(attachments.contentHash)))
-      .orderBy(asc(attachments.id));
   },
 
   async create(database: DbSession, data: AttachmentCreateData, userId?: number): Promise<AttachmentRecord> {
@@ -97,7 +72,7 @@ export const attachmentRepository = {
     }
     assertVersion(current.version, expectedVersion);
     const now = nowIso();
-    await database
+    const result = await database
       .update(attachments)
       .set({
         ...data,
@@ -105,8 +80,78 @@ export const attachmentRepository = {
         updatedBy: userId ?? null,
         updatedAt: now
       })
-      .where(eq(attachments.id, id));
+      .where(and(eq(attachments.id, id), eq(attachments.version, expectedVersion)));
+    if (mutationAffectedRows(result) === 0) {
+      return undefined;
+    }
     return { ...current, ...data, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
+  },
+
+  async updateKind(
+    database: DbSession,
+    id: number,
+    expectedVersion: number,
+    kind: AttachmentKind,
+    userId?: number
+  ): Promise<AttachmentRecord | undefined> {
+    const current = await this.findById(database, id);
+    if (!current) {
+      return undefined;
+    }
+    assertVersion(current.version, expectedVersion);
+    const now = nowIso();
+    const result = await database
+      .update(attachments)
+      .set({
+        kind,
+        version: current.version + 1,
+        updatedBy: userId ?? null,
+        updatedAt: now
+      })
+      .where(and(eq(attachments.id, id), eq(attachments.version, expectedVersion)));
+    if (mutationAffectedRows(result) === 0) {
+      return undefined;
+    }
+    return {
+      ...current,
+      kind,
+      version: current.version + 1,
+      updatedBy: userId ?? null,
+      updatedAt: now
+    };
+  },
+
+  async bumpVersion(
+    database: DbSession,
+    id: number,
+    expectedVersion: number,
+    userId?: number
+  ): Promise<AttachmentRecord | undefined> {
+    const current = await this.findById(database, id);
+    if (!current) {
+      return undefined;
+    }
+    assertVersion(current.version, expectedVersion);
+    const now = nowIso();
+    const result = await database
+      .update(attachments)
+      .set({
+        version: current.version + 1,
+        updatedBy: userId ?? null,
+        updatedAt: now
+      })
+      .where(and(eq(attachments.id, id), eq(attachments.version, expectedVersion)));
+    if (mutationAffectedRows(result) === 0) {
+      return undefined;
+    }
+    return { ...current, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
+  },
+
+  async deleteVersioned(database: DbSession, id: number, expectedVersion: number): Promise<boolean> {
+    const result = await database
+      .delete(attachments)
+      .where(and(eq(attachments.id, id), eq(attachments.version, expectedVersion)));
+    return mutationAffectedRows(result) > 0;
   },
 
   async deleteByIds(database: DbSession, ids: number[]): Promise<number> {
@@ -128,12 +173,5 @@ export const attachmentRepository = {
         version: sql`${attachments.version} + 1`
       })
       .where(eq(attachments.id, id));
-  },
-
-  async backfillContentHash(database: DbSession, id: number, contentHash: string): Promise<void> {
-    await database
-      .update(attachments)
-      .set({ contentHash })
-      .where(and(eq(attachments.id, id), isNull(attachments.contentHash)));
   }
 };

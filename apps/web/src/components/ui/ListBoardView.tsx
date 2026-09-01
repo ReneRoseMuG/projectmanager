@@ -1035,7 +1035,10 @@ function ListBoardViewContent<T>({
       data-testid="list-board-view"
     >
       {showToolbar ? (
-      <div className="grid w-full gap-3">
+      <div
+        className="sticky top-0 z-20 grid w-full gap-3 bg-white pb-1"
+        data-testid="list-board-toolbar"
+      >
         <div className={`grid w-full grid-cols-1 items-center gap-3 ${toolbarFilters && (items.length > 0 || loading) ? "md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]" : "md:grid-cols-[minmax(0,1fr)_auto]"}`}>
           <div className="flex min-w-0 justify-start">
             {onSearchChange ? (

@@ -59,7 +59,6 @@ import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { UseCaseListBoardView } from "../usecases/UseCaseListBoardView";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
-import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { FormSidebar } from "../ui/FormSidebar";
@@ -229,7 +228,6 @@ export function FeatureForm({
       ? { type: "project", id: stableInitialProjectId }
       : null;
   const { showToast } = useToast();
-  const { confirm } = useConfirm();
   const auth = useAuth();
   const canReadJournal = useHasPermission("journal", "read");
   const canWriteProjectRelations = useHasPermission("projects", "write");
@@ -794,38 +792,8 @@ export function FeatureForm({
           <Section>
             {feature ? (
               <div className="grid gap-4">
-                <AttachmentUploader onUpload={uploadAttachment} />
-                <AttachmentList
-                  attachments={attachments.attachments}
-                  onDelete={(attachment) => {
-                    void confirm({
-                      title: "Datei löschen?",
-                      body: attachment.originalName,
-                      severity: "danger",
-                      confirmLabel: "Löschen",
-                    }).then((approved) => {
-                      if (approved) {
-                        void attachments
-                          .removeAttachment(attachment.id)
-                          .then(() =>
-                            showToast({
-                              tone: "success",
-                              title: "Datei gelöscht",
-                            }),
-                          )
-                          .catch((attachmentError: unknown) =>
-                            showToast({
-                              tone: "error",
-                              title: "Datei konnte nicht gelöscht werden",
-                              message: errorMessage(attachmentError),
-                            }),
-                          );
-                      }
-                    });
-                  }}
-                  onOpen={(attachment) => attachments.openAttachment(attachment.id)}
-                  openingAttachmentId={attachments.openingAttachmentId}
-                />
+                <AttachmentUploader visibilityMode="owner" onUpload={uploadAttachment} />
+                <AttachmentList manager={attachments} />
               </div>
             ) : (
               <PendingFileList

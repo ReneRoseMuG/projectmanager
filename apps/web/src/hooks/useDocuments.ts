@@ -1,10 +1,17 @@
-import type { AttachmentCategory, AttachmentCategoryOrderInput, AttachmentFolder, AttachmentFolderOrderInput } from "@taskmanager/shared-types";
+import type {
+  Attachment,
+  AttachmentFolder,
+  AttachmentVersionInput,
+  DocumentDuplicateCheck,
+  Paginated,
+} from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { InfiniteData } from "@tanstack/react-query";
 import { useCallback } from "react";
 import * as documentsApi from "../api/documents";
 import type { DocumentLibraryFilter } from "../api/documents";
 import { useProgressiveList } from "./useProgressiveList";
-import { invalidateDocuments } from "../queries/invalidation";
+import { invalidateDocumentDuplicateCheck, invalidateDocuments } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
@@ -27,37 +34,8 @@ export function useDocumentLibrary(filter: DocumentLibraryFilter) {
     loadedCount: list.loadedCount,
     loading: list.loading,
     loadingMore: list.loadingMore,
-    // Erst wenn ALLE Blöcke geladen sind. Zwischen zwei Blöcken sind `loading` und `loadingMore`
-    // beide kurz false, obwohl noch Dokumente fehlen — wer auf „fertig" prüfen will, braucht dies.
-    isComplete: list.isComplete,
     error: list.error,
     reload
-  };
-}
-
-export function useCategories() {
-  const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: queryKeys.documents.categories(), queryFn: documentsApi.getAttachmentCategories });
-  const invalidate = useCallback(() => invalidateDocuments(queryClient), [queryClient]);
-
-  const createMutation = useMutation({ mutationFn: documentsApi.createAttachmentCategory, onSuccess: invalidate });
-  const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: number; input: { name?: string; color?: string; expectedVersion: number } }) =>
-      documentsApi.updateAttachmentCategory(id, input),
-    onSuccess: invalidate
-  });
-  const deleteMutation = useMutation({ mutationFn: documentsApi.deleteAttachmentCategory, onSuccess: invalidate });
-  const reorderMutation = useMutation({ mutationFn: documentsApi.reorderAttachmentCategories, onSuccess: invalidate });
-
-  return {
-    categories: query.data ?? ([] as AttachmentCategory[]),
-    loading: query.isLoading,
-    error: toQueryError(query.error),
-    createCategory: (input: { name: string; color?: string }) => createMutation.mutateAsync(input),
-    updateCategory: (id: number, input: { name?: string; color?: string; expectedVersion: number }) =>
-      updateMutation.mutateAsync({ id, input }),
-    deleteCategory: (id: number) => deleteMutation.mutateAsync(id),
-    reorderCategories: (input: AttachmentCategoryOrderInput) => reorderMutation.mutateAsync(input)
   };
 }
 
@@ -68,25 +46,23 @@ export function useFolders() {
 
   const createMutation = useMutation({ mutationFn: documentsApi.createAttachmentFolder, onSuccess: invalidate });
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: number; input: { name?: string; parentId?: number | null; projectId?: number | null; expectedVersion: number } }) =>
+    mutationFn: ({ id, input }: { id: number; input: { name?: string; parentId?: number | null; expectedVersion: number } }) =>
       documentsApi.updateAttachmentFolder(id, input),
     onSuccess: invalidate
   });
   const deleteMutation = useMutation({
-    mutationFn: ({ id, recursive }: { id: number; recursive?: boolean }) => documentsApi.deleteAttachmentFolder(id, recursive),
+    mutationFn: ({ id, expectedVersion }: { id: number; expectedVersion: number }) => documentsApi.deleteAttachmentFolder(id, expectedVersion),
     onSuccess: invalidate
   });
-  const reorderMutation = useMutation({ mutationFn: documentsApi.reorderAttachmentFolders, onSuccess: invalidate });
 
   return {
     folders: query.data ?? ([] as AttachmentFolder[]),
     loading: query.isLoading,
     error: toQueryError(query.error),
-    createFolder: (input: { name: string; parentId?: number | null; projectId?: number | null }) => createMutation.mutateAsync(input),
-    updateFolder: (id: number, input: { name?: string; parentId?: number | null; projectId?: number | null; expectedVersion: number }) =>
+    createFolder: (input: { name: string; parentId?: number | null }) => createMutation.mutateAsync(input),
+    updateFolder: (id: number, input: { name?: string; parentId?: number | null; expectedVersion: number }) =>
       updateMutation.mutateAsync({ id, input }),
-    deleteFolder: (id: number, recursive?: boolean) => deleteMutation.mutateAsync({ id, recursive }),
-    reorderFolders: (input: AttachmentFolderOrderInput) => reorderMutation.mutateAsync(input)
+    deleteFolder: (id: number, expectedVersion: number) => deleteMutation.mutateAsync({ id, expectedVersion })
   };
 }
 
@@ -94,13 +70,10 @@ export function useDocumentActions() {
   const queryClient = useQueryClient();
   const invalidate = useCallback(() => invalidateDocuments(queryClient), [queryClient]);
 
-  // BEWUSST OHNE `onSuccess: invalidate`. Der Uploader lädt mehrere Dateien sequenziell hoch; eine
-  // Invalidierung je Datei würde jedes Mal die gesamte (progressiv geladene) Bibliothek neu holen —
-  // und weil `mutateAsync` auf `onSuccess` wartet, würde der nächste Upload darauf blockieren.
-  // Der Aufrufer lädt stattdessen EINMAL am Ende des Upload-Vorgangs über `refreshDocuments` nach.
   const uploadMutation = useMutation({
-    mutationFn: ({ file, folderId, categoryId }: { file: File; folderId?: number; categoryId?: number }) =>
-      documentsApi.uploadDocument(file, folderId, categoryId)
+    mutationFn: ({ file, folderId, tagIds }: { file: File; folderId?: number; tagIds: number[] }) =>
+      documentsApi.uploadDocument(file, folderId, tagIds),
+    onSuccess: invalidate
   });
   const metadataMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: { displayName?: string | null; description?: string | null; expectedVersion: number } }) =>
@@ -108,58 +81,76 @@ export function useDocumentActions() {
     onSuccess: invalidate
   });
   const tagsMutation = useMutation({
-    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => documentsApi.setDocumentTags(id, tagIds),
+    mutationFn: ({ id, tagIds, expectedVersion }: { id: number; tagIds: number[]; expectedVersion: number }) =>
+      documentsApi.setDocumentTags(id, tagIds, expectedVersion),
     onSuccess: invalidate
   });
-  const deleteMutation = useMutation({ mutationFn: documentsApi.deleteDocument, onSuccess: invalidate });
-  const moveMutation = useMutation({
-    mutationFn: ({ id, fromFolderId, toFolderId }: { id: number; fromFolderId: number; toFolderId: number }) =>
-      documentsApi.moveDocument(id, fromFolderId, toFolderId),
+  const bulkTagsMutation = useMutation({
+    mutationFn: ({ attachments, tagIds }: { attachments: AttachmentVersionInput[]; tagIds: number[] }) =>
+      documentsApi.addDocumentTagsBulk(attachments, tagIds),
+    onSuccess: async (updatedDocuments) => {
+      const updatedById = new Map(updatedDocuments.map((document) => [document.id, document]));
+      queryClient.setQueriesData<InfiniteData<Paginated<Attachment>>>(
+        { queryKey: [...queryKeys.documents.root, "library"] },
+        (current) => {
+          if (!current || !Array.isArray(current.pages)) {
+            return current;
+          }
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              data: page.data.map((document) => updatedById.get(document.id) ?? document),
+            })),
+          };
+        },
+      );
+      await invalidate();
+    }
+  });
+  const deleteMutation = useMutation({
+    mutationFn: ({ id, expectedVersion }: { id: number; expectedVersion: number }) => documentsApi.deleteDocumentPermanently(id, expectedVersion),
     onSuccess: invalidate
   });
-  const assignCategoryMutation = useMutation({
-    mutationFn: ({ id, categoryId }: { id: number; categoryId: number }) => documentsApi.assignDocumentCategory(id, categoryId),
+  const folderMutation = useMutation({
+    mutationFn: ({ id, folderId, expectedVersion }: { id: number; folderId: number | null; expectedVersion: number }) =>
+      documentsApi.setDocumentFolder(id, folderId, expectedVersion),
     onSuccess: invalidate
   });
-  const removeCategoryMutation = useMutation({
-    mutationFn: ({ id, categoryId }: { id: number; categoryId: number }) => documentsApi.removeDocumentCategory(id, categoryId),
-    onSuccess: invalidate
+  return {
+    uploadDocument: (file: File, folderId?: number, tagIds: number[] = []) => uploadMutation.mutateAsync({ file, folderId, tagIds }),
+    updateMetadata: (id: number, input: { displayName?: string | null; description?: string | null; expectedVersion: number }) =>
+      metadataMutation.mutateAsync({ id, input }),
+    setTags: (id: number, tagIds: number[], expectedVersion: number) => tagsMutation.mutateAsync({ id, tagIds, expectedVersion }),
+    addTagsBulk: (attachments: AttachmentVersionInput[], tagIds: number[]) =>
+      bulkTagsMutation.mutateAsync({ attachments, tagIds }),
+    addingTagsBulk: bulkTagsMutation.isPending,
+    deleteDocumentPermanently: (id: number, expectedVersion: number) => deleteMutation.mutateAsync({ id, expectedVersion }),
+    setDocumentFolder: (id: number, folderId: number | null, expectedVersion: number) =>
+      folderMutation.mutateAsync({ id, folderId, expectedVersion })
+  };
+}
+
+export function useDocumentDuplicateCheck() {
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: queryKeys.documents.duplicateCheck(),
+    queryFn: documentsApi.getDocumentDuplicateCheck,
+    refetchInterval: (currentQuery) => currentQuery.state.data?.status === "running" ? 500 : false
   });
-  const addToFolderMutation = useMutation({
-    mutationFn: ({ folderId, attachmentId }: { folderId: number; attachmentId: number }) => documentsApi.addDocumentToFolder(folderId, attachmentId),
-    onSuccess: invalidate
-  });
-  const removeFromFolderMutation = useMutation({
-    mutationFn: ({ folderId, attachmentId }: { folderId: number; attachmentId: number }) => documentsApi.removeDocumentFromFolder(folderId, attachmentId),
-    onSuccess: invalidate
-  });
-  const addToFolderBulkMutation = useMutation({
-    mutationFn: ({ folderId, attachmentIds }: { folderId: number; attachmentIds: number[] }) => documentsApi.addDocumentsToFolder(folderId, attachmentIds),
-    onSuccess: invalidate
-  });
-  const assignCategoryBulkMutation = useMutation({
-    mutationFn: ({ categoryId, attachmentIds }: { categoryId: number; attachmentIds: number[] }) => documentsApi.assignDocumentsCategory(categoryId, attachmentIds),
-    onSuccess: invalidate
+  const startMutation = useMutation({
+    mutationFn: documentsApi.startDocumentDuplicateCheck,
+    onSuccess: async (check) => {
+      queryClient.setQueryData(queryKeys.documents.duplicateCheck(), check);
+      await invalidateDocumentDuplicateCheck(queryClient);
+    }
   });
 
   return {
-    uploadDocument: (file: File, folderId?: number, categoryId?: number) =>
-      uploadMutation.mutateAsync({ file, folderId, categoryId }),
-    // Gehört zu `uploadDocument`: einmal nach dem gesamten Upload-Vorgang aufrufen.
-    refreshDocuments: invalidate,
-    updateMetadata: (id: number, input: { displayName?: string | null; description?: string | null; expectedVersion: number }) =>
-      metadataMutation.mutateAsync({ id, input }),
-    setTags: (id: number, tagIds: number[]) => tagsMutation.mutateAsync({ id, tagIds }),
-    deleteDocument: (id: number) => deleteMutation.mutateAsync(id),
-    moveDocument: (id: number, fromFolderId: number, toFolderId: number) => moveMutation.mutateAsync({ id, fromFolderId, toFolderId }),
-    assignCategory: (id: number, categoryId: number) => assignCategoryMutation.mutateAsync({ id, categoryId }),
-    removeCategory: (id: number, categoryId: number) => removeCategoryMutation.mutateAsync({ id, categoryId }),
-    addToFolder: (folderId: number, attachmentId: number) => addToFolderMutation.mutateAsync({ folderId, attachmentId }),
-    removeFromFolder: (folderId: number, attachmentId: number) => removeFromFolderMutation.mutateAsync({ folderId, attachmentId }),
-    addToFolderBulk: (folderId: number, attachmentIds: number[]) => addToFolderBulkMutation.mutateAsync({ folderId, attachmentIds }),
-    assignCategoryBulk: (categoryId: number, attachmentIds: number[]) => assignCategoryBulkMutation.mutateAsync({ categoryId, attachmentIds }),
-    // Reine Lese-Downloads (Blob), kein Server-State → keine Invalidierung.
-    downloadDocument: (id: number) => documentsApi.downloadDocument(id),
-    downloadZip: (attachmentIds: number[]) => documentsApi.downloadDocumentsZip(attachmentIds)
+    check: query.data ?? (null as DocumentDuplicateCheck | null),
+    loading: query.isLoading,
+    starting: startMutation.isPending,
+    error: toQueryError(query.error ?? startMutation.error),
+    startCheck: () => startMutation.mutateAsync()
   };
 }

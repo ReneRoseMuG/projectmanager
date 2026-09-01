@@ -1,59 +1,28 @@
-import type { AttachmentFolder, AttachmentFolderOrderInput } from "@taskmanager/shared-types";
-import { and, eq } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+import type { AttachmentFolder } from "@taskmanager/shared-types";
+import { eq, inArray, sql } from "drizzle-orm";
+import type { DbClient, DbSession } from "../db/client.js";
 import { firstRow } from "../db/query-utils.js";
-import { attachmentFolders, folderAttachments, projects } from "../db/schema.js";
+import { attachmentFolders, folderAttachments } from "../db/schema.js";
 import { attachmentFolderRepository, type AttachmentFolderRecord } from "../repositories/attachment-folder.repository.js";
 import { attachmentRepository } from "../repositories/attachment.repository.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
+import { buildJournalChanges, makeJournalObject, recordJournalEntry, type JournalActor } from "./journal.service.js";
 
-// MS-75 (DMS): Sammlungen ("virtuelle Ordner") sind hierarchisch (Selbst-FK parent_id)
-// und n:m zu Dokumenten (folder_attachments). Journaling ist bewusst noch nicht
-// angebunden — Folgeschritt (analog Kategorien).
-
-function mapFolder(record: AttachmentFolderRecord): AttachmentFolder {
-  return { id: record.id, parentId: record.parentId, projectId: record.projectId, name: record.name, sortOrder: record.sortOrder, version: record.version };
+interface FolderUsage {
+  childCount: number;
+  directDocumentCount: number;
 }
 
-function flattenFolders(rows: AttachmentFolderRecord[]): AttachmentFolderRecord[] {
-  const childrenByParent = new Map<number | null, AttachmentFolderRecord[]>();
-  for (const row of rows) {
-    const siblings = childrenByParent.get(row.parentId) ?? [];
-    siblings.push(row);
-    childrenByParent.set(row.parentId, siblings);
-  }
-  const result: AttachmentFolderRecord[] = [];
-  const appendChildren = (parentId: number | null) => {
-    for (const child of childrenByParent.get(parentId) ?? []) {
-      result.push(child);
-      appendChildren(child.id);
-    }
+function mapFolder(record: AttachmentFolderRecord, usage?: FolderUsage): AttachmentFolder {
+  return {
+    id: record.id,
+    parentId: record.parentId,
+    name: record.name,
+    childCount: usage?.childCount ?? 0,
+    directDocumentCount: usage?.directDocumentCount ?? 0,
+    version: record.version
   };
-  appendChildren(null);
-  return result;
-}
-
-function assertCompleteFolderOrder(rows: AttachmentFolderRecord[], input: AttachmentFolderOrderInput): void {
-  if (input.items.length === 0) {
-    throw badRequest("Die Sammlungsreihenfolge darf nicht leer sein.");
-  }
-  const ids = input.items.map((item) => item.id);
-  const idSet = new Set(ids);
-  if (idSet.size !== ids.length) {
-    throw badRequest("Die Sammlungsreihenfolge enthält doppelte Einträge.");
-  }
-  if (rows.length !== ids.length || rows.some((row) => !idSet.has(row.id))) {
-    throw badRequest("Die Sammlungsreihenfolge muss alle Sammlungen derselben Ebene enthalten.");
-  }
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  for (const item of input.items) {
-    const current = byId.get(item.id);
-    if (!current) {
-      throw badRequest("Die Sammlungsreihenfolge enthält einen unbekannten Eintrag.");
-    }
-    assertVersion(current.version, item.expectedVersion);
-  }
 }
 
 function cleanName(value: string | undefined): string {
@@ -64,26 +33,20 @@ function cleanName(value: string | undefined): string {
   return trimmed;
 }
 
-async function ensureAttachmentExists(database: DbClient, attachmentId: number): Promise<void> {
+async function ensureAttachmentExists(database: DbClient, attachmentId: number) {
   const attachment = await attachmentRepository.findById(database, attachmentId);
   if (!attachment) {
     throw notFound(`Attachment with id ${attachmentId} not found`);
   }
+  return attachment;
 }
 
-async function ensureFolderExists(database: DbClient, id: number): Promise<AttachmentFolderRecord> {
+async function ensureFolderExists(database: DbSession, id: number): Promise<AttachmentFolderRecord> {
   const folder = await attachmentFolderRepository.findById(database, id);
   if (!folder) {
     throw notFound(`Attachment folder with id ${id} not found`);
   }
   return folder;
-}
-
-async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {
-  const project = firstRow(await database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)));
-  if (!project) {
-    throw notFound(`Project with id ${projectId} not found`);
-  }
 }
 
 async function assertNameUniquePerLevel(
@@ -98,44 +61,109 @@ async function assertNameUniquePerLevel(
   }
 }
 
-async function assertNoCycle(database: DbClient, folderId: number, newParentId: number | null): Promise<void> {
+function assertNoCycle(folders: AttachmentFolderRecord[], folderId: number, newParentId: number | null): void {
   if (newParentId === null) {
     return;
   }
   if (newParentId === folderId) {
     throw badRequest("Eine Sammlung kann nicht sich selbst untergeordnet werden.");
   }
+  const parentById = new Map(folders.map((folder) => [folder.id, folder.parentId]));
   let currentId: number | null = newParentId;
   const visited = new Set<number>();
   while (currentId !== null) {
     if (currentId === folderId) {
-      throw badRequest("Eine Sammlung kann nicht unter eine ihrer Unter-Sammlungen verschoben werden.");
+      throw badRequest("Eine Sammlung kann nicht unter eine ihrer Untersammlungen verschoben werden.");
     }
     if (visited.has(currentId)) {
-      break;
+      throw badRequest("Die Sammlungshierarchie enthält bereits einen Zyklus.");
     }
     visited.add(currentId);
-    const parent: AttachmentFolderRecord | undefined = await attachmentFolderRepository.findById(database, currentId);
-    currentId = parent?.parentId ?? null;
+    const parentId = parentById.get(currentId);
+    if (parentId === undefined) {
+      throw badRequest("Die gewählte übergeordnete Sammlung ist ungültig.");
+    }
+    currentId = parentId;
   }
 }
 
-async function deleteFolderRecursive(database: DbClient, id: number): Promise<void> {
-  const children = await attachmentFolderRepository.findChildren(database, id);
-  for (const child of children) {
-    await deleteFolderRecursive(database, child.id);
+async function loadFolderUsage(database: DbClient, folderIds: number[]): Promise<Map<number, FolderUsage>> {
+  const usage = new Map<number, FolderUsage>();
+  for (const folderId of folderIds) {
+    usage.set(folderId, { childCount: 0, directDocumentCount: 0 });
   }
-  await attachmentFolderRepository.delete(database, id);
+  if (folderIds.length === 0) {
+    return usage;
+  }
+
+  const childRows = await database
+    .select({ folderId: attachmentFolders.parentId, count: sql<number>`count(*)` })
+    .from(attachmentFolders)
+    .where(inArray(attachmentFolders.parentId, folderIds))
+    .groupBy(attachmentFolders.parentId);
+  for (const row of childRows) {
+    if (row.folderId !== null) {
+      const entry = usage.get(row.folderId);
+      if (entry) {
+        entry.childCount = Number(row.count);
+      }
+    }
+  }
+
+  const documentRows = await database
+    .select({ folderId: folderAttachments.folderId, count: sql<number>`count(*)` })
+    .from(folderAttachments)
+    .where(inArray(folderAttachments.folderId, folderIds))
+    .groupBy(folderAttachments.folderId);
+  for (const row of documentRows) {
+    const entry = usage.get(row.folderId);
+    if (entry) {
+      entry.directDocumentCount = Number(row.count);
+    }
+  }
+  return usage;
 }
 
 export async function listAttachmentFolders(database: DbClient): Promise<AttachmentFolder[]> {
   const rows = await attachmentFolderRepository.findAll(database);
-  return flattenFolders(rows).map(mapFolder);
+  const usage = await loadFolderUsage(database, rows.map((row) => row.id));
+  return rows.map((row) => mapFolder(row, usage.get(row.id)));
+}
+
+export async function listFolderAndDescendantIds(database: DbClient, folderId: number): Promise<number[]> {
+  const rows = await attachmentFolderRepository.findAll(database);
+  if (!rows.some((folder) => folder.id === folderId)) {
+    throw notFound(`Attachment folder with id ${folderId} not found`);
+  }
+  const childrenByParent = new Map<number, number[]>();
+  for (const folder of rows) {
+    if (folder.parentId !== null) {
+      const children = childrenByParent.get(folder.parentId);
+      if (children) {
+        children.push(folder.id);
+      } else {
+        childrenByParent.set(folder.parentId, [folder.id]);
+      }
+    }
+  }
+  const result: number[] = [];
+  const visited = new Set<number>();
+  const queue = [folderId];
+  for (let index = 0; index < queue.length; index += 1) {
+    const currentId = queue[index];
+    if (currentId === undefined || visited.has(currentId)) {
+      continue;
+    }
+    visited.add(currentId);
+    result.push(currentId);
+    queue.push(...(childrenByParent.get(currentId) ?? []));
+  }
+  return result;
 }
 
 export async function createAttachmentFolder(
   database: DbClient,
-  input: { name?: string; parentId?: number | null; projectId?: number | null },
+  input: { name?: string; parentId?: number | null },
   userId?: number
 ): Promise<AttachmentFolder> {
   const name = cleanName(input.name);
@@ -143,70 +171,33 @@ export async function createAttachmentFolder(
   if (parentId !== null) {
     await ensureFolderExists(database, parentId);
   }
-  if (input.projectId != null) {
-    await ensureProjectExists(database, input.projectId);
-  }
   await assertNameUniquePerLevel(database, parentId, name);
-  const sortOrder = await attachmentFolderRepository.nextSortOrder(database, parentId);
   const created = await attachmentFolderRepository.create(
     database,
-    { name, parentId, projectId: input.projectId ?? null, sortOrder },
+    { name, parentId },
     userId
   );
   return mapFolder(created);
 }
 
-export async function reorderAttachmentFolders(
-  database: DbClient,
-  input: AttachmentFolderOrderInput,
-  userId?: number
-): Promise<AttachmentFolder[]> {
-  if (input.parentId !== null) {
-    await ensureFolderExists(database, input.parentId);
-  }
-  await database.transaction(async (tx) => {
-    const rows = input.parentId === null
-      ? await attachmentFolderRepository.findRootFolders(tx)
-      : await attachmentFolderRepository.findChildren(tx, input.parentId);
-    assertCompleteFolderOrder(rows, input);
-    const affected = await attachmentFolderRepository.updateOrder(
-      tx,
-      input.items.map((item, index) => ({ ...item, sortOrder: index * 1024 })),
-      userId
-    );
-    if (affected !== input.items.length) {
-      throw conflict("Die Sammlungen wurden zwischenzeitlich geändert. Bitte neu laden.");
-    }
-  });
-  return listAttachmentFolders(database);
-}
-
 export async function updateAttachmentFolder(
   database: DbClient,
   id: number,
-  input: { name?: string; parentId?: number | null; projectId?: number | null; expectedVersion: number },
+  input: { name?: string; parentId?: number | null; expectedVersion: number },
   userId?: number
 ): Promise<AttachmentFolder> {
   const current = await ensureFolderExists(database, id);
-  const data: { name?: string; parentId?: number | null; projectId?: number | null; sortOrder?: number } = {};
+  assertVersion(current.version, input.expectedVersion);
+  const data: { name?: string; parentId?: number | null } = {};
 
   const nextParentId = input.parentId !== undefined ? input.parentId : current.parentId;
   if (input.parentId !== undefined && input.parentId !== current.parentId) {
-    if (input.parentId !== null) {
-      await ensureFolderExists(database, input.parentId);
-    }
-    await assertNoCycle(database, id, input.parentId);
+    const folders = await attachmentFolderRepository.findAll(database);
+    assertNoCycle(folders, id, input.parentId);
     data.parentId = input.parentId;
-    data.sortOrder = await attachmentFolderRepository.nextSortOrder(database, input.parentId);
   }
   if (input.name !== undefined) {
     data.name = cleanName(input.name);
-  }
-  if (input.projectId !== undefined) {
-    if (input.projectId !== null) {
-      await ensureProjectExists(database, input.projectId);
-    }
-    data.projectId = input.projectId;
   }
   if (Object.keys(data).length === 0) {
     throw badRequest("Es wurden keine Änderungen übergeben.");
@@ -217,61 +208,83 @@ export async function updateAttachmentFolder(
 
   const updated = await attachmentFolderRepository.update(database, id, input.expectedVersion, data, userId);
   if (!updated) {
-    throw notFound(`Attachment folder with id ${id} not found`);
+    throw conflict("Die Sammlung wurde zwischenzeitlich geändert.");
   }
-  return mapFolder(updated);
+  const usage = await loadFolderUsage(database, [id]);
+  return mapFolder(updated, usage.get(id));
 }
 
-export async function deleteAttachmentFolder(database: DbClient, id: number, options?: { recursive?: boolean }): Promise<void> {
-  await ensureFolderExists(database, id);
-  const children = await attachmentFolderRepository.findChildren(database, id);
-  if (children.length > 0 && !options?.recursive) {
-    throw conflict("Die Sammlung enthält Unter-Sammlungen und kann nur mit ausdrücklicher Bestätigung gelöscht werden.");
+export async function deleteAttachmentFolder(
+  database: DbClient,
+  id: number,
+  expectedVersion: number
+): Promise<void> {
+  const current = await ensureFolderExists(database, id);
+  assertVersion(current.version, expectedVersion);
+  const usage = (await loadFolderUsage(database, [id])).get(id) ?? { childCount: 0, directDocumentCount: 0 };
+  if (usage.childCount > 0 || usage.directDocumentCount > 0) {
+    throw conflict(
+      `Die Sammlung ist nicht leer (${usage.childCount} direkte Untersammlung(en), ${usage.directDocumentCount} direkt zugeordnete Dokument(e)). Verschieben oder entfernen Sie diese Inhalte zuerst.`
+    );
   }
-  // Dokumente bleiben erhalten: folder_attachments wird per FK-Cascade gelöst, nicht das Attachment.
-  await deleteFolderRecursive(database, id);
-}
-
-export async function addAttachmentToFolder(database: DbClient, folderId: number, attachmentId: number): Promise<void> {
-  await ensureFolderExists(database, folderId);
-  await ensureAttachmentExists(database, attachmentId);
-  await database.insert(folderAttachments).ignore().values({ folderId, attachmentId });
-}
-
-// Bulk-Variante (Mehrfachauswahl): weist mehrere Dokumente EINER Sammlung zu. Nicht
-// existierende Attachment-IDs werden vorab gefiltert (kein FK-Fehler), die Zuordnung erfolgt
-// als EIN gebündelter Insert — konstante Roundtrip-Zahl statt einer Query pro Dokument.
-export async function addAttachmentsToFolder(database: DbClient, folderId: number, attachmentIds: number[]): Promise<void> {
-  await ensureFolderExists(database, folderId);
-  const uniqueIds = [...new Set(attachmentIds)];
-  if (uniqueIds.length === 0) {
-    return;
+  if (await attachmentFolderRepository.deleteVersioned(database, id, expectedVersion) === 0) {
+    throw conflict("Die Sammlung wurde zwischenzeitlich geändert.");
   }
-  const existing = await attachmentRepository.findCleanupRecords(database, uniqueIds);
-  if (existing.length === 0) {
-    return;
-  }
-  await database.insert(folderAttachments).ignore().values(existing.map((row) => ({ folderId, attachmentId: row.id })));
 }
 
-export async function removeAttachmentFromFolder(database: DbClient, folderId: number, attachmentId: number): Promise<void> {
-  await database
-    .delete(folderAttachments)
-    .where(and(eq(folderAttachments.folderId, folderId), eq(folderAttachments.attachmentId, attachmentId)));
-}
-
-export async function moveAttachmentBetweenFolders(
+export async function setAttachmentFolder(
   database: DbClient,
   attachmentId: number,
-  fromFolderId: number,
-  toFolderId: number
-): Promise<void> {
-  await ensureFolderExists(database, toFolderId);
-  await ensureAttachmentExists(database, attachmentId);
-  await database.transaction(async (tx) => {
-    await tx
-      .delete(folderAttachments)
-      .where(and(eq(folderAttachments.folderId, fromFolderId), eq(folderAttachments.attachmentId, attachmentId)));
-    await tx.insert(folderAttachments).ignore().values({ folderId: toFolderId, attachmentId });
+  input: { folderId: number | null; expectedVersion: number },
+  actor?: JournalActor | null
+): Promise<number> {
+  const attachment = await ensureAttachmentExists(database, attachmentId);
+  assertVersion(attachment.version, input.expectedVersion);
+  let nextFolder: AttachmentFolderRecord | null = null;
+  if (input.folderId !== null) {
+    nextFolder = await ensureFolderExists(database, input.folderId);
+  }
+
+  const currentLink = firstRow(
+    await database
+      .select({ folderId: folderAttachments.folderId })
+      .from(folderAttachments)
+      .where(eq(folderAttachments.attachmentId, attachmentId))
+  );
+  if ((currentLink?.folderId ?? null) === input.folderId) {
+    return attachment.version;
+  }
+
+  const currentFolder = currentLink ? await ensureFolderExists(database, currentLink.folderId) : null;
+
+  return database.transaction(async (tx) => {
+    await tx.delete(folderAttachments).where(eq(folderAttachments.attachmentId, attachmentId));
+    if (input.folderId !== null) {
+      await tx.insert(folderAttachments).values({ folderId: input.folderId, attachmentId });
+    }
+    const updated = await attachmentRepository.bumpVersion(tx, attachmentId, input.expectedVersion, actor?.actorUserId ?? undefined);
+    if (!updated) {
+      throw conflict("Das Dokument wurde zwischenzeitlich geändert.");
+    }
+    const journalObject = makeJournalObject("attachment", attachment.id, attachment.originalName);
+    const before = { folderId: currentFolder?.id ?? null };
+    const after = { folderId: nextFolder?.id ?? null };
+    const changes = buildJournalChanges(before, after, [{
+      key: "folderId",
+      label: "Sammlung",
+      format: (value) => value === null
+        ? null
+        : value === currentFolder?.id
+          ? currentFolder?.name ?? String(value)
+          : nextFolder?.name ?? String(value)
+    }]);
+    await recordJournalEntry(tx, {
+      operation: "update",
+      object: journalObject,
+      summary: `${journalObject.label} wurde von ${currentFolder?.name ?? "Nicht einsortiert"} nach ${nextFolder?.name ?? "Nicht einsortiert"} verschoben.`,
+      changes,
+      actor
+    });
+    return updated.version;
   });
 }
