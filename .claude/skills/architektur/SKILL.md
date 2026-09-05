@@ -86,3 +86,5 @@ Neue parallele Komponente oder Logik entstanden? → Drift dokumentieren oder so
 - Gleichrangige Quellen verlangen unvereinbare Architektur
 - Zuständige Komponente unklar und die Unsicherheit beeinflusst die Lösung wesentlich
 - Scope widerspricht `agents.md`
+
+Quelle (Ebene 1): Skill Library `dev-testing/architecture/` + `dev-testing/core/graphify-protocol.md` — dort zuerst ändern, dann hier nachziehen.

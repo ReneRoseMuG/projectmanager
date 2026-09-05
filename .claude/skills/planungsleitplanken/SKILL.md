@@ -168,4 +168,4 @@ Abbrechen und Blocker dokumentieren wenn:
 - Benötigte Task-Datei oder Schema-Quelle fehlt und alle abhängigen Schritte brauchen sie
 
 Bauplan: `docs/skill-documentation/planungsleitplanken.md`
-Quelle (Ebene 1): Skill Library `core/planung.md` + `core/graphify-protocol.md` — dort zuerst ändern, dann hier nachziehen.
+Quelle (Ebene 1): Skill Library `dev-testing/core/planung.md` + `dev-testing/core/graphify-protocol.md` — dort zuerst ändern, dann hier nachziehen.

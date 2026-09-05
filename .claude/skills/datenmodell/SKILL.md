@@ -76,3 +76,5 @@ Neue Tabellen erfordern:
 - ON DELETE Regel hat Auswirkungen die nicht vollständig bewertet sind
 - Migration würde Daten löschen ohne dokumentierten Entscheid
 - Test-Infrastruktur (Fixtures, Schema-Init) nicht klar aktualisierbar
+
+Quelle (Ebene 1): Skill Library `dev-testing/data-model/` — dort zuerst ändern, dann hier nachziehen.

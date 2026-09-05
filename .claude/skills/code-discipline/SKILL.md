@@ -81,4 +81,4 @@ Minimaler Code, der den Auftrag löst — nichts Spekulatives.
 Bei Befund: sofort korrigieren, außer der Auftrag erlaubt ausdrücklich das Offenlassen.
 
 Bauplan: `docs/skill-documentation/code-discipline.md`
-Quelle (Ebene 1): Skill Library `core/code-discipline.md` — dort zuerst ändern, dann hier nachziehen.
+Quelle (Ebene 1): Skill Library `dev-testing/core/code-discipline.md` — dort zuerst ändern, dann hier nachziehen.

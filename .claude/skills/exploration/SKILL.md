@@ -81,3 +81,5 @@ Vor Übergabe an Planung oder Implementierung benennen:
 - Offene Fragen und Widersprüche
 
 Kein Code verändern. Nur analysieren und dokumentieren.
+
+Quelle (Ebene 1): Skill Library `dev-testing/exploration/` — dort zuerst ändern, dann hier nachziehen.

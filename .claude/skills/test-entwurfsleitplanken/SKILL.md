@@ -146,4 +146,4 @@ Jeder Testplan benennt konkret:
 Wenn diese Punkte nicht beantwortbar sind: nicht raten — Blocker dokumentieren.
 
 Bauplan: `docs/skill-documentation/test-entwurfsleitplanken.md`
-Quelle (Ebene 1): Skill Library `testing/01-test-skill.md` + `core/graphify-protocol.md` — dort zuerst ändern, dann hier nachziehen.
+Quelle (Ebene 1): Skill Library `dev-testing/testing/01-test-skill.md` + `dev-testing/core/graphify-protocol.md` — dort zuerst ändern, dann hier nachziehen.
