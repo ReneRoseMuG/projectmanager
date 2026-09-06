@@ -210,6 +210,12 @@ $startPs1Path = "$Target\Start.ps1"
 # Statischer Teil 1: Hilfsfunktionen und API/Web-Start
 $startPs1Content = @'
 # Start.ps1 - Projekt Manager starten
+# -NoBrowser: Dienste starten, ohne die Oberflaeche im Browser zu oeffnen.
+#             Wird vom Windows-Autostart verwendet.
+param(
+    [switch]$NoBrowser
+)
+
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Net.Http
 $root = $PSScriptRoot
@@ -248,6 +254,37 @@ function Wait-HttpReady([string]$Name, [string]$Uri, [System.Diagnostics.Process
         Start-Sleep -Seconds 1
     }
     throw "$Name ist nicht erreichbar: $Uri. Siehe runtime-logs."
+}
+
+# Der MCP-Endpunkt beantwortet nur POST-Anfragen, deshalb wird hier der
+# lauschende Port geprueft statt einer HTTP-Statusantwort.
+function Test-PortReady([int]$Port) {
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $connect = $client.BeginConnect("127.0.0.1", $Port, $null, $null)
+        if (-not $connect.AsyncWaitHandle.WaitOne(2000)) {
+            return $false
+        }
+        $client.EndConnect($connect)
+        return $true
+    } catch {
+        return $false
+    } finally {
+        $client.Close()
+    }
+}
+
+function Wait-PortReady([string]$Name, [int]$Port, [System.Diagnostics.Process]$Process) {
+    for ($i = 0; $i -lt 30; $i++) {
+        if (Test-PortReady $Port) {
+            return
+        }
+        if ($Process.HasExited) {
+            throw "$Name wurde beendet, bevor Port $Port erreichbar war. Siehe runtime-logs."
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw "$Name ist nicht erreichbar auf Port $Port. Siehe runtime-logs."
 }
 
 # Vorher aufraeumen, damit Mehrfachstarts keine Prozesse stapeln oder Ports blockieren
@@ -310,10 +347,16 @@ Wait-HttpReady "API" "http://127.0.0.1:3001/api/health" $api
 Write-StartLog "api ready"
 Wait-HttpReady "Web" "http://127.0.0.1:5173" $web
 Write-StartLog "web ready"
+Wait-PortReady "MCP" ([int]$env:MCP_HTTP_PORT) $mcp
+Write-StartLog "mcp ready on port $($env:MCP_HTTP_PORT)"
 
-Write-StartLog "opening browser"
-Start-Process -FilePath "explorer.exe" -ArgumentList "http://localhost:5173"
-Write-StartLog "browser opened"
+if ($NoBrowser) {
+    Write-StartLog "browser skipped (-NoBrowser)"
+} else {
+    Write-StartLog "opening browser"
+    Start-Process -FilePath "explorer.exe" -ArgumentList "http://localhost:5173"
+    Write-StartLog "browser opened"
+}
 exit 0
 '@
 Set-Content -Path $startPs1Path -Value $startPs1Content -Encoding UTF8
@@ -330,6 +373,8 @@ Write-Host "[7/7] Toolbar-Verknüpfungen werden eingerichtet und gestartet..." -
 $psExe = (Get-Command powershell.exe).Source
 $toolbarPs1 = "$repoRoot\scripts\toolbar.ps1"
 $toolbarArgs = "-WindowStyle Hidden -ExecutionPolicy Bypass -NonInteractive -File `"$toolbarPs1`" -DeployDir `"$Target`" -RepoRoot `"$repoRoot`""
+# Nur der Autostart-Eintrag fährt die Dienste beim Anmelden mit hoch.
+$autostartArgs = "$toolbarArgs -AutoStart"
 $shell = New-Object -ComObject WScript.Shell
 
 $desktopPath = [Environment]::GetFolderPath('Desktop')
@@ -358,10 +403,10 @@ Write-Host "  Desktop-Verknüpfung : $shortcutPath" -ForegroundColor Gray
 $startupPath = "$startupDir\Projekt Manager.lnk"
 $shortcut2 = $shell.CreateShortcut($startupPath)
 $shortcut2.TargetPath = $psExe
-$shortcut2.Arguments = $toolbarArgs
+$shortcut2.Arguments = $autostartArgs
 $shortcut2.WorkingDirectory = $repoRoot
 $shortcut2.WindowStyle = 7
-$shortcut2.Description = "Projekt Manager Toolbar"
+$shortcut2.Description = "Projekt Manager Toolbar (startet die Dienste mit)"
 $shortcut2.Save()
 Write-Host "  Autostart-Verknüpfung: $startupPath" -ForegroundColor Gray
 

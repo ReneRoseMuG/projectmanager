@@ -1,3 +1,13 @@
+﻿# setup-mcp.ps1 - Projekt-Manager-MCP in Claude Desktop eintragen
+#
+# Trägt den Server "projekt-manager" in alle gefundenen Claude-Desktop-
+# Konfigurationen ein (klassische Installation und Store-Paket). Der Eintrag
+# zeigt bewusst auf das Deployment-Verzeichnis und nicht auf das Repository,
+# damit ein Build im Repo laufende Chats nicht unterbricht.
+param(
+    [string]$DeployDir = "$env:LOCALAPPDATA\Projekt Manager"
+)
+
 $ScriptDir = $PSScriptRoot
 $ConfigPaths = @("$env:APPDATA\Claude\claude_desktop_config.json")
 $StoreClaudeRoot = "$env:LOCALAPPDATA\Packages"
@@ -41,17 +51,6 @@ function Read-LocalEnv {
     return $values
 }
 
-function Write-JsonWithoutBom {
-    param(
-        [string]$Path,
-        [object]$Value
-    )
-
-    $json = $Value | ConvertTo-Json -Depth 10
-    $encoding = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($Path, $json, $encoding)
-}
-
 $LocalEnv = Read-LocalEnv "$ScriptDir\.env.local"
 $ApiKey = $env:PROJECT_MANAGER_API_KEY
 if (-not $ApiKey) { $ApiKey = $env:API_KEY }
@@ -68,39 +67,29 @@ if (-not $ApiBaseUrl -and $LocalEnv.ContainsKey("PROJECT_MANAGER_API_BASE_URL"))
 if (-not $ApiBaseUrl -and $LocalEnv.ContainsKey("VITE_API_URL")) { $ApiBaseUrl = $LocalEnv["VITE_API_URL"] }
 if (-not $ApiBaseUrl) { $ApiBaseUrl = "http://127.0.0.1:3001/api" }
 
-$McpEntry = [PSCustomObject]@{
-    command = "node"
-    args = @("$ScriptDir\apps\mcp-server\dist\stdio.js")
-    env = [PSCustomObject]@{
-        PROJECT_MANAGER_API_BASE_URL = $ApiBaseUrl
-        PROJECT_MANAGER_API_KEY = $ApiKey
-    }
+# Geschrieben wird mit Node: ConvertTo-Json in Windows PowerShell 5.1 macht aus
+# einelementigen Arrays Skalare und kappt tiefe Verschachtelungen - das würde
+# den bestehenden preferences-Block der Claude-Konfiguration beschädigen.
+$Writer = Join-Path $ScriptDir "scripts\write-claude-mcp-config.mjs"
+if (-not (Test-Path $Writer)) {
+    Write-Host "Schreib-Skript nicht gefunden: $Writer"
+    exit 1
 }
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Host "node.exe nicht gefunden. Bitte Node.js installieren (https://nodejs.org)."
+    exit 1
+}
+
+$env:PROJECT_MANAGER_API_KEY = $ApiKey
 
 foreach ($ConfigPath in $ConfigPaths) {
-    if (Test-Path $ConfigPath) {
-        $raw = Get-Content $ConfigPath -Raw -Encoding UTF8
-        $Config = $raw | ConvertFrom-Json
-    } else {
-        Write-Host "No existing config found at $ConfigPath - creating new one."
-        $Config = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} }
+    Write-Host "Claude-Konfiguration: $ConfigPath"
+    node $Writer $ConfigPath $DeployDir $ApiBaseUrl
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Eintrag fehlgeschlagen: $ConfigPath"
+        exit 1
     }
-
-    if (-not ($Config.PSObject.Properties.Name -contains "mcpServers")) {
-        $Config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value ([PSCustomObject]@{})
-    }
-
-    if (Test-Path $ConfigPath) {
-        Copy-Item $ConfigPath "$ConfigPath.bak" -Force
-        Write-Host "Backup created: $ConfigPath.bak"
-    }
-
-    $Config.mcpServers | Add-Member -MemberType NoteProperty -Name "projekt-manager" -Value $McpEntry -Force
-
-    $dir = Split-Path $ConfigPath
-    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    Write-JsonWithoutBom $ConfigPath $Config
-    Write-Host "Updated Claude config: $ConfigPath"
 }
 
-Write-Host "Done! Please restart Claude Desktop."
+Write-Host ""
+Write-Host "Fertig. Bitte Claude Desktop neu starten, damit der Server geladen wird."

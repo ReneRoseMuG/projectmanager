@@ -1,7 +1,10 @@
 ﻿# scripts/toolbar.ps1 - Projekt Manager Tray-Toolbar
+# -AutoStart: fährt die Dienste beim Windows-Start ohne Browserfenster hoch.
+#             Nur die Autostart-Verknüpfung wird damit angelegt.
 param(
     [string]$DeployDir = "$env:LOCALAPPDATA\Projekt Manager",
-    [string]$RepoRoot = (Split-Path $PSScriptRoot -Parent)
+    [string]$RepoRoot = (Split-Path $PSScriptRoot -Parent),
+    [switch]$AutoStart
 )
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -13,6 +16,7 @@ $script:startPs1  = "$script:deployDir\Start.ps1"
 $script:stopPs1   = "$script:deployDir\Stop.ps1"
 $script:restartPs1 = "$script:deployDir\Restart.ps1"
 $script:updatePs1 = "$PSScriptRoot\update.ps1"
+$script:autostartPs1 = "$PSScriptRoot\autostart.ps1"
 
 # Icon: blaues Quadrat mit "PM"
 $bmp = New-Object System.Drawing.Bitmap 16, 16
@@ -114,6 +118,19 @@ $script:tray.Add_MouseClick({
         ).Invoke($script:tray, $null)
     }
 })
+
+# Beim Windows-Start die Dienste im Hintergrund hochfahren. Der eigene Prozess
+# hält das Tray-Symbol frei, während autostart.ps1 auf die Bereitschaft wartet.
+if ($AutoStart) {
+    if (Test-Path $script:autostartPs1) {
+        Start-Process powershell.exe -WindowStyle Hidden -ArgumentList `
+            "-WindowStyle Hidden -ExecutionPolicy Bypass -NonInteractive -File `"$script:autostartPs1`" -DeployDir `"$script:deployDir`""
+    } else {
+        $script:tray.ShowBalloonTip(5000, "Projekt Manager",
+            "autostart.ps1 nicht gefunden. Dienste wurden nicht gestartet.",
+            [System.Windows.Forms.ToolTipIcon]::Warning)
+    }
+}
 
 [System.Windows.Forms.Application]::Run()
 
