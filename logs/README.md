@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 06.09.26 | 15:10:03 | Nachtrag | Plugin-Versionsstand Project-Scope | ✅ |
 | 06.09.26 | 15:07:48 | Feature | dev-testing-skills und Wiki-Umstellung | ✅ |
 | 06.09.26 | 06:59:20 | Feature | Skill-Library als Plugin | ✅ |
 | 05.09.26 | 09:17:18 | Feature | Windows-Autostart und MCP-Anbindung | ✅ |
