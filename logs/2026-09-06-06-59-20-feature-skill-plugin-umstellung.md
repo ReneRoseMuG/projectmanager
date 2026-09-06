@@ -50,6 +50,8 @@ Codeänderungen gab es keine, entsprechend kein Testlauf. `graphify query` wurde
 - MCP auf Port 3010 antwortet mit `projekt-manager-mcp 0.1.0`; Port 3001 `/mcp` antwortet erwartungsgemäß mit `401`.
 - `ensure-plugins.sh` und `session-log-reminder.sh` sind syntaktisch fehlerfrei.
 - `graphify query` liefert nach dem Umbau weiterhin einen Teilgraphen.
+- `claude mcp list` nach Entfernen des globalen Eintrags — sowohl im Repository als auch im Home-Verzeichnis genau ein Server: `plugin:pm-workflow-skills:projekt-manager … ✔ Connected`. Keine Doppelregistrierung.
+- `~/.claude.json` vor der Änderung als `.bak-2026-09-06-plugin-umstellung` gesichert; alle 9 Projekteinträge unverändert.
 - Verbleibende Repo-Skills: `architektur`, `code-discipline`, `datenmodell`, `exploration`, `leitfaden-pflege`, `planungsleitplanken`, `test-entwurfsleitplanken`, `test-quality-review`.
 
 ## Offene Punkte / Folgeaufgaben
@@ -58,4 +60,5 @@ Codeänderungen gab es keine, entsprechend kein Testlauf. `graphify query` wurde
 - Die deutschen Skillnamen `dokumentation`/`spezifikation` heißen im Plugin `documentation`/`specification`. Auslöser in der Beschreibung sind weiterhin deutsch, aber der direkte Aufruf über den alten Namen greift nicht mehr.
 - MuGPlan hat das Plugin noch nicht installiert und verliert mit dem entfernten globalen Eintrag vorübergehend den MCP-Zugriff. Dort denselben Marketplace- und Plugin-Eintrag ergänzen (Vorlage: `templates/settings-snippet.md` der Bibliothek). Wird laut Übergabe separat gehandhabt.
 - In der Skill Library liegt der verwaiste Zweig `skill-orchestration-graphify` (Juni 2026). Sein Inhalt wurde beim Plugin-Umbau neu geschrieben, der Zweig ist überholt und kann nach Sichtung gelöscht werden.
+- Der Berechtigungseintrag in `.claude/settings.json` deckt vorsorglich drei mögliche Namensformen ab, weil die tatsächliche Werkzeug-Präfixform erst in einer neuen Sitzung sichtbar wird. Der Servername lautet `plugin:pm-workflow-skills:projekt-manager`; nach der ersten Sitzung kann auf das zutreffende Muster reduziert werden.
 - `claude -p` ist auf diesem Rechner nicht angemeldet; für headless-Verifikationen wäre eine Neuanmeldung der CLI nötig.
