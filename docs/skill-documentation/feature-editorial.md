@@ -1,5 +1,10 @@
 # Bauplan: feature-editorial
 
+> **Herkunft seit 2026-09-06:** Der Skill selbst liegt nicht mehr unter `.claude/skills/`, sondern kommt aus dem Plugin
+> `pm-workflow-skills@skill-library` (Repo `ReneRoseMuG/Skill-Library`, Ordner `plugins/pm-workflow-skills/`).
+> Dieser Bauplan bleibt als projektbezogene Entwurfs- und Begründungsquelle bestehen — Änderungen am Skillverhalten
+> zuerst in der Skill Library vornehmen.
+
 ## Zweck
 
 Redaktionelle Aufbereitung eines Features aus Anwendersicht. Erstellt eine strukturierte, fachlich verständliche Feature-Beschreibung mit festgelegter Gliederung, optional mit Use Cases. Zielgruppe ist ein Fachverantwortlicher oder Product Owner — kein technischer Jargon, keine Implementierungsdetails.
@@ -11,7 +16,7 @@ IMMER verwenden wenn der Nutzer formuliert: „Feature überarbeiten", „redakt
 ## Referenzen
 
 - `agents.md` Abschnitt 14 (Domäne 2 — Dokumentation): Features und Use Cases
-- `.claude/skills/projekt-manager/SKILL.md`: HTML-Konvertierungsregeln und MCP-Tools
+- Skill `projekt-manager` (Plugin `pm-workflow-skills`): HTML-Konvertierungsregeln und MCP-Tools
 - `docs/design-leitfaden.md`: bei visuellen Aspekten eines Features
 
 ## Projektkontext
@@ -94,7 +99,7 @@ Wenn der Nutzer Use Cases möchte:
 
 Features und Use Cases werden im Projekt Manager gepflegt. Der MCP-Server ist immer das Ausgabeziel, wenn eine ID bekannt ist.
 
-**Textfelder sind HTML** — Konvertierung gemäß `.claude/skills/projekt-manager/SKILL.md`:
+**Textfelder sind HTML** — Konvertierung gemäß Skill `projekt-manager` (Plugin `pm-workflow-skills`):
 
 | Markdown | HTML |
 |---|---|

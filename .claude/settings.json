@@ -1,10 +1,33 @@
 {
+  "extraKnownMarketplaces": {
+    "skill-library": {
+      "source": {
+        "source": "github",
+        "repo": "ReneRoseMuG/Skill-Library"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "pm-workflow-skills@skill-library": true
+  },
   "permissions": {
     "allow": [
-      "mcp__plugin_projekt-manager_projekt-manager__*"
+      "mcp__projekt-manager__*",
+      "mcp__plugin_pm-workflow-skills_projekt-manager__*",
+      "mcp__pm-workflow-skills__projekt-manager__*"
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/ensure-plugins.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash|Read|Glob|Grep",

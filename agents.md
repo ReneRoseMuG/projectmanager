@@ -426,7 +426,8 @@ taskmanager/
 │   ├── fixtures/                      ← Test-Fixtures und Test-Helper
 │   ├── setup/                         ← Test-Setups
 │   └── .runtime/                      ← generierte Testlaufdaten (ignoriert)
-├── .claude/skills/                    ← Repo-Skills (Claude-konform, z. B. planungsleitplanken/)
+├── .claude/skills/                    ← projekteigene Skills (stackgebunden, Abschnitt 7.3)
+├── .claude/hooks/                     ← Repo-Hooks (graphify-hint, leitfaden-check, ensure-plugins)
 ├── docs/
 │   ├── tasks/                         ← Aufgabendateien (Abschnitt 7.1)
 │   └── ...                            ← Architektur- und Implementierungsdokumentation
@@ -468,6 +469,23 @@ Jede Aufgabendatei enthält einen Abschnitt **Testhinweise** mit:
 - Abnahmekriterium: alle aufgeführten Tests müssen vor Abnahme grün sein
 
 `test.skip`, `it.skip` und leere Testkörper sind ohne dokumentierten Blocker im Schritt-Log unzulässig und zählen nicht als implementierte Tests.
+
+---
+
+### 7.3 Skill-Herkunft (verbindlich)
+
+Skills kommen aus zwei Quellen. Beide sind gleichrangig nutzbar; nur der Änderungsort unterscheidet sich.
+
+| Quelle | Skills | Änderung erfolgt |
+|---|---|---|
+| Plugin `pm-workflow-skills@skill-library` | `projekt-manager`, `mcp-code-auftrag`, `documentation`, `specification`, `feature-editorial`, `tagebuch` | im Repo `ReneRoseMuG/Skill-Library` unter `plugins/pm-workflow-skills/`, danach `claude plugin marketplace update skill-library` |
+| `.claude/skills/` in diesem Repo | `architektur`, `code-discipline`, `datenmodell`, `exploration`, `planungsleitplanken`, `test-entwurfsleitplanken`, `test-quality-review`, `leitfaden-pflege` | hier im Repo |
+
+Die projekteigenen Skills hängen am Technologiestack dieses Repos und bleiben deshalb hier. Ihre gemeinsame, stackfreie Wissensquelle liegt in der Skill Library unter `dev-testing/` — dort zuerst ändern, dann hier nachziehen. `leitfaden-pflege` ist projekteigen ohne Ebene-1-Quelle.
+
+Das Plugin bringt zusätzlich den MCP-Server `projekt-manager` mit (`http://127.0.0.1:3010/mcp`). Marketplace und Plugin sind in `.claude/settings.json` eingetragen; der SessionStart-Hook `.claude/hooks/ensure-plugins.sh` installiert sie auf einem neuen Rechner selbsttätig nach.
+
+Die Baupläne unter `docs/skill-documentation/` bleiben die projektbezogene Entwurfsbegründung — auch für Skills, die inzwischen aus dem Plugin kommen.
 
 ---
 

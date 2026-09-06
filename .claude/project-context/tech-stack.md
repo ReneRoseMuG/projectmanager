@@ -1,6 +1,7 @@
 # Projekt-Kontext: Tech-Stack — Projekt Manager
 
-Ausgefüllt gemäß Vorlage aus `dev-testing-skills/reference/tech-stack-template.md`.
+Projektspezifische Konkretisierung der stackfreien Wissensbasis `dev-testing/` aus der Skill Library
+(`ReneRoseMuG/Skill-Library`). Zuletzt gegen den Code verifiziert: 2026-09-06.
 
 ## Schichten
 
@@ -35,7 +36,7 @@ Weitere Workspace-Pakete: `apps/mcp-server` (Projekt-Manager-MCP-Server), `apps/
 - Typ: MySQL (Aiven-gehostet in Produktion)
 - ORM: Drizzle ORM (`drizzle-orm/mysql2`), Treiber `mysql2`
 - Migrationsordner: `apps/api/src/db/migrations` (Config: `apps/api/drizzle.config.ts`)
-- Connection-Pool-Limits: `connectionLimit 10`, `queueLimit 50` (`apps/api/src/db/client.ts`) — Sammel-Queries (`inArray`) statt Pro-Element-Queries verwenden
+- Connection-Pool-Limits: `connectionLimit 10`, `queueLimit 50`, `maxIdle 5`, `idleTimeout 60000` (`apps/api/src/db/client.ts`) — bei 10 gleichzeitigen Verbindungen sind N+1-Zugriffe der schnellste Weg in die Warteschlange: Sammel-Queries (`inArray`) statt Pro-Element-Queries verwenden
 - Verbotene Pfade in Tests: keine produktive MySQL-Instanz; Tests erzeugen eine eigene, eindeutig benannte Test-Datenbank pro Lauf (siehe `tests/fixtures/api/db.ts`, `assertSafeTestDatabaseTarget`)
 
 ## Tests
@@ -52,17 +53,26 @@ Weitere Workspace-Pakete: `apps/mcp-server` (Projekt-Manager-MCP-Server), `apps/
 
 ## Domänen-Abdeckung (für test-quality-review)
 
+Tabellennamen wie in `apps/api/src/db/schema.ts`.
+
 | Domäne | Kern-Entitäten |
 |---|---|
-| Projektmanagement | projects, milestones, tasks |
-| Dokumentation | features, useCases, wikiPages |
-| Tickets | tickets, ticketRelations |
-| Tags | projectTags, milestoneTags, taskTags, ticketTags |
-| Notes | projectNotes, milestoneNotes, taskNotes, ticketNotes |
-| Attachments | projectAttachments, milestoneAttachments, taskAttachments, ticketAttachments |
-| Comments | projectComments, milestoneComments, taskComments, ticketComments |
-| Auth & Rollen | Permissions, Session, Guards |
-| Journal | journal entries, objectJournal |
+| Projektmanagement | projects, milestones, tasks, projectTasks, milestoneTasks, projectFeatures, milestoneFeatures |
+| Tagesplanung | dayPlans, dayPlanTasks, dayPlanNotes, dayPlanComments, dayPlanEvents |
+| Dokumentation | features, useCases, featureRelations, wikiPages, wikiPageRelations, contentImages |
+| Tickets | tickets, ticketRelations, projectTickets, milestoneTickets, taskTickets, featureTickets, useCaseTickets, wikiPageTickets |
+| Backlog | backlogItems, backlogItemComments |
+| Dokumentenverwaltung (DMS) | attachments, attachmentFolders, attachmentTags, attachmentLocalFolders, folderAttachments, *AttachmentFolders, *DocumentLinks |
+| Attachments (Parent-Bindung) | projectAttachments, milestoneAttachments, taskAttachments, featureAttachments, ticketAttachments, wikiPageAttachments |
+| Kalender & Termine | events, projectEvents, milestoneEvents, taskEvents, calendarConnections, externalCalendars, calendarSyncStates, eventMappings, calendarSyncJournal |
+| Benachrichtigungen | sentNotifications, pushSubscriptions |
+| Tagebuch | diaryEntries |
+| Tags | tags, projectTags, milestoneTags, taskTags, ticketTags |
+| Notes | notes, projectNotes, milestoneNotes, taskNotes, ticketNotes, dayPlanNotes, wikiPageNotes |
+| Comments | comments, projectComments, milestoneComments, taskComments, ticketComments, featureComments, useCaseComments, wikiPageComments, dayPlanComments, backlogItemComments |
+| Auth & Rollen | users, roles, permissions (Session/Guards in `apps/api/src/plugins/auth.ts`) |
+| Journal / Audit | journalEntries, journalEntryChanges, journalEntryContexts |
+| Konfiguration & Dashboard | appSettings, settingsValues, catalogEntries, dashboards, dashboardWidgets, dashboardDefaults |
 
 ## Analysewerkzeuge
 
@@ -72,7 +82,7 @@ Weitere Workspace-Pakete: `apps/mcp-server` (Projekt-Manager-MCP-Server), `apps/
 ## Auth & Rollen
 
 - Permission-Mapping: lesende Endpunkte → `read`; erstellende/ändernde → `write`; Löschoperationen → `delete`; Admin-Endpunkte → domänenspezifische Admin-Permissions (z. B. `users:admin`, `roles:admin`); neue Domänen ergänzen den Permission-Katalog
-- Öffentliche Ausnahmen: `/health`, `/api/health`, `/api/auth/*`
+- Öffentliche Ausnahmen (`apps/api/src/plugins/auth.ts`, `openApiPrefixes` + Sonderfall `/health`): `/health`, `/api/health`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`, `/api/auth/set-password`, `/api/calendar-connections/google/callback`, `/api/calendar-connections/google/notifications` — **nicht** pauschal `/api/auth/*`
 
 ## Git-Kurzkommandos
 

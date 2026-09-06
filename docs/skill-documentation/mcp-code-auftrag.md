@@ -1,5 +1,10 @@
 # Bauplan: mcp-code-auftrag
 
+> **Herkunft seit 2026-09-06:** Der Skill selbst liegt nicht mehr unter `.claude/skills/`, sondern kommt aus dem Plugin
+> `pm-workflow-skills@skill-library` (Repo `ReneRoseMuG/Skill-Library`, Ordner `plugins/pm-workflow-skills/`).
+> Dieser Bauplan bleibt als projektbezogene Entwurfs- und Begründungsquelle bestehen — Änderungen am Skillverhalten
+> zuerst in der Skill Library vornehmen.
+
 ## Zweck
 
 Orchestrierungs-Skill für Arbeitsaufträge die aus der Projekt Manager App über den MCP-Server übergeben werden. Lädt den Parent-Kontext vollständig, leitet den Auftrag ab, fragt vor der Ausführung nach Plan oder Direktausführung, schreibt danach einen nutzerlesbaren Log zurück und setzt den Parent-Status auf „Wartend".
@@ -98,7 +103,7 @@ Kein Status-Update-Tool verfügbar → als Blocker melden und explizit nennen da
 
 ## Implementierungshinweise für den Skill-Bau
 
-- Skill liegt unter `.claude/skills/mcp-code-auftrag/` (Claude-konform). Frühere OpenAI-Codex-Quelle am 2026-06-12 entfernt — Repo ist Claude-only.
+- Skill liegt seit 2026-09-06 im Plugin `pm-workflow-skills@skill-library` (vorher `.claude/skills/mcp-code-auftrag/`). Frühere OpenAI-Codex-Quelle am 2026-06-12 entfernt — Repo ist Claude-only.
 - Referenz-Format ist projektspezifisch und muss bei Übernahme in andere Projekte angepasst werden
 - Die Pflichtfrage (Schritt 3) ist bewusst hartcodiert — nicht weglassen, auch wenn Nutzer ungeduldig wirkt
 - Dieser Skill ist der einzige der aktiv nach Plan oder Direktausführung fragt — alle anderen setzen einen bereits getroffenen Entscheid voraus

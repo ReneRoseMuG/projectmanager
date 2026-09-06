@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 06.09.26 | 06:59:20 | Feature | Skill-Library als Plugin | ✅ |
 | 05.09.26 | 09:17:18 | Feature | Windows-Autostart und MCP-Anbindung | ✅ |
 | 01.09.26 | 09:11:04 | Abschluss | Attachment/DMS-Trennung | ✅ |
 | 01.09.26 | 08:59:51 | Fix | E2E-Auth- und Kalender-Startblocker | ✅ |

@@ -1,5 +1,10 @@
 # Bauplan: projekt-manager (Basis-Skill)
 
+> **Herkunft seit 2026-09-06:** Der Skill selbst liegt nicht mehr unter `.claude/skills/`, sondern kommt aus dem Plugin
+> `pm-workflow-skills@skill-library` (Repo `ReneRoseMuG/Skill-Library`, Ordner `plugins/pm-workflow-skills/`).
+> Dieser Bauplan bleibt als projektbezogene Entwurfs- und Begründungsquelle bestehen — Änderungen am Skillverhalten
+> zuerst in der Skill Library vornehmen.
+
 ## Zweck
 
 Basis-Interaktions-Skill für die Projekt Manager App. Verbindet den Coding Agent mit dem MCP-Server, stellt das Tool-Verzeichnis bereit und regelt den Bearbeitungs-Workflow für alle Objekte. Spezialisierte Skills (z. B. `feature-editorial`, `test-quality-review`) bauen auf diesem Skill auf — sie ergänzen ihn, ersetzen ihn nicht.
