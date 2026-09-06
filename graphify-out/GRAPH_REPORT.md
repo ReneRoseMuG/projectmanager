@@ -1,16 +1,16 @@
-# Graph Report - Projekt Manager  (2026-07-08)
+# Graph Report - Projekt Manager  (2026-09-06)
 
 ## Corpus Check
-- 1502 files · ~889,541 words
+- 1633 files · ~1,152,806 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 11323 nodes · 21188 edges · 976 communities (925 shown, 51 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 92 edges (avg confidence: 0.8)
+- 12380 nodes · 22779 edges · 1084 communities (1029 shown, 55 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 95 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `188ef7f7`
+- Built from commit: `e954c58c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -811,6 +811,7 @@
 - [[_COMMUNITY_Community 802|Community 802]]
 - [[_COMMUNITY_Community 803|Community 803]]
 - [[_COMMUNITY_Community 804|Community 804]]
+- [[_COMMUNITY_Community 806|Community 806]]
 - [[_COMMUNITY_Community 807|Community 807]]
 - [[_COMMUNITY_Community 808|Community 808]]
 - [[_COMMUNITY_Community 812|Community 812]]
@@ -965,34 +966,136 @@
 - [[_COMMUNITY_Community 969|Community 969]]
 - [[_COMMUNITY_Community 970|Community 970]]
 - [[_COMMUNITY_Community 971|Community 971]]
+- [[_COMMUNITY_Community 972|Community 972]]
 - [[_COMMUNITY_Community 973|Community 973]]
 - [[_COMMUNITY_Community 974|Community 974]]
 - [[_COMMUNITY_Community 975|Community 975]]
 - [[_COMMUNITY_Community 976|Community 976]]
+- [[_COMMUNITY_Community 977|Community 977]]
+- [[_COMMUNITY_Community 978|Community 978]]
+- [[_COMMUNITY_Community 979|Community 979]]
+- [[_COMMUNITY_Community 980|Community 980]]
+- [[_COMMUNITY_Community 981|Community 981]]
+- [[_COMMUNITY_Community 982|Community 982]]
+- [[_COMMUNITY_Community 984|Community 984]]
+- [[_COMMUNITY_Community 985|Community 985]]
+- [[_COMMUNITY_Community 986|Community 986]]
+- [[_COMMUNITY_Community 987|Community 987]]
+- [[_COMMUNITY_Community 988|Community 988]]
+- [[_COMMUNITY_Community 989|Community 989]]
+- [[_COMMUNITY_Community 990|Community 990]]
+- [[_COMMUNITY_Community 991|Community 991]]
+- [[_COMMUNITY_Community 992|Community 992]]
+- [[_COMMUNITY_Community 993|Community 993]]
+- [[_COMMUNITY_Community 994|Community 994]]
+- [[_COMMUNITY_Community 995|Community 995]]
+- [[_COMMUNITY_Community 996|Community 996]]
+- [[_COMMUNITY_Community 997|Community 997]]
+- [[_COMMUNITY_Community 998|Community 998]]
+- [[_COMMUNITY_Community 1000|Community 1000]]
+- [[_COMMUNITY_Community 1001|Community 1001]]
+- [[_COMMUNITY_Community 1003|Community 1003]]
+- [[_COMMUNITY_Community 1004|Community 1004]]
+- [[_COMMUNITY_Community 1005|Community 1005]]
+- [[_COMMUNITY_Community 1006|Community 1006]]
+- [[_COMMUNITY_Community 1007|Community 1007]]
+- [[_COMMUNITY_Community 1008|Community 1008]]
+- [[_COMMUNITY_Community 1009|Community 1009]]
+- [[_COMMUNITY_Community 1010|Community 1010]]
+- [[_COMMUNITY_Community 1011|Community 1011]]
+- [[_COMMUNITY_Community 1012|Community 1012]]
+- [[_COMMUNITY_Community 1013|Community 1013]]
+- [[_COMMUNITY_Community 1014|Community 1014]]
+- [[_COMMUNITY_Community 1015|Community 1015]]
+- [[_COMMUNITY_Community 1016|Community 1016]]
+- [[_COMMUNITY_Community 1017|Community 1017]]
+- [[_COMMUNITY_Community 1018|Community 1018]]
+- [[_COMMUNITY_Community 1019|Community 1019]]
+- [[_COMMUNITY_Community 1020|Community 1020]]
+- [[_COMMUNITY_Community 1021|Community 1021]]
+- [[_COMMUNITY_Community 1022|Community 1022]]
+- [[_COMMUNITY_Community 1023|Community 1023]]
+- [[_COMMUNITY_Community 1024|Community 1024]]
+- [[_COMMUNITY_Community 1025|Community 1025]]
+- [[_COMMUNITY_Community 1026|Community 1026]]
+- [[_COMMUNITY_Community 1027|Community 1027]]
+- [[_COMMUNITY_Community 1028|Community 1028]]
+- [[_COMMUNITY_Community 1029|Community 1029]]
+- [[_COMMUNITY_Community 1030|Community 1030]]
+- [[_COMMUNITY_Community 1031|Community 1031]]
+- [[_COMMUNITY_Community 1032|Community 1032]]
+- [[_COMMUNITY_Community 1033|Community 1033]]
+- [[_COMMUNITY_Community 1034|Community 1034]]
+- [[_COMMUNITY_Community 1035|Community 1035]]
+- [[_COMMUNITY_Community 1036|Community 1036]]
+- [[_COMMUNITY_Community 1037|Community 1037]]
+- [[_COMMUNITY_Community 1038|Community 1038]]
+- [[_COMMUNITY_Community 1039|Community 1039]]
+- [[_COMMUNITY_Community 1040|Community 1040]]
+- [[_COMMUNITY_Community 1041|Community 1041]]
+- [[_COMMUNITY_Community 1042|Community 1042]]
+- [[_COMMUNITY_Community 1043|Community 1043]]
+- [[_COMMUNITY_Community 1044|Community 1044]]
+- [[_COMMUNITY_Community 1045|Community 1045]]
+- [[_COMMUNITY_Community 1048|Community 1048]]
+- [[_COMMUNITY_Community 1050|Community 1050]]
+- [[_COMMUNITY_Community 1051|Community 1051]]
+- [[_COMMUNITY_Community 1052|Community 1052]]
+- [[_COMMUNITY_Community 1053|Community 1053]]
+- [[_COMMUNITY_Community 1054|Community 1054]]
+- [[_COMMUNITY_Community 1055|Community 1055]]
+- [[_COMMUNITY_Community 1056|Community 1056]]
+- [[_COMMUNITY_Community 1057|Community 1057]]
+- [[_COMMUNITY_Community 1058|Community 1058]]
+- [[_COMMUNITY_Community 1059|Community 1059]]
+- [[_COMMUNITY_Community 1060|Community 1060]]
+- [[_COMMUNITY_Community 1061|Community 1061]]
+- [[_COMMUNITY_Community 1062|Community 1062]]
+- [[_COMMUNITY_Community 1063|Community 1063]]
+- [[_COMMUNITY_Community 1064|Community 1064]]
+- [[_COMMUNITY_Community 1065|Community 1065]]
+- [[_COMMUNITY_Community 1066|Community 1066]]
+- [[_COMMUNITY_Community 1067|Community 1067]]
+- [[_COMMUNITY_Community 1068|Community 1068]]
+- [[_COMMUNITY_Community 1069|Community 1069]]
+- [[_COMMUNITY_Community 1070|Community 1070]]
+- [[_COMMUNITY_Community 1071|Community 1071]]
+- [[_COMMUNITY_Community 1072|Community 1072]]
+- [[_COMMUNITY_Community 1073|Community 1073]]
+- [[_COMMUNITY_Community 1075|Community 1075]]
+- [[_COMMUNITY_Community 1076|Community 1076]]
+- [[_COMMUNITY_Community 1077|Community 1077]]
+- [[_COMMUNITY_Community 1079|Community 1079]]
+- [[_COMMUNITY_Community 1080|Community 1080]]
+- [[_COMMUNITY_Community 1081|Community 1081]]
+- [[_COMMUNITY_Community 1082|Community 1082]]
+- [[_COMMUNITY_Community 1083|Community 1083]]
+- [[_COMMUNITY_Community 1086|Community 1086]]
+- [[_COMMUNITY_Community 1087|Community 1087]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `notFound()` - 168 edges
-2. `firstRow()` - 151 edges
-3. `badRequest()` - 148 edges
-4. `buildTestApp()` - 105 edges
+1. `notFound()` - 186 edges
+2. `badRequest()` - 166 edges
+3. `firstRow()` - 162 edges
+4. `buildTestApp()` - 110 edges
 5. `useCatalogs()` - 96 edges
-6. `toQueryError()` - 91 edges
-7. `useToast()` - 86 edges
-8. `createTestDb()` - 73 edges
-9. `useHasPermission()` - 72 edges
-10. `TestDb` - 70 edges
+6. `toQueryError()` - 92 edges
+7. `useToast()` - 88 edges
+8. `createTestDb()` - 80 edges
+9. `TestDb` - 77 edges
+10. `useHasPermission()` - 74 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `insertLocalEvent()` --calls--> `insertId()`  [EXTRACTED]
-  tests/integration/api/google-export.test.ts → apps/api/src/db/query-utils.ts
-- `insertLocalEvent()` --calls--> `insertId()`  [EXTRACTED]
-  tests/integration/api/google-sync.test.ts → apps/api/src/db/query-utils.ts
-- `insertLocalEvent()` --calls--> `insertId()`  [EXTRACTED]
-  tests/integration/api/google-timezones.test.ts → apps/api/src/db/query-utils.ts
 - `buildTestApp()` --calls--> `registerAuthPlugins()`  [INFERRED]
   tests/fixtures/api/app.ts → apps/api/src/plugins/auth.ts
 - `buildTestApp()` --calls--> `registerGlobalAuthGuard()`  [INFERRED]
   tests/fixtures/api/app.ts → apps/api/src/plugins/auth.ts
+- `buildTestApp()` --calls--> `registerCors()`  [INFERRED]
+  tests/fixtures/api/app.ts → apps/api/src/plugins/cors.ts
+- `buildTestApp()` --calls--> `registerMultipart()`  [INFERRED]
+  tests/fixtures/api/app.ts → apps/api/src/plugins/multipart.ts
+- `buildTestApp()` --calls--> `registerRealtimePublisher()`  [INFERRED]
+  tests/fixtures/api/app.ts → apps/api/src/plugins/realtime.ts
 
 ## Import Cycles
 - 3-file cycle: `apps/web/src/components/ui/Badge.tsx -> apps/web/src/utils/catalogs.ts -> apps/web/src/utils/domainLabels.ts -> apps/web/src/components/ui/Badge.tsx`
@@ -1001,67 +1104,67 @@
 - 4-file cycle: `apps/web/src/components/ui/Pill.tsx -> apps/web/src/utils/catalogs.ts -> apps/web/src/utils/domainLabels.ts -> apps/web/src/utils/statusTones.ts -> apps/web/src/components/ui/Pill.tsx`
 - 5-file cycle: `apps/web/src/components/calendar/CalendarDashboardProvider.tsx -> apps/web/src/components/tasks/TaskForm.tsx -> apps/web/src/components/dashboard/DashboardView.tsx -> apps/web/src/components/dashboard/DashboardGrid.tsx -> apps/web/src/components/dashboard/DashboardWidgets.tsx -> apps/web/src/components/calendar/CalendarDashboardProvider.tsx`
 
-## Communities (976 total, 51 thin omitted)
+## Communities (1084 total, 55 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.04
-Nodes (72): stateFromAuthUrl(), CALENDAR_LIST, QueuedResponse, CalDavFetch, CALENDAR_JOURNAL_EVENT_TYPES, calendarConnections, calendarSyncJournal, calendarSyncStates (+64 more)
+Nodes (81): stateFromAuthUrl(), CALENDAR_LIST, QueuedResponse, CalDavFetch, calendarConnections, calendarSyncStates, eventMappings, externalCalendars (+73 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.06
-Nodes (52): CREDS, ics(), parseVEvent(), CREDS, Handlers, WINDOW, assertResponseOk(), basicAuthHeader() (+44 more)
+Nodes (50): CREDS, ics(), parseVEvent(), CREDS, Handlers, WINDOW, assertResponseOk(), basicAuthHeader() (+42 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.01
-Nodes (209): PRIORITIES, AdminUser, AdminUserInput, AdminUserUpdate, ApiErrorPayload, Attachment, AttachmentCategory, AttachmentFolder (+201 more)
+Nodes (230): PRIORITIES, AdminUser, AdminUserInput, AdminUserUpdate, ApiErrorPayload, Attachment, ATTACHMENT_KINDS, ATTACHMENT_OWNER_TYPES (+222 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.08
-Nodes (28): WINDOW, registerGoogleSyncHandler(), RecordSyncResultInput, getEffectiveCalendarConfig(), applyCalendarSchedulerState(), BackoffEntry, backoffState, isCalendarSyncSchedulerRunning() (+20 more)
+Cohesion: 0.05
+Nodes (47): registerGoogleSyncHandler(), registerAuthPlugins(), registerGlobalAuthGuard(), requirePermission(), registerCors(), registerMultipart(), mutatingMethods, registerRealtimePublisher() (+39 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.04
-Nodes (89): permissions, roles, sentNotifications, users, NotificationChannel, notificationRepository, sentNotificationKey, PushSubscriptionRecord (+81 more)
+Cohesion: 0.06
+Nodes (52): RecencyColumns, permissions, users, PermissionCreateData, PermissionRecord, RoleCreateData, RoleRecord, roleRepository (+44 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.11
 Nodes (16): GlobalSearchData, useGlobalSearchData(), openGlobalSearch(), OpenGlobalSearchDetail, ShellOverlays(), GlobalSearch(), GlobalSearchProps, ResultScope (+8 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.05
-Nodes (89): TICKET_RELATION_TYPES, TICKET_RESOLUTIONS, ticketComments, commentBodySchema, dashboardTicketQuerySchema, idAndChildIdParamSchema, MultipartFileField, noteBodySchema (+81 more)
+Cohesion: 0.04
+Nodes (120): featureTasks, featureTickets, milestoneTasks, milestoneTickets, projectTickets, TICKET_RELATION_TYPES, TICKET_RESOLUTIONS, ticketRelations (+112 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.04
-Nodes (78): attachmentCategoryLinks, attachmentFolders, attachmentTags, folderAttachments, AttachmentFolderCreateData, AttachmentFolderRecord, attachmentFolderRepository, AttachmentFolderUpdateData (+70 more)
+Cohesion: 0.03
+Nodes (134): attachmentCategories, attachmentCategoryLinks, attachmentFolders, folderAttachments, AttachmentFolderCreateData, AttachmentFolderRecord, attachmentFolderRepository, AttachmentFolderUpdateData (+126 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.03
-Nodes (91): buildTestApp(), BacklogListItem, PaginatedBacklog, MilestoneResponse, createUser(), loginAdmin(), previewCacheDir, uploadDir (+83 more)
+Nodes (105): buildTestApp(), localRoot, uploadDir, BacklogListItem, PaginatedBacklog, loginAdmin(), loginReader(), uploadImage() (+97 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.02
-Nodes (171): RoleCard(), RoleCardProps, RoleListBoardViewProps, UserCard(), UserCardProps, UserListBoardViewProps, createCatalogEntry(), deleteCatalogEntry() (+163 more)
+Cohesion: 0.03
+Nodes (108): RoleCard(), RoleCardProps, RoleListBoardViewProps, UserCard(), UserCardProps, UserListBoardViewProps, BacklogItemCard(), BacklogItemRow() (+100 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.05
-Nodes (58): baseConnectionConfig(), defaultCatalogEntries, seedDefaultAuth(), seedDefaultCatalogEntries(), truncateTables, isSameOrInside(), setup(), adminConnection() (+50 more)
+Cohesion: 0.17
+Nodes (14): apiDir, apiEntry, DEFAULT_API_PORT_BASE, DEFAULT_WEB_PORT_BASE, pipeLogs(), repoRoot, startWorkerServers(), StartWorkerServersOptions (+6 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.03
-Nodes (124): appSettings, apiKeyHeaderValue(), hasMatchingApiKey(), isAllowedDuringPasswordSetup(), isOpenRoute(), openApiPrefixes, registerAuthPlugins(), registerGlobalAuthGuard() (+116 more)
+Cohesion: 0.06
+Nodes (57): appSettings, dashboardDefaults, dashboards, dashboardWidgets, apiKeyHeaderValue(), hasMatchingApiKey(), isAllowedDuringPasswordSetup(), isOpenRoute() (+49 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.03
-Nodes (79): ActivityContext, activityEntryItem(), activityReportSchema, addSupportCounts(), addTagsToParent(), attachmentFileSchema, attachmentInputSchema, attachmentListInputSchema (+71 more)
+Cohesion: 0.02
+Nodes (83): ActivityContext, activityEntryItem(), activityReportSchema, addSupportCounts(), addTagsToParent(), attachmentFileSchema, attachmentInputSchema, attachmentListInputSchema (+75 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.02
-Nodes (95): closeDatabase(), db, DbSession, DbTransaction, mysqlPool, migrationsFolder, insertId(), mutationAffectedRows() (+87 more)
+Nodes (115): previewCacheDir, uploadDir, createNoteForWikiPage(), mutationAffectedRows(), backlogItemComments, CALENDAR_CONNECTION_STATUSES, CALENDAR_JOURNAL_EVENT_TYPES, CALENDAR_PROVIDERS (+107 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.06
-Nodes (56): dashboardDefaults, dashboards, dashboardWidgets, DashboardCreateData, DashboardDefaultRecord, DashboardDefaultScopeRef, DashboardRecord, dashboardRepository (+48 more)
+Cohesion: 0.10
+Nodes (19): FeatureRelationPanel(), FeatureRelationPanelProps, featureToneMap, featureTones, relationTypes, TicketRelationPanel(), TicketRelationPanelProps, Divider() (+11 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.16
@@ -1069,23 +1172,23 @@ Nodes (10): CalendarWidgetMode, CalendarWidgetView(), CalendarWidgetViewMode, Ca
 
 ### Community 16 - "Community 16"
 Cohesion: 0.05
-Nodes (83): taskComments, dashboardOverdueTaskQuerySchema, dashboardRecentTaskQuerySchema, dashboardTaskQuerySchema, ensureDashboardDayPlanAccess(), overdueTaskOwnerFromQuery(), ownerTaskParamSchema, registerTasksRoutes() (+75 more)
+Nodes (88): recencyOrder(), tasks, TaskCreateData, TaskListFilter, TaskRecord, taskRepository, TaskUpdateData, dashboardOverdueTaskQuerySchema (+80 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.06
-Nodes (61): addResult(), BacklogStatus, buildImportReport(), contentBeforeHeading(), descriptionFromSection(), emptySummary(), ensureProjectExists(), escapeHtml() (+53 more)
+Nodes (65): featureRelations, registerImportsRoutes(), wikiImportBodySchema, addResult(), BacklogStatus, buildImportReport(), contentBeforeHeading(), descriptionFromSection() (+57 more)
 
 ### Community 18 - "Community 18"
-Cohesion: 0.05
-Nodes (78): BuildTestAppOptions, DbClient, milestoneAttachments, projectAttachments, taskAttachments, MultipartFileField, readUpload(), recentAttachmentOwnerFromQuery() (+70 more)
+Cohesion: 0.04
+Nodes (106): attachments, AttachmentCreateData, AttachmentMetadataUpdateData, AttachmentRecord, attachmentRepository, attachmentArchiveBodySchema, attachmentContentQuerySchema, attachmentOwnerProperties (+98 more)
 
 ### Community 19 - "Community 19"
 Cohesion: 0.09
 Nodes (42): appendTextBlocks(), blockToWordParagraph(), buildDocumentXml(), buildPdf(), buildPdfContentStream(), bytesToArrayBuffer(), contentTypesXml(), crc32() (+34 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.15
-Nodes (18): DocumentLibraryFilter, DocumentSidePanel, DocumentSidePanelProps, isThumbnailSize(), loadThumbnailSize(), saveThumbnailSize(), THUMBNAIL_SIZES, thumbnailMinPx() (+10 more)
+Cohesion: 0.11
+Nodes (20): DocumentLibraryFilter, DocumentSidePanel, DocumentSidePanelProps, isThumbnailSize(), loadThumbnailSize(), saveThumbnailSize(), THUMBNAIL_SIZES, thumbnailMinPx() (+12 more)
 
 ### Community 21 - "Community 21"
 Cohesion: 0.06
@@ -1093,51 +1196,51 @@ Nodes (16): addPendingComment(), changeInput(), clickTab(), feature, fixtures, f
 
 ### Community 22 - "Community 22"
 Cohesion: 0.07
-Nodes (19): renderUploader(), renderWithProviders(), dashboards, renderPicker(), renderForm(), renderForm(), hookMocks, milestones (+11 more)
+Nodes (22): renderForm(), renderWithProviders(), dashboards, renderPicker(), renderForm(), renderForm(), notes, pageMocks (+14 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.08
-Nodes (59): wikiBodySchema, wikiExportBodySchema, wikiPatchSchema, wikiRelationBodySchema, wikiTreeMoveBodySchema, deleteWikiPageCommentsForIds(), readContentFromDb(), deleteWikiPageNotesForIds() (+51 more)
+Cohesion: 0.05
+Nodes (84): DbClient, contentImages, wikiPages, ContentImageCreateData, ContentImageRecord, contentImageRepository, WikiPageCreateData, WikiPageRecord (+76 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.15
-Nodes (11): deleteSettingValue(), getResolvedSettings(), setSettingValue(), DeleteMutationInput, DeleteSettingInput, expectedVersionFor(), SetMutationInput, SetSettingInput (+3 more)
+Cohesion: 0.14
+Nodes (12): deleteSettingValue(), getResolvedSettings(), setSettingValue(), DeleteMutationInput, DeleteSettingInput, expectedVersionFor(), SetMutationInput, SetSettingInput (+4 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.11
-Nodes (44): invalidateRealtimeScope(), invalidateOwner(), attachmentOwnerKeys(), commentOwnerKeys(), expectInvalidated(), invalidatedLabels(), KnownQueryLabel, invalidateAdminRoles() (+36 more)
+Cohesion: 0.10
+Nodes (46): invalidateRealtimeScope(), invalidateOwner(), ownerTaskKey(), attachmentOwnerKeys(), commentOwnerKeys(), expectInvalidated(), invalidatedLabels(), KnownQueryLabel (+38 more)
 
 ### Community 26 - "Community 26"
 Cohesion: 0.09
-Nodes (41): restoreCatalogEntries(), trimCatalog(), openDayPlan(), apiPortBase, authenticatedApiRequests, BacklogItemFixture, cleanupTasksByTitle(), cleanupTicketsByTitle() (+33 more)
+Nodes (39): restoreCatalogEntries(), trimCatalog(), openDayPlan(), apiPortBase, authenticatedApiRequests, BacklogItemFixture, cleanupTasksByTitle(), cleanupTicketsByTitle() (+31 more)
 
 ### Community 27 - "Community 27"
-Cohesion: 0.13
-Nodes (29): FEATURE_RELATION_TYPES, featureIdsBodySchema, featureRelationsBodySchema, buildFeatureSetChange(), buildRelationSetChange(), ensureFeatureExists(), ensureFeaturesExist(), ensureMilestoneExists() (+21 more)
+Cohesion: 0.07
+Nodes (53): CommentCreateData, CommentRecord, commentRepository, CommentUpdateData, commentBodySchema, commentUpdateSchema, entityCommentDeleteParamsSchema, entityCommentParamsSchema (+45 more)
 
 ### Community 28 - "Community 28"
-Cohesion: 0.04
-Nodes (125): firstRow(), backlogBodySchema, BacklogListQuery, backlogPatchSchema, backlogQuerySchema, registerBacklogRoutes(), commentBodySchema, commentUpdateSchema (+117 more)
+Cohesion: 0.06
+Nodes (72): firstRow(), milestoneFeatures, projectFeatures, backlogContexts(), createBacklogItem(), ensureFeatureExists(), ensureUseCaseExists(), getFeatureJournalObject() (+64 more)
 
 ### Community 29 - "Community 29"
-Cohesion: 0.07
-Nodes (60): recencyOrder(), dayPlanNoteParamSchema, noteBodySchema, noteMoveSchema, notePatchSchema, notesListQuerySchema, cleanTitle(), createDayPlanNote() (+52 more)
+Cohesion: 0.03
+Nodes (111): diaryEntries, DiaryEntryCreateData, DiaryEntryRecord, diaryEntryRepository, DiaryEntryUpdateData, NoteCreateData, NotePageParams, NoteRecord (+103 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.12
-Nodes (8): FeatureProjectPanel(), toListBoardMode(), buildProjectSet(), renderFeatureProjectPanel(), closedStatusValues, openStatusColumns, renderProjectList(), statusColumns
+Cohesion: 0.20
+Nodes (4): closedStatusValues, openStatusColumns, renderProjectList(), statusColumns
 
 ### Community 31 - "Community 31"
-Cohesion: 0.07
-Nodes (23): apiMocks, buildFeature(), buildFeatureSet(), buildMilestone(), buildMilestoneSet(), buildProject(), buildTag(), buildTask() (+15 more)
+Cohesion: 0.09
+Nodes (19): apiMocks, buildBacklogItems(), renderBacklogList(), buildBacklogItem(), buildFeature(), buildFeatureSet(), buildMilestone(), buildMilestoneSet() (+11 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.10
-Nodes (29): tags, TagCreateData, TagRecord, tagRepository, TagUpdateData, registerTagsRoutes(), tagBodySchema, tagDomainPropertySchema (+21 more)
+Cohesion: 0.06
+Nodes (48): attachmentTags, milestoneTags, projectTags, tags, taskTags, ticketTags, TagCreateData, TagRecord (+40 more)
 
 ### Community 33 - "Community 33"
-Cohesion: 0.11
-Nodes (36): seedThumbnail(), acquireConversionSlot(), assetUrl(), attachmentDiskPath(), AttachmentPreviewProfile, AttachmentRecord, availablePreview(), conversionFailureMessage() (+28 more)
+Cohesion: 0.12
+Nodes (35): acquireConversionSlot(), assetUrl(), attachmentDiskPath(), AttachmentPreviewProfile, AttachmentRecord, availablePreview(), conversionFailureMessage(), conversionWaiters (+27 more)
 
 ### Community 34 - "Community 34"
 Cohesion: 0.14
@@ -1152,16 +1255,16 @@ Cohesion: 0.14
 Nodes (4): CalendarConfigStatus, ConnectNextCloudInput, GoogleCalendarOption, SyncAllResult
 
 ### Community 37 - "Community 37"
-Cohesion: 0.13
-Nodes (30): createDashboard(), DashboardWidgetData, deleteDashboard(), getDashboard(), getDashboardJournal(), getDashboardMilestoneList(), getDashboardMilestones(), getDashboardNotes() (+22 more)
+Cohesion: 0.14
+Nodes (28): createDashboard(), DashboardWidgetData, deleteDashboard(), getDashboard(), getDashboardJournal(), getDashboardMilestones(), getDashboardNotes(), getDashboardOverdueTasks() (+20 more)
 
 ### Community 38 - "Community 38"
-Cohesion: 0.12
-Nodes (38): authenticatedGoto(), clickItemAction(), createFeature(), deleteFeature(), expectRichText(), expectToast(), fillRichText(), formPage() (+30 more)
+Cohesion: 0.14
+Nodes (31): authenticatedGoto(), clickItemAction(), expectRichText(), expectToast(), formPage(), itemCard(), expectFeatureFormData(), expectListRendersWithoutCrash() (+23 more)
 
 ### Community 39 - "Community 39"
-Cohesion: 0.04
-Nodes (97): DAY_PLAN_STATUSES, journalEntries, journalEntryChanges, journalEntryContexts, milestoneEvents, taskEvents, JournalActorRecord, JournalChangeCreateData (+89 more)
+Cohesion: 0.07
+Nodes (50): dayPlanComments, dayPlanEvents, dayPlanNotes, dayPlans, commentSelect, DayPlanCommentRow, DayPlanEventRow, DayPlanNoteRow (+42 more)
 
 ### Community 40 - "Community 40"
 Cohesion: 0.06
@@ -1193,7 +1296,7 @@ Nodes (19): loadConfig(), McpConfig, McpHttpAuthMode, optionalHttpAuthMode(), op
 
 ### Community 47 - "Community 47"
 Cohesion: 0.04
-Nodes (107): featureComments, milestoneComments, projectComments, useCaseComments, FeatureCreateData, FeatureListFilter, FeatureRecord, featureRepository (+99 more)
+Nodes (119): milestoneComments, milestones, projectComments, projects, JournalChangeCreateData, MilestoneCreateData, MilestoneListFilter, MilestoneRecord (+111 more)
 
 ### Community 48 - "Community 48"
 Cohesion: 0.06
@@ -1204,48 +1307,48 @@ Cohesion: 0.09
 Nodes (14): useHealthCheck(), canReadItem(), documentationItems, hasAdminAccess(), homeItems, informationItems, NavigationItem, NavigationSectionConfig (+6 more)
 
 ### Community 50 - "Community 50"
-Cohesion: 0.11
-Nodes (22): ApiClientOptions, ProjectManagerApiError, annotationsForTool(), createProjectManagerMcpServer(), readOnlyHint, writeHint, config, server (+14 more)
+Cohesion: 0.08
+Nodes (31): ApiClientOptions, ProjectManagerApiError, ReferenceContext, annotationsForTool(), createProjectManagerMcpServer(), readOnlyHint, writeHint, config (+23 more)
 
 ### Community 51 - "Community 51"
 Cohesion: 0.12
 Nodes (23): commandEnv, localEnv, mergedEnv, mode, plan, prefixStream(), RunningCommand, runningCommands (+15 more)
 
 ### Community 52 - "Community 52"
-Cohesion: 0.13
-Nodes (28): CATALOG_KINDS, catalogEntryBodySchema, catalogEntryPatchSchema, kindAndIdParamSchema, kindParamSchema, registerCatalogRoutes(), assertCatalogKind(), createCatalogEntry() (+20 more)
+Cohesion: 0.11
+Nodes (32): CATALOG_KINDS, catalogEntries, CatalogEntryCreateData, CatalogEntryRecord, CatalogEntryUpdateData, catalogRepository, catalogEntryBodySchema, catalogEntryPatchSchema (+24 more)
 
 ### Community 53 - "Community 53"
 Cohesion: 0.15
 Nodes (23): objectReference(), ACTIVE_STATUS_KEYS, buildTaskItem(), buildTicketItem(), buildWorkDossier(), BuildWorkDossierOptions, ClassifiedItem, classify() (+15 more)
 
 ### Community 54 - "Community 54"
-Cohesion: 0.24
-Nodes (11): createMilestone(), createProject(), createTask(), createTicket(), deleteProject(), DomainFixtures, test, createUnlinkedTask() (+3 more)
+Cohesion: 0.19
+Nodes (16): createMilestone(), createProject(), createTicket(), deleteProject(), MilestoneFixture, ProjectFixture, TaskFixture, TicketFixture (+8 more)
 
 ### Community 55 - "Community 55"
 Cohesion: 0.11
-Nodes (21): addWikiPageRelation(), createWikiPage(), deleteWikiPage(), exportWiki(), getRootWikiPages(), getWikiBreadcrumb(), getWikiChildren(), getWikiPage() (+13 more)
+Nodes (22): addWikiPageRelation(), createWikiPage(), deleteWikiPage(), exportWiki(), getRootWikiPages(), getWikiBreadcrumb(), getWikiChildren(), getWikiPage() (+14 more)
 
 ### Community 56 - "Community 56"
-Cohesion: 0.03
-Nodes (60): AttachmentPreview(), AttachmentPreviewProps, CsvPreview(), needsServerPreview(), parseDelimitedRows(), prettyBytes(), attachment, toastMocks (+52 more)
+Cohesion: 0.09
+Nodes (22): useJournalEntries(), useObjectJournalEntries(), formatDateTime(), JournalEntryList(), JournalEntryListProps, JournalEntryRow(), journalObjectLabels, journalOperationLabels (+14 more)
 
 ### Community 57 - "Community 57"
 Cohesion: 0.06
 Nodes (32): ⚠️ Bitte bestätigen – Features ohne bisherige Nummer, Features, FT(01): Kalendertermine, FT(02): Projekte, FT(03): Kalenderansichten, FT(04): Tourenplanung, FT(05): Mitarbeiterverwaltung, FT(06): Automatische Regeln (+24 more)
 
 ### Community 58 - "Community 58"
-Cohesion: 0.15
-Nodes (16): createTag(), deleteTag(), getTags(), updateTag(), useTags(), SettingsTagsPage(), ProjectListBoardView(), DomainFilter (+8 more)
+Cohesion: 0.07
+Nodes (41): BuildTestAppOptions, attachmentLocalFolders, AttachmentLocalFolderCreateData, AttachmentLocalFolderRecord, attachmentLocalFolderRepository, createBodySchema, entriesQuerySchema, expectedVersionQuerySchema (+33 more)
 
 ### Community 59 - "Community 59"
-Cohesion: 0.21
-Nodes (9): deleteEntityComment(), getEntityComments(), updateComment(), apiMocks, createdComment, Harness(), initialComment, renderHarness() (+1 more)
+Cohesion: 0.16
+Nodes (19): buildTicketsQuery(), createTicket(), deleteTicket(), getOwnerTickets(), getProjectTickets(), getTicket(), getTicketAttachments(), getTicketRelationCandidates() (+11 more)
 
 ### Community 60 - "Community 60"
 Cohesion: 0.09
-Nodes (14): WikiTreeNode, InsertSlotDropData, insertSlotId(), pageDropId(), childPage, dndMock, renderTree(), rootPage (+6 more)
+Nodes (16): WikiTreeNode, measureTextWidth(), computeIdealWidth(), InsertSlotDropData, insertSlotId(), pageDropId(), childPage, dndMock (+8 more)
 
 ### Community 61 - "Community 61"
 Cohesion: 0.09
@@ -1256,12 +1359,12 @@ Cohesion: 0.11
 Nodes (21): devDependencies, concurrently, fastify, prettier, @tiptap/extension-text-style, typescript, engines, node (+13 more)
 
 ### Community 63 - "Community 63"
-Cohesion: 0.60
-Nodes (3): loginAdmin(), loginReader(), uploadImage()
+Cohesion: 0.16
+Nodes (15): useSetting(), useSettings(), isViewMode(), useViewMode(), ViewModeSettingKey, useWikiTreeState(), DayPlanTasks(), hasNotificationWriteAccess() (+7 more)
 
 ### Community 64 - "Community 64"
-Cohesion: 0.08
-Nodes (25): 8.10 ItemRow (Liste), 8.11 Modal, 8.12 ConfirmDialog, 8.13 FormModal / DetailModal (Detail-Header), 8.14 Section, 8.15 EmptyState, 8.16 ActionMenu / Dropdown, 8.17 Avatar (+17 more)
+Cohesion: 0.07
+Nodes (27): 8.10 ItemRow (Liste), 8.11 Modal, 8.12 ConfirmDialog, 8.13 FormModal / DetailModal (Detail-Header), 8.14 Section, 8.15 EmptyState, 8.16 ActionMenu / Dropdown, 8.17 Avatar (+19 more)
 
 ### Community 65 - "Community 65"
 Cohesion: 0.29
@@ -1269,7 +1372,7 @@ Nodes (6): Geänderte / angelegte Dateien, Log: Dokument-Manager Teil C — Mult
 
 ### Community 66 - "Community 66"
 Cohesion: 0.16
-Nodes (18): createDayPlanEvent(), createDayPlanTask(), getDayPlan(), linkDayPlanEvent(), linkDayPlanTask(), listDayPlanEvents(), listDayPlanTasks(), unlinkDayPlanEvent() (+10 more)
+Nodes (19): createDayPlanEvent(), createDayPlanTask(), getDayPlan(), linkDayPlanEvent(), linkDayPlanTask(), listDayPlanEvents(), listDayPlanTasks(), unlinkDayPlanEvent() (+11 more)
 
 ### Community 67 - "Community 67"
 Cohesion: 0.09
@@ -1280,8 +1383,8 @@ Cohesion: 0.10
 Nodes (19): Abnahmekriterien, Aufgabenbeschreibung, Codex-Aufgabe: Test Suite — Relationen, UI-Konsistenz und Persönliche Planung, Ebene 1 — Fachliche Kernobjekte, Ebene 2 — Relationen zwischen Kernobjekten, Ebene 3 — Querschnitts-Support-Objekte, Ebene 4 — Persönliche Planung (DayPlan), Ebene 5 — Ist-Stand Testabdeckung (+11 more)
 
 ### Community 69 - "Community 69"
-Cohesion: 0.07
-Nodes (37): FetchOptions, insertLocalEvent(), RecordedRequest, insertLocalEvent(), RecordedRequest, insertLocalEvent(), RecordedRequest, deleteAllOfCalendar() (+29 more)
+Cohesion: 0.06
+Nodes (44): WINDOW, FetchOptions, insertLocalEvent(), RecordedRequest, insertLocalEvent(), RecordedRequest, insertLocalEvent(), RecordedRequest (+36 more)
 
 ### Community 70 - "Community 70"
 Cohesion: 0.18
@@ -1292,20 +1395,20 @@ Cohesion: 0.18
 Nodes (9): AP1 – Wiki-Export (`apps/api/src/services/wiki.service.ts`), AP2 – TKT-95 Autosave bei Navigation (Dirty-Guard entfernt), AP3 – Editor & Formulare, Geänderte / angelegte Dateien, Log: MS-56 – Wiki-Export, Autosave-Navigation, Editor/Input, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken / Testebenen (+1 more)
 
 ### Community 72 - "Community 72"
-Cohesion: 0.13
-Nodes (18): dependencies, @modelcontextprotocol/sdk, @taskmanager/shared-types, zod, devDependencies, @types/node, typescript, vitest (+10 more)
+Cohesion: 0.12
+Nodes (19): dependencies, @modelcontextprotocol/sdk, @taskmanager/shared-types, zod, devDependencies, dotenv, @types/node, typescript (+11 more)
 
 ### Community 73 - "Community 73"
-Cohesion: 0.16
-Nodes (16): addPendingChildren(), addPendingComment(), addPendingFile(), addPendingNote(), createChildren(), deleteBacklogItem(), deleteUseCase(), deleteWikiPage() (+8 more)
+Cohesion: 0.15
+Nodes (18): addPendingChildren(), addPendingComment(), addPendingFile(), addPendingNote(), createChildren(), deleteBacklogItem(), deleteUseCase(), deleteWikiPage() (+10 more)
 
 ### Community 74 - "Community 74"
 Cohesion: 0.11
 Nodes (19): devDependencies, autoprefixer, eslint, eslint-plugin-react-hooks, jsdom, @playwright/test, postcss, tailwindcss (+11 more)
 
 ### Community 75 - "Community 75"
-Cohesion: 0.03
-Nodes (110): createReaderAgent(), loginAdmin(), previewCacheDir, uploadDir, attachments, backlogItemComments, backlogItems, CALENDAR_CONNECTION_STATUSES (+102 more)
+Cohesion: 0.26
+Nodes (10): createWorkerAuthState(), WorkerDbHandle, WorkerServers, cleanupWorkerStorage(), e2eRuntimeRoot, prepareWorkerStorage(), workerStoragePaths(), assertSafeTestRuntimeTargets() (+2 more)
 
 ### Community 76 - "Community 76"
 Cohesion: 0.10
@@ -1328,12 +1431,12 @@ Cohesion: 0.11
 Nodes (18): devDependencies, drizzle-kit, eslint, supertest, tsx, @types/archiver, @types/node, @types/node-cron (+10 more)
 
 ### Community 81 - "Community 81"
-Cohesion: 0.33
+Cohesion: 0.29
 Nodes (5): Geänderte / angelegte Dateien, Log: Kalender-Sync-Konfiguration DB-gestützt (Admin), Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 82 - "Community 82"
-Cohesion: 0.17
-Nodes (12): DocumentHoverPreview(), DocumentHoverPreviewProps, CsvPreview(), DocumentPreviewBody(), DocumentPreviewBodyProps, needsServerPreview(), parseDelimitedRows(), prettyBytes() (+4 more)
+Cohesion: 0.12
+Nodes (20): assetUrl(), AttachmentPreview(), AttachmentPreviewProps, CsvPreview(), needsServerPreview(), parseDelimitedRows(), prettyBytes(), attachment (+12 more)
 
 ### Community 83 - "Community 83"
 Cohesion: 0.13
@@ -1444,12 +1547,12 @@ Cohesion: 0.17
 Nodes (12): default, devDependencies, typescript, exports, main, name, private, scripts (+4 more)
 
 ### Community 112 - "Community 112"
-Cohesion: 0.27
-Nodes (9): adjacentDateInCurrentIsoWeek(), createEventViaUi(), deleteEventsByTitle(), eventByTitle(), fillEventBase(), openCalendar(), createEvent(), deleteEvent() (+1 more)
+Cohesion: 0.21
+Nodes (11): adjacentDateInCurrentIsoWeek(), createEventViaUi(), deleteEventsByTitle(), eventByTitle(), fillEventBase(), openCalendar(), createEvent(), createTask() (+3 more)
 
 ### Community 113 - "Community 113"
-Cohesion: 0.18
-Nodes (14): 0. Auftragsklassifikation (Pflicht vor jedem weiteren Schritt), 12. Voller Testlauf und voller Audit, 1. Dokumentenstrategie — Kontext sparsam nutzen, 2. Analyse vor der Umsetzung (Pflicht, aber klein starten), 7.1 Aufgabendateien (verbindlich), 7.2 Testregime in Aufgabendateien (verbindlich), 7. Projektstruktur (Referenz), 8. Migrationsstrategie (verbindlich) (+6 more)
+Cohesion: 0.23
+Nodes (11): 0. Auftragsklassifikation (Pflicht vor jedem weiteren Schritt), 12. Voller Testlauf und voller Audit, 1. Dokumentenstrategie — Kontext sparsam nutzen, 2. Analyse vor der Umsetzung (Pflicht, aber klein starten), 8. Migrationsstrategie (verbindlich), 9. Einheitliches Fehlerformat (API), Folgen der Klassifikation, Pflichtablauf bei DB-Änderungen (+3 more)
 
 ### Community 114 - "Community 114"
 Cohesion: 0.17
@@ -1469,11 +1572,11 @@ Nodes (11): Abnahmekriterien, Architektur-Referenz, Auth und Rollen — Referenz
 
 ### Community 118 - "Community 118"
 Cohesion: 0.11
-Nodes (20): buildMilestoneListQuery(), createMilestone(), createProjectMilestone(), deleteMilestone(), getMilestone(), getMilestonesPage(), getProjectMilestones(), MilestoneListFilter (+12 more)
+Nodes (22): getDashboardMilestoneList(), buildMilestoneListQuery(), createMilestone(), createProjectMilestone(), deleteMilestone(), getMilestone(), getMilestones(), getMilestonesPage() (+14 more)
 
 ### Community 119 - "Community 119"
-Cohesion: 0.27
-Nodes (11): MilestoneFixture, ProjectFixture, TaskFixture, TicketFixture, MilestoneWithTaskAndTicketFixture, ProjectWithDashboardItemsFixture, escapeRegExp(), openTab() (+3 more)
+Cohesion: 0.60
+Nodes (5): escapeRegExp(), openTab(), tabByLabel(), tabWithCount(), ticketForm()
 
 ### Community 120 - "Community 120"
 Cohesion: 0.09
@@ -1508,7 +1611,7 @@ Cohesion: 0.25
 Nodes (6): Angewendete Testleitplanken / Abdeckung, Geänderte / angelegte Dateien, Log: MCP-Werkzeuge für Wiki-Seiten (list/get/create/update), Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 130 - "Community 130"
-Cohesion: 0.17
+Cohesion: 0.15
 Nodes (15): StatusCascadeDialogState, toCandidate(), StatusCascadeDialog(), StatusCascadeDialogProps, buildDialogSteps(), filterAffectedObjects(), isStatusIncrease(), StatusCascadeCandidate (+7 more)
 
 ### Community 131 - "Community 131"
@@ -1517,7 +1620,7 @@ Nodes (3): permissionState, renderWithProviders(), wikiPage
 
 ### Community 132 - "Community 132"
 Cohesion: 0.03
-Nodes (67): useOptionalCalendarDashboard(), EventForm(), UpcomingEvents(), DashboardBuilder(), DashboardBuilderProps, sanitizeWidgetParams(), SortableWidgetRow(), widgetSupportsDataParams() (+59 more)
+Nodes (64): deleteEntityComment(), getEntityComments(), updateComment(), useOptionalCalendarDashboard(), UpcomingEvents(), DashboardGrid(), DashboardGridProps, sortWidgets() (+56 more)
 
 ### Community 133 - "Community 133"
 Cohesion: 0.20
@@ -1552,8 +1655,8 @@ Cohesion: 0.22
 Nodes (9): 15.1 Basiskomponenten — Übersicht, 15.2 Domänen-Views als dünne Adapter, 15.3 Card-Komposition, 15.4 Formular-Komposition, 15.5 domainLabels.ts — Single Source of Truth für Labels, 15.6 Styling-Prinzipien, 15.7 Abnahme-Checkliste für neue UI-Komponenten, 15.8 Browser-Tab-Konvention für Views und Detailformulare (+1 more)
 
 ### Community 143 - "Community 143"
-Cohesion: 0.15
-Nodes (12): getMilestoneFeatures(), getProjectFeatures(), setMilestoneFeatures(), setProjectFeatures(), docLinkApi, ProjectFeatureLinksHarness(), renderWithQueryClient(), taskApi (+4 more)
+Cohesion: 0.07
+Nodes (37): createComment(), deleteComment(), getMilestoneFeatures(), getProjectFeatures(), setMilestoneFeatures(), setProjectFeatures(), createTag(), deleteTag() (+29 more)
 
 ### Community 144 - "Community 144"
 Cohesion: 0.20
@@ -1577,11 +1680,11 @@ Nodes (8): Erledigte Tickets, Geänderte Dateien, MS-42: Tags, Tag Picker, Tag F
 
 ### Community 151 - "Community 151"
 Cohesion: 0.03
-Nodes (172): uploadTaskAttachment(), createComment(), createEntityComment(), deleteComment(), entityPaths, createTaskNote(), ProjectListFilter, createSubtask() (+164 more)
+Nodes (159): CalendarSyncSettingsForm(), uploadTaskAttachment(), createEntityComment(), entityPaths, createTaskNote(), createSubtask(), linkOwnerTask(), addTicketRelation() (+151 more)
 
 ### Community 152 - "Community 152"
-Cohesion: 0.17
-Nodes (19): attachmentFileFormData(), attachmentFormData(), attachmentOwnerPath(), bufferToArrayBuffer(), BulkFailure, bulkResult(), createAttachmentsBulk(), createCommentsBulk() (+11 more)
+Cohesion: 0.20
+Nodes (17): attachmentFileFormData(), attachmentFormData(), bufferToArrayBuffer(), BulkFailure, bulkResult(), createAttachmentsBulk(), createCommentsBulk(), createNotesBulk() (+9 more)
 
 ### Community 153 - "Community 153"
 Cohesion: 0.33
@@ -1592,8 +1695,8 @@ Cohesion: 0.25
 Nodes (8): 3.0.1 Testentwurfs-Skill (Pflicht bei Tests), 3.0 Planungs-Skill (Pflicht), 3.1 Branch-Nutzung (nur bei explizitem Nutzerwunsch), 3.2 Planformat, 3.3 Planinhalt, 3.4 Kurzkommandos, 3. Planung, `savetowork` Sicherheitsablauf
 
 ### Community 155 - "Community 155"
-Cohesion: 0.24
-Nodes (7): CopyReferenceButton(), CopyReferenceButtonProps, deleteButtonClass, DetailHeaderActions(), DetailHeaderActionsProps, DetailHeaderTone, iconButtonClass
+Cohesion: 0.05
+Nodes (31): AttachmentList(), AttachmentListProps, AttachmentManager, AttachmentViewMode, sourceFolderId(), sourceLocalFolderId(), viewModes, useAttachmentLocalEntries() (+23 more)
 
 ### Community 156 - "Community 156"
 Cohesion: 0.22
@@ -1628,8 +1731,8 @@ Cohesion: 0.22
 Nodes (7): Datenmodell — Projekt Manager, Gemeinsame Felder, Hierarchie der Projektobjekte, Kernobjekte (Platzhalter), Löschregeln (Platzhalter), Migrationshistorie, Status
 
 ### Community 165 - "Community 165"
-Cohesion: 0.08
-Nodes (4): buildLibraryQuery(), DocumentLibraryPagination, getDocumentLibrary(), getDocumentLibraryPage()
+Cohesion: 0.07
+Nodes (8): addDocumentTagsBulk(), buildLibraryQuery(), DocumentLibraryPagination, getDocumentLibrary(), getDocumentLibraryPage(), openDocument(), apiMocks, uploadDocument()
 
 ### Community 166 - "Community 166"
 Cohesion: 0.31
@@ -1640,12 +1743,12 @@ Cohesion: 0.26
 Nodes (9): defaultPaletteColors, normalizeColor(), parseHexColors(), useColorPalette(), colorInputValue(), ColorPicker(), ColorPickerProps, normalizeHexColor() (+1 more)
 
 ### Community 168 - "Community 168"
-Cohesion: 0.13
-Nodes (20): deleteAttachment(), deleteWikiPageAttachment(), getAttachmentPreview(), getFeatureAttachments(), getMilestoneAttachments(), getTaskAttachments(), getWikiPageAttachments(), openAttachment() (+12 more)
+Cohesion: 0.11
+Nodes (35): bulkDeleteAttachments(), createAttachmentLocalFolder(), createParentAttachmentFolder(), createParentDocumentLink(), deleteAttachment(), deleteAttachmentLocalFolder(), deleteOwnerAttachment(), deleteParentAttachmentFolder() (+27 more)
 
 ### Community 169 - "Community 169"
-Cohesion: 0.33
-Nodes (8): createBacklogItem(), createUseCase(), childUrlPattern(), escapeRegex(), expectDetailRoundTrip(), NavigationCase, openParentTab(), parentUrlPattern()
+Cohesion: 0.19
+Nodes (13): createBacklogItem(), createFeature(), createUseCase(), linkProjectFeature(), pathWithOptionalQuery(), openFeatureList(), childUrlPattern(), escapeRegex() (+5 more)
 
 ### Community 170 - "Community 170"
 Cohesion: 0.43
@@ -1660,8 +1763,8 @@ Cohesion: 0.25
 Nodes (8): 14. Domänenarchitektur (Referenz), Domäne 1 — Projektmanagement, Domäne 2 — Dokumentation, Domäne 3 — Tickets & Bug-Tracking, Dump- und Backup-Registry, Pflichtcheckliste für neue Domänen und Support-Objekte, Querschnittsinfrastruktur, Titel-Konvention für Features und Use Cases (verbindlich)
 
 ### Community 173 - "Community 173"
-Cohesion: 0.31
-Nodes (8): categoryDropId(), documentDragId(), dragDocumentIds(), dragIdsFromData(), DropTarget, folderDropId(), parseDropTarget(), DraggableTile()
+Cohesion: 0.04
+Nodes (64): backlogItems, journalEntries, journalEntryChanges, journalEntryContexts, BacklogItemCreateData, BacklogItemFilters, BacklogItemRecord, backlogItemRepository (+56 more)
 
 ### Community 174 - "Community 174"
 Cohesion: 0.20
@@ -1860,8 +1963,8 @@ Cohesion: 0.47
 Nodes (5): dbConfig(), e2eRuntimeRoot, globalSetup(), quoteIdentifier(), repoRoot
 
 ### Community 224 - "Community 224"
-Cohesion: 0.33
-Nodes (4): adminUser, projectReaderUser, readerUser, renderSidebar()
+Cohesion: 0.25
+Nodes (6): adminUser, attachmentReaderUser, documentReaderUser, projectReaderUser, readerUser, renderSidebar()
 
 ### Community 225 - "Community 225"
 Cohesion: 0.33
@@ -3916,8 +4019,8 @@ Cohesion: 0.29
 Nodes (5): Auftragsart, Feature schreiben, Spec-Audit, Spezifikationsredaktion — Projekt Manager, Use Case schreiben
 
 ### Community 738 - "Community 738"
-Cohesion: 0.15
-Nodes (16): archiveExtensions, AttachmentFamily, AttachmentTypeMeta, badgeFor(), codeExtensions, csvExtensions, describeAttachmentType(), extensionOf() (+8 more)
+Cohesion: 0.17
+Nodes (15): archiveExtensions, AttachmentTypeMeta, badgeFor(), codeExtensions, csvExtensions, describeAttachmentType(), extensionOf(), isPresentationMimeType() (+7 more)
 
 ### Community 739 - "Community 739"
 Cohesion: 0.25
@@ -3928,8 +4031,8 @@ Cohesion: 0.33
 Nodes (5): apiPort, authFile, e2eRuntimeRoot, repoRoot, webPort
 
 ### Community 741 - "Community 741"
-Cohesion: 0.16
-Nodes (13): createAttachmentWithAdmin(), loginAdmin(), previewCacheDir, uploadDir, ActiveWatcher, activeWatchers, getActiveAttachmentWatcherCountForTests(), setAttachmentWatcherPollIntervalForTests() (+5 more)
+Cohesion: 0.17
+Nodes (12): createAttachmentWithAdmin(), loginAdmin(), previewCacheDir, uploadDir, ActiveWatcher, activeWatchers, getActiveAttachmentWatcherCountForTests(), setAttachmentWatcherPollIntervalForTests() (+4 more)
 
 ### Community 742 - "Community 742"
 Cohesion: 0.40
@@ -3984,8 +4087,8 @@ Cohesion: 0.33
 Nodes (4): Geänderte Dateien, Log: Editor Fill — Details Tabs, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 755 - "Community 755"
-Cohesion: 0.33
-Nodes (4): Automatischer Start mit Projekt Manager, Projekt Manager MCP Server, Start, Umgebungsvariablen
+Cohesion: 0.25
+Nodes (6): Anbindung an die Claude-Oberflächen, Automatischer Start mit Projekt Manager, Projekt Manager MCP Server, Start, Umgebungsvariablen, Windows-Autostart
 
 ### Community 756 - "Community 756"
 Cohesion: 0.25
@@ -4056,12 +4159,12 @@ Cohesion: 0.25
 Nodes (6): Geänderte / angelegte Dateien, Log: MS-67 AP03 — Per-Worker-DB-Lifecycle, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
 
 ### Community 776 - "Community 776"
-Cohesion: 0.33
-Nodes (5): hooks, PreToolUse, Stop, permissions, allow
+Cohesion: 0.14
+Nodes (13): enabledPlugins, pm-workflow-skills@skill-library, extraKnownMarketplaces, skill-library, hooks, PreToolUse, SessionStart, Stop (+5 more)
 
 ### Community 780 - "Community 780"
-Cohesion: 0.29
-Nodes (3): buildBacklogItems(), renderBacklogList(), buildBacklogItem()
+Cohesion: 0.11
+Nodes (27): argumentValue(), loadConfig(), main(), parseEnvFile(), apiJson(), apiUrl(), buildFolderLabels(), buildUploadUrl() (+19 more)
 
 ### Community 782 - "Community 782"
 Cohesion: 0.25
@@ -4184,8 +4287,8 @@ Cohesion: 0.50
 Nodes (3): getHealth(), HealthStatus, HealthCheckState
 
 ### Community 852 - "Community 852"
-Cohesion: 0.05
-Nodes (43): RoleDetailPage(), RoleEditorModal(), RoleEditorModalProps, RoleListBoardView(), RoleEditorState, RolesPage(), UISettingsPage(), emptyForm (+35 more)
+Cohesion: 0.02
+Nodes (122): CalendarSyncSettingsPage(), FormState, MIN_INTERVAL_MIN, RoleDetailPage(), RoleEditorModal(), RoleEditorModalProps, RoleListBoardView(), RoleEditorState (+114 more)
 
 ### Community 853 - "Community 853"
 Cohesion: 0.25
@@ -4216,8 +4319,8 @@ Cohesion: 0.25
 Nodes (6): Durchgeführte Prüfungen, Log: Document Management System (MS-75) umgesetzt, Offene Punkte / Blocker, Was der Nutzer erwarten kann, Was wurde umgesetzt, Wichtige Entscheidungen
 
 ### Community 862 - "Community 862"
-Cohesion: 0.02
-Nodes (183): CalendarSyncSettingsForm(), CalendarSyncSettingsPage(), FormState, MIN_INTERVAL_MIN, getCurrentUser(), login(), loginAsRene(), logout() (+175 more)
+Cohesion: 0.03
+Nodes (136): createCatalogEntry(), deleteCatalogEntry(), getCatalogEntries(), updateCatalogEntry(), getTicketLinkCandidates(), AttachmentUploader(), AttachmentUploaderProps, FeatureFormProps (+128 more)
 
 ### Community 864 - "Community 864"
 Cohesion: 0.29
@@ -4256,8 +4359,8 @@ Cohesion: 0.25
 Nodes (6): Geänderte / angelegte Dateien, Log: Dashboard-Row-Widgets — Tab-Öffnen und returnTo, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Verifikation, Was wurde umgesetzt
 
 ### Community 873 - "Community 873"
-Cohesion: 0.09
-Nodes (29): getProjectAttachments(), buildFeatureListQuery(), createFeature(), deleteFeature(), FeatureListFilter, FeatureListPagination, getFeature(), getFeatures() (+21 more)
+Cohesion: 0.10
+Nodes (31): getProjectAttachments(), buildFeatureListQuery(), createFeature(), deleteFeature(), FeatureListFilter, FeatureListPagination, getFeature(), getFeatures() (+23 more)
 
 ### Community 874 - "Community 874"
 Cohesion: 0.29
@@ -4288,7 +4391,7 @@ Cohesion: 0.29
 Nodes (6): Geänderte / angelegte Dateien, Log: DayPlan Aufgaben-Tab, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
 
 ### Community 881 - "Community 881"
-Cohesion: 0.33
+Cohesion: 0.29
 Nodes (5): Geänderte / angelegte Dateien, Log: Wiki Autosave Navigation, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 882 - "Community 882"
@@ -4296,8 +4399,8 @@ Cohesion: 0.43
 Nodes (6): ddl, dialect, id, prevIds, renames, version
 
 ### Community 883 - "Community 883"
-Cohesion: 0.29
-Nodes (7): Toast(), ToastAction, ToastProps, ToastTone, ToastViewModel, toneClasses, ToastInput
+Cohesion: 0.17
+Nodes (11): Analysewerkzeuge, Auth & Rollen, Datenbank, Domänen-Abdeckung (für test-quality-review), Git-Kurzkommandos, Projekt-Kontext: Tech-Stack — Projekt Manager, Schichten, Sonstige verbindliche Referenzdokumente (+3 more)
 
 ### Community 884 - "Community 884"
 Cohesion: 0.33
@@ -4364,24 +4467,28 @@ Cohesion: 0.33
 Nodes (5): Geänderte / angelegte Dateien, Log: Kontextbaum Verschieben, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 900 - "Community 900"
-Cohesion: 0.33
+Cohesion: 0.29
 Nodes (5): Geänderte / angelegte Dateien, Log: Wiki Navigation WIKI-20, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 901 - "Community 901"
-Cohesion: 0.12
-Nodes (21): buildNotesQuery(), createDayPlanNote(), createMilestoneNote(), createProjectNote(), createWikiPageNote(), deleteNote(), getDayPlanNotes(), getMilestoneNotes() (+13 more)
+Cohesion: 0.14
+Nodes (20): buildNotesQuery(), createDayPlanNote(), createMilestoneNote(), createProjectNote(), createWikiPageNote(), deleteNote(), getDayPlanNotes(), getMilestoneNotes() (+12 more)
 
 ### Community 902 - "Community 902"
 Cohesion: 0.21
 Nodes (9): eventDateKey(), eventsByStartDate(), MonthCalendarProps, MonthDayCell(), tasksByDueDate(), toDateKey(), tasksByDueDate(), sortCalendarTasks() (+1 more)
 
 ### Community 903 - "Community 903"
-Cohesion: 0.22
-Nodes (9): ReferenceContext, BulkCreated, BulkError, BulkResult, callTool(), parseToolJson(), previewCacheDir, ToolCallResponse (+1 more)
+Cohesion: 0.06
+Nodes (50): createEvent(), createUser(), getRoleId(), closeDatabase(), db, DbSession, DbTransaction, mysqlPool (+42 more)
 
 ### Community 904 - "Community 904"
 Cohesion: 0.67
 Nodes (3): Task, TaskBoardItem, TaskDetail
+
+### Community 905 - "Community 905"
+Cohesion: 0.27
+Nodes (7): itemKey(), SelectParent(), SelectParentItem, SelectParentProps, items, renderSelectParent(), typeIcons
 
 ### Community 906 - "Community 906"
 Cohesion: 0.25
@@ -4400,8 +4507,8 @@ Cohesion: 0.22
 Nodes (7): Ausgangslage, Durchgeführte Prüfungen, Log: DMS — Verständliche Dateitypen & Dokumentvorschau (MS-75), Offene Punkte, Was der Nutzer erwarten kann, Was wurde umgesetzt, Wichtige Entscheidungen / Klarstellungen
 
 ### Community 912 - "Community 912"
-Cohesion: 0.52
-Nodes (5): createUseCase(), deleteUseCase(), getUseCase(), getUseCases(), updateUseCase()
+Cohesion: 0.11
+Nodes (28): settingsValues, SettingScopeCandidate, settingsRepository, SettingsValueRecord, SettingValueData, deleteSettingBodySchema, registerSettingsRoutes(), setSettingBodySchema (+20 more)
 
 ### Community 913 - "Community 913"
 Cohesion: 0.43
@@ -4424,8 +4531,8 @@ Cohesion: 0.25
 Nodes (6): Geänderte / angelegte Dateien, Log: Tag-Domäne (PM/DMS) mit Sichtbarkeitstrennung, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken und Testebenen, Was wurde umgesetzt
 
 ### Community 919 - "Community 919"
-Cohesion: 0.22
-Nodes (3): CountRow, MIGRATION_SQL, NEW_TABLES
+Cohesion: 0.28
+Nodes (4): buildTicket(), buildTicketItems(), closedStatusValues, renderTicketList()
 
 ### Community 920 - "Community 920"
 Cohesion: 0.29
@@ -4448,8 +4555,8 @@ Cohesion: 0.29
 Nodes (5): Geänderte / angelegte Dateien, Log: API Config Test Isolation, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 925 - "Community 925"
-Cohesion: 0.04
-Nodes (50): BadgeTone, CardGrid(), CardGridProps, columnClasses, CatalogAwareListBoardView(), catalogColumns(), CollapsedStatusSection(), DroppableStatusSection() (+42 more)
+Cohesion: 0.03
+Nodes (72): FeatureListBoardView(), FeatureListBoardViewProps, FeatureProjectPanelProps, ProjectFeaturePanelProps, MilestoneListBoardView(), MilestoneListBoardViewProps, toListBoardMode(), ProjectListBoardViewProps (+64 more)
 
 ### Community 926 - "Community 926"
 Cohesion: 0.29
@@ -4460,12 +4567,12 @@ Cohesion: 0.29
 Nodes (5): Geänderte / angelegte Dateien, Log: Flex-Fill Test-Assertions, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 928 - "Community 928"
-Cohesion: 0.24
-Nodes (11): calendarTimeLabel(), contextualAccent(), eventDateKey(), eventEndForRange(), eventsByDay(), moveEventToDate(), neutralEventAccents, resolveEventContext() (+3 more)
+Cohesion: 0.19
+Nodes (13): calendarTimeLabel(), contextualAccent(), eventDateKey(), eventEndForRange(), eventsByDay(), moveEventToDate(), neutralEventAccents, resolveEventContext() (+5 more)
 
 ### Community 933 - "Community 933"
-Cohesion: 0.29
-Nodes (6): ConfirmDialog(), ConfirmDialogProps, ConfirmOptions, ConfirmSeverity, toneMap, ConfirmContextValue
+Cohesion: 0.14
+Nodes (16): isSameOrInside(), setup(), apiRoot, assertSafeTestDatabaseTarget(), isAllowedTestDatabaseHost(), isAllowedTestDatabaseName(), isAllowedTestPath(), isSameOrInside() (+8 more)
 
 ### Community 935 - "Community 935"
 Cohesion: 0.29
@@ -4484,8 +4591,8 @@ Cohesion: 0.33
 Nodes (5): Geänderte / angelegte Dateien, Log: Design-Leitfaden §8.25/§8.26 auf Drag-&-Drop-Zuweisung nachgezogen, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 939 - "Community 939"
-Cohesion: 0.38
-Nodes (4): DashboardGrid(), DashboardGridProps, sortWidgets(), dashboard
+Cohesion: 0.43
+Nodes (6): getCurrentUser(), login(), loginAsRene(), logout(), setInitialPassword(), UseAuthOptions
 
 ### Community 940 - "Community 940"
 Cohesion: 0.29
@@ -4496,16 +4603,20 @@ Cohesion: 0.33
 Nodes (5): Geänderte / angelegte Dateien, Log: MCP-Abschlusskommentar zur D&D-Zuweisung nachgeholt, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 942 - "Community 942"
-Cohesion: 0.33
-Nodes (9): BacklogFilters, BacklogPagination, buildSearchParams(), createBacklogItem(), deleteBacklogItem(), getBacklogItem(), getBacklogItems(), getBacklogItemsPage() (+1 more)
+Cohesion: 0.09
+Nodes (30): BacklogFilters, BacklogPagination, buildSearchParams(), createBacklogItem(), deleteBacklogItem(), getBacklogItem(), getBacklogItems(), getBacklogItemsPage() (+22 more)
 
 ### Community 943 - "Community 943"
-Cohesion: 0.24
-Nodes (7): catalogTabLabels, SettingsCatalogsPage(), CatalogGroup(), CatalogGroupProps, catalogGroups, CatalogManager(), CatalogManagerProps
+Cohesion: 0.18
+Nodes (20): apiRoot, assertLocalRestoreHost(), awaitFile(), [command, backupArgument], createBackup(), createZip(), databaseOptions(), dumpDatabase() (+12 more)
 
 ### Community 944 - "Community 944"
 Cohesion: 0.33
 Nodes (7): CalendarHolidayBadge(), CalendarHolidayBadgeProps, getCalendarHolidayNames(), WeekDayColumn(), getGermanHolidaysForDate(), holidayCache, holidayClient()
+
+### Community 945 - "Community 945"
+Cohesion: 0.25
+Nodes (7): Aktueller Stand in diesem Repo, Auftrag, Bekannter Blocker — vor der Installation klären, Handover an Claude Code: Skill-Library-Plugins einrichten — Projekt Manager, Nicht Teil dieses Auftrags, Voraussetzung — zuerst prüfen, Ziel
 
 ### Community 946 - "Community 946"
 Cohesion: 0.50
@@ -4516,40 +4627,44 @@ Cohesion: 0.33
 Nodes (5): Geänderte / angelegte Dateien, Log: Leitfäden auf Auswahl-Bereinigung, Upload-Kontext und Batch-Nachladen nachgezogen, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 948 - "Community 948"
-Cohesion: 0.28
-Nodes (4): buildTicket(), buildTicketItems(), closedStatusValues, renderTicketList()
+Cohesion: 0.29
+Nodes (7): Toast(), ToastAction, ToastProps, ToastTone, ToastViewModel, toneClasses, ToastInput
 
 ### Community 949 - "Community 949"
-Cohesion: 0.46
-Nodes (6): createAdminRole(), deleteAdminRole(), getAdminRole(), getAdminRoles(), getPermissionCatalog(), updateAdminRole()
+Cohesion: 0.12
+Nodes (11): createAdminRole(), deleteAdminRole(), getAdminRole(), getAdminRoles(), getPermissionCatalog(), updateAdminRole(), EventSourceDouble, MoveOwnerType (+3 more)
 
 ### Community 950 - "Community 950"
-Cohesion: 0.27
-Nodes (10): assetUrl(), documentThumbnailUrl(), DocumentTile(), DocumentTileProps, documentTitle(), fileExtension(), stripFileExtension(), doc() (+2 more)
+Cohesion: 0.26
+Nodes (10): documentThumbnailUrl(), AttachmentFamily, DocumentTile(), DocumentTileProps, documentTitle(), fileExtension(), stripFileExtension(), doc() (+2 more)
 
 ### Community 951 - "Community 951"
 Cohesion: 0.33
 Nodes (5): DocumentListItem, loginAdmin(), loginReader(), PaginatedDocuments, uploadDir
 
 ### Community 952 - "Community 952"
-Cohesion: 0.25
-Nodes (7): actions, checkboxFor(), dnd, fixtures, library, permissions, selectDocument()
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Skill-Library als Plugin, PM-Workflow-Skills aus dem Marketplace, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Verifikation, Was wurde umgesetzt
 
 ### Community 953 - "Community 953"
-Cohesion: 0.36
-Nodes (6): escapeHtml(), htmlDocument(), inlineMarkdownToHtml(), isHtmlContent(), textToHtml(), noteUpdateBody()
+Cohesion: 0.17
+Nodes (13): escapeHtml(), htmlDocument(), inlineMarkdownToHtml(), isHtmlContent(), textToHtml(), noteUpdateBody(), withHtmlContent(), withHtmlDescription() (+5 more)
 
 ### Community 954 - "Community 954"
-Cohesion: 0.40
-Nodes (3): mutatingMethods, requestPath(), shouldPublish()
+Cohesion: 0.29
+Nodes (6): ConfirmDialog(), ConfirmDialogProps, ConfirmOptions, ConfirmSeverity, toneMap, ConfirmContextValue
 
 ### Community 955 - "Community 955"
-Cohesion: 0.36
-Nodes (5): computePanelWidth(), PanelRow, measure(), measureTextWidth(), computeIdealWidth()
+Cohesion: 0.13
+Nodes (14): dependencies, @taskmanager/shared-types, devDependencies, @types/node, typescript, vitest, name, private (+6 more)
+
+### Community 956 - "Community 956"
+Cohesion: 0.14
+Nodes (13): Backup vor dem Kategorie-Cleanup, Bekannte offene Abnahmepunkte, Clients und Verträge, Entfernen und Löschen, Manueller Duplikat-Check, Monitoring nach dem Rollout, MS-80 – Dokumentenmanagement: Nutzung und Betrieb, Nutzung aus Anwendersicht (+5 more)
 
 ### Community 957 - "Community 957"
 Cohesion: 0.24
-Nodes (8): getAllDiaries(), getProjectDiary(), AllHarness(), getAllDiariesMock, getProjectDiaryMock, Harness(), sampleEntry, useAllDiaries()
+Nodes (9): getAllDiaries(), getProjectDiary(), AllHarness(), getAllDiariesMock, getProjectDiaryMock, Harness(), sampleEntry, useAllDiaries() (+1 more)
 
 ### Community 958 - "Community 958"
 Cohesion: 0.29
@@ -4588,12 +4703,20 @@ Cohesion: 0.33
 Nodes (5): Geänderte / angelegte Dateien, Log: Design-Leitfaden §8.26 (DMS-Kachelansicht) ergänzt, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 967 - "Community 967"
-Cohesion: 0.25
-Nodes (4): actions, fixtures, library, toast
+Cohesion: 0.11
+Nodes (27): registerCalendarSettingsRoutes(), updateBodySchema, CALENDAR_SYNC_CONFIG_SCOPE_TYPE, decryptSecret(), EffectiveCalendarConfig, getCalendarSyncConfigView(), getEffectiveCalendarConfig(), loadRow() (+19 more)
+
+### Community 968 - "Community 968"
+Cohesion: 0.14
+Nodes (13): Abnahmekriterien, Aufgabe, Browser-/E2E-Tests, Codex-Auftrag: Parent-Anhänge und Dokumentenmanagement trennen, Implementierungsreihenfolge, Integrationstests, Kontext, Randfälle & Fehlerpfade (+5 more)
+
+### Community 969 - "Community 969"
+Cohesion: 0.06
+Nodes (23): AttachmentKindRow, CountRow, MIGRATION_SQL, ConstraintRow, CountRow, junctions, JunctionSpec, MIGRATION_SQL (+15 more)
 
 ### Community 970 - "Community 970"
-Cohesion: 0.10
-Nodes (17): createAdminUser(), deleteAdminUser(), getAdminUser(), getAdminUsers(), updateAdminUser(), api, createClientTabId(), getClientTabId() (+9 more)
+Cohesion: 0.09
+Nodes (21): createAdminUser(), deleteAdminUser(), getAdminUser(), getAdminUsers(), updateAdminUser(), api, createClientTabId(), getClientTabId() (+13 more)
 
 ### Community 971 - "Community 971"
 Cohesion: 0.40
@@ -4604,36 +4727,412 @@ Cohesion: 0.29
 Nodes (6): Angewendete Leitplanken, Geänderte / angelegte Dateien, Log: Einmal nachladen pro Upload-Vorgang statt einmal pro Datei, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
 
 ### Community 974 - "Community 974"
-Cohesion: 0.04
-Nodes (44): baseItem, features, renderForm(), user, baseFeature, user, useSetting(), useSettings() (+36 more)
+Cohesion: 0.14
+Nodes (15): useTags(), SettingsTagsPage(), ProjectListBoardView(), DomainFilter, domainLabels, SortMode, TagManager(), mixedDomainTags (+7 more)
 
 ### Community 975 - "Community 975"
 Cohesion: 0.50
+Nodes (4): 7.1 Aufgabendateien (verbindlich), 7.2 Testregime in Aufgabendateien (verbindlich), 7.3 Skill-Herkunft (verbindlich), 7. Projektstruktur (Referenz)
+
+### Community 977 - "Community 977"
+Cohesion: 0.24
+Nodes (9): pngSignature, sourcePng, createAffinityThumbnail(), execFileAsync, extractWindowsShellThumbnail(), isPng(), pngSignature, shellThumbnailScript (+1 more)
+
+### Community 978 - "Community 978"
+Cohesion: 0.18
+Nodes (10): Datenbestand, Duplikat-Vorprüfung, Integritätsprüfung, Migrations-Gates, MS-80 – DMS-Bestandsaufnahme und Migrationsvorprüfung, Nachtrag zum Cleanup-Gate am 19.07.26, Offener Abnahmepunkt, Technischer Ausgangszustand (+2 more)
+
+### Community 979 - "Community 979"
+Cohesion: 0.18
+Nodes (5): buildTaskSet(), closedStatusValues, openStatusColumns, renderTaskList(), statusColumns
+
+### Community 981 - "Community 981"
+Cohesion: 0.29
+Nodes (6): DocumentDuplicateCheck(), formatDateTime(), ownerLabels, resultSummary(), mocks, useDocumentDuplicateCheck()
+
+### Community 982 - "Community 982"
+Cohesion: 0.22
+Nodes (4): isRunning(), repoRoot, sourceStopScript, stopChild()
+
+### Community 984 - "Community 984"
+Cohesion: 0.25
+Nodes (6): attachment, document, documentLink, localFolder, mocks, parentFolder
+
+### Community 985 - "Community 985"
+Cohesion: 0.32
+Nodes (4): documentFolderDescendantIds(), DocumentFolderTreeItem, flattenDocumentFolders(), DocumentDetailPanel()
+
+### Community 986 - "Community 986"
+Cohesion: 0.25
+Nodes (7): Ausgeführte Prüfungen, Geänderte / angelegte Dateien, Log: Admin-Tag-Bereichsfilter, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 987 - "Community 987"
+Cohesion: 0.25
+Nodes (7): Ausgeführte Prüfungen, Geänderte / angelegte Dateien, Log: Admin-Tag-Verwendungsstatus, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 988 - "Community 988"
+Cohesion: 0.25
+Nodes (7): Ergebnisse, Geänderte / angelegte Dateien, Log: Nicht ausgeführte Abnahmeblöcke, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 989 - "Community 989"
+Cohesion: 0.25
+Nodes (3): closedStatusValues, renderFeatureList(), statusColumns
+
+### Community 990 - "Community 990"
+Cohesion: 0.29
+Nodes (6): ddl, dialect, id, prevIds, renames, version
+
+### Community 991 - "Community 991"
+Cohesion: 0.29
+Nodes (6): ddl, dialect, id, prevIds, renames, version
+
+### Community 992 - "Community 992"
+Cohesion: 0.29
+Nodes (6): ddl, dialect, id, prevIds, renames, version
+
+### Community 993 - "Community 993"
+Cohesion: 0.29
+Nodes (6): ddl, dialect, id, prevIds, renames, version
+
+### Community 994 - "Community 994"
+Cohesion: 0.29
+Nodes (6): ddl, dialect, id, prevIds, renames, version
+
+### Community 995 - "Community 995"
+Cohesion: 0.29
+Nodes (6): ddl, dialect, id, prevIds, renames, version
+
+### Community 996 - "Community 996"
+Cohesion: 0.29
+Nodes (6): ddl, dialect, id, prevIds, renames, version
+
+### Community 997 - "Community 997"
+Cohesion: 0.29
+Nodes (6): ddl, dialect, id, prevIds, renames, version
+
+### Community 998 - "Community 998"
+Cohesion: 0.29
+Nodes (6): ddl, dialect, id, prevIds, renames, version
+
+### Community 1001 - "Community 1001"
+Cohesion: 0.33
 Nodes (3): loginAdmin(), loginReader(), uploadDir
 
-### Community 976 - "Community 976"
+### Community 1003 - "Community 1003"
+Cohesion: 0.29
+Nodes (3): configuredApiKey, configuredSessionSecret, configuredUploadDir
+
+### Community 1004 - "Community 1004"
+Cohesion: 0.29
+Nodes (6): Attachment-Uploads an Fachobjekte, Einheitlicher Dokumentimport, Gültigkeit, MCP, MS-80: Importvertrag für Dokumente, Windows-Explorer-Importer
+
+### Community 1005 - "Community 1005"
+Cohesion: 0.29
+Nodes (6): Ausgangslage, Destruktiver Cleanup, Eindeutige Zuordnung vor der Migration, Ergebnisabgleich, MS-80 – Konflikt- und Migrationsbericht Kategorien zu Tags, Technische Migrationsregeln
+
+### Community 1006 - "Community 1006"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Kontrollierter Neustart im Tray-Menü, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1007 - "Community 1007"
+Cohesion: 0.29
+Nodes (6): Angewendete Testleitplanken, Geänderte / angelegte Dateien, Log: DMS-Importvertrag, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1008 - "Community 1008"
+Cohesion: 0.29
+Nodes (6): Angewendete Testleitplanken, Geänderte / angelegte Dateien, Log: Windows-Explorer-Importer, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1009 - "Community 1009"
+Cohesion: 0.29
+Nodes (6): Angewendete Testleitplanken, Geänderte / angelegte Dateien, Log: Tests und Verifikation des Explorer-Imports, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1010 - "Community 1010"
+Cohesion: 0.29
+Nodes (6): Angewendete Testleitplanken, Geänderte / angelegte Dateien, Log: Explorer-Befehlszuordnung, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1011 - "Community 1011"
+Cohesion: 0.29
+Nodes (6): Angewendete Testleitplanken, Geänderte / angelegte Dateien, Log: Explorer-Dateiplatzhalter, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1012 - "Community 1012"
+Cohesion: 0.29
+Nodes (6): Angewendete Testleitplanken, Geänderte / angelegte Dateien, Log: WPF-Einzeldatei-Dialog, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1013 - "Community 1013"
+Cohesion: 0.29
+Nodes (6): Angewendete Testleitplanken, Geänderte / angelegte Dateien, Log: Import-Terminal ausblenden, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1014 - "Community 1014"
+Cohesion: 0.29
+Nodes (6): Angewendete Testleitplanken, Geänderte / angelegte Dateien, Log: Explorer-Batch, Mehrfach-Picker und Encoding, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1015 - "Community 1015"
+Cohesion: 0.29
+Nodes (6): Angewendete Testleitplanken, Geänderte / angelegte Dateien, Log: Explorer-Import-Fortschritt, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1016 - "Community 1016"
+Cohesion: 0.29
+Nodes (6): Angewendete Testleitplanken, Geänderte / angelegte Dateien, Log: DMS-Import-Deployment und Zuordnungen, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1017 - "Community 1017"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: DMS-Filterzeile sticky, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1018 - "Community 1018"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: DMS mit eigenem Scrollcontainer, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1019 - "Community 1019"
+Cohesion: 0.29
+Nodes (6): Angewandte Testleitplanken, Geänderte / angelegte Dateien, Log: DMS-Schema und gemeinsame Typen, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1020 - "Community 1020"
+Cohesion: 0.29
+Nodes (6): Angewandte Testleitplanken, Geänderte / angelegte Dateien, Log: Manueller Duplikat-Check, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1021 - "Community 1021"
+Cohesion: 0.29
+Nodes (6): Angewandte Testleitplanken, Geänderte / angelegte Dateien, Log: Upload-Bibliothekssichtbarkeit, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1022 - "Community 1022"
+Cohesion: 0.29
+Nodes (6): Angewandte Testleitplanken, Geänderte / angelegte Dateien, Log: Attachment-Lebenszyklus, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1023 - "Community 1023"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Sammlungshierarchie, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken und Prüfergebnisse, Was wurde umgesetzt
+
+### Community 1024 - "Community 1024"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Kategorien zu Tags, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken und Prüfergebnisse, Was wurde umgesetzt
+
+### Community 1025 - "Community 1025"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: SQL-Dokumentfilter, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken und Prüfergebnisse, Was wurde umgesetzt
+
+### Community 1026 - "Community 1026"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: DMS-Navigation und Karten, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1027 - "Community 1027"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Importer- und MCP-Verträge, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1028 - "Community 1028"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Gesamttest und Build, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1029 - "Community 1029"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Browserabnahme blockiert, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1030 - "Community 1030"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Sichere Prozessbeendigung, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken und Testebenen, Was wurde umgesetzt
+
+### Community 1031 - "Community 1031"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Attachment-Regressionstests, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1032 - "Community 1032"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Sticky Sub-Item-Steuerzeile, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1033 - "Community 1033"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: TKT-164 – Virtuelle Attachment-Ordner, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1034 - "Community 1034"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: TKT-165 – Attachment-Ansichten, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1035 - "Community 1035"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: TKT-167 – Attachment-Bulk-Operationen, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1036 - "Community 1036"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Lokale Attachment-Ordnerquelle, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1037 - "Community 1037"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: TKT-176 Upload-Tag-Zuordnung, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken und Testebenen, Was wurde umgesetzt
+
+### Community 1038 - "Community 1038"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: `.af`-Thumbnails über Windows Shell, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1039 - "Community 1039"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Datenmodell und Migration, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1040 - "Community 1040"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Backend und Berechtigungen, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1041 - "Community 1041"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Parent-Dateiansicht, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1042 - "Community 1042"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: MCP und Dokumentation, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1043 - "Community 1043"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: E2E-Auth- und Kalender-Startblocker, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Testleitplanken, Was wurde umgesetzt
+
+### Community 1044 - "Community 1044"
+Cohesion: 0.29
+Nodes (6): Geänderte / angelegte Dateien, Log: Windows-Autostart und MCP-Anbindung, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Verifikation, Was wurde umgesetzt
+
+### Community 1045 - "Community 1045"
+Cohesion: 0.29
+Nodes (6): compilerOptions, outDir, rootDir, types, extends, include
+
+### Community 1050 - "Community 1050"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Attachment-Sync/SFTP-Env bereinigt, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1051 - "Community 1051"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: APPDATA-Env für Attachment-Sync/SFTP nachgezogen, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1052 - "Community 1052"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: TKT-156/157/158 DMS-Download und Duplikaterkennung, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1053 - "Community 1053"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: DMS-Sortierung für Sammlungen und Kategorien, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1054 - "Community 1054"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: DMS-Bestandsaufnahme, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1055 - "Community 1055"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Berechtigungen, Versionierung und Dateischutz, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1056 - "Community 1056"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Kategorie-Cleanup und Rollout, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1057 - "Community 1057"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Legacy-Kategorievertrag, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1058 - "Community 1058"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: API-Testnachführung, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1059 - "Community 1059"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: MCP-MySQL-Testisolation, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1060 - "Community 1060"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Serielle Testorchestrierung, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1061 - "Community 1061"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: MS-80 auf Work-Stand wiederhergestellt, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1062 - "Community 1062"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Attachment-FK-Migration, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1063 - "Community 1063"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Abschluss TKT-164 bis TKT-167, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1064 - "Community 1064"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Aufgabe zur MCP-Referenzauflösung, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1065 - "Community 1065"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Abschluss TKT-176, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1066 - "Community 1066"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Dokument-Mehrfachauswahl und Tags, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1067 - "Community 1067"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Dokument-Kachel-Scrollcontainer, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1068 - "Community 1068"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Attachment-Trennungs-Preflight, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1069 - "Community 1069"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: E2E-Worker-DB-Rechte, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1070 - "Community 1070"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Testdrift und Lint, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1071 - "Community 1071"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: DMS-Bulk-Vertrag, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1072 - "Community 1072"
+Cohesion: 0.33
+Nodes (5): Geänderte / angelegte Dateien, Log: Attachment/DMS-Trennung Abschluss, Offene Punkte / Folgeaufgaben, Probleme und Abweichungen, Was wurde umgesetzt
+
+### Community 1073 - "Community 1073"
+Cohesion: 0.33
+Nodes (4): hookMocks, milestones, projects, renderTicketsPage()
+
+### Community 1075 - "Community 1075"
+Cohesion: 0.50
+Nodes (3): DocumentTagPills(), DocumentTagPillsProps, tags
+
+### Community 1076 - "Community 1076"
 Cohesion: 0.40
-Nodes (3): notes, pageMocks, renderNotesPage()
+Nodes (4): actions, imageDocument, pdfDocument, renderPage()
+
+### Community 1077 - "Community 1077"
+Cohesion: 0.40
+Nodes (3): failedTargets, scriptTest, workspaces
+
+### Community 1079 - "Community 1079"
+Cohesion: 0.50
+Nodes (3): Answer, Q: Der Dokument Manager erzeugt Thubnails. Können diese auch für das Dateiformat von afinnity angezeigt werden?, Source Nodes
+
+### Community 1080 - "Community 1080"
+Cohesion: 0.50
+Nodes (3): Answer, Q: hast Du die ENdung .af berücksichtigt?, Source Nodes
+
+### Community 1081 - "Community 1081"
+Cohesion: 0.50
+Nodes (3): Answer, Q: Bitte ausschließlich auf .af konzentrieren, ohne zusätzliches JPEG. Die App läuft lokal auf Windows. Hilft das?, Source Nodes
+
+### Community 1083 - "Community 1083"
+Cohesion: 0.50
+Nodes (3): config, [configPath, deployDir, apiBaseUrl], stdioEntry
 
 ## Knowledge Gaps
-- **4964 isolated node(s):** `allow`, `PreToolUse`, `Stop`, `allow`, `name` (+4959 more)
+- **5550 isolated node(s):** `ensure-plugins.sh script`, `source`, `repo`, `pm-workflow-skills@skill-library`, `allow` (+5545 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **51 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **55 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `toLocalDateTimeInput()` connect `Community 1` to `Community 862`?**
-  _High betweenness centrality (0.132) - this node is a cross-community bridge._
-- **Why does `getDefinitionOrThrow()` connect `Community 14` to `Community 905`?**
-  _High betweenness centrality (0.024) - this node is a cross-community bridge._
+- **Why does `toLocalDateTimeInput()` connect `Community 1` to `Community 852`?**
+  _High betweenness centrality (0.116) - this node is a cross-community bridge._
+- **Why does `DbClient` connect `Community 23` to `Community 0`, `Community 1`, `Community 4`, `Community 6`, `Community 7`, `Community 903`, `Community 11`, `Community 13`, `Community 912`, `Community 16`, `Community 18`, `Community 17`, `Community 27`, `Community 28`, `Community 29`, `Community 32`, `Community 33`, `Community 39`, `Community 173`, `Community 47`, `Community 52`, `Community 58`, `Community 69`, `Community 967`, `Community 741`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
 - **Are the 8 inferred relationships involving `buildTestApp()` (e.g. with `registerAuthPlugins()` and `registerGlobalAuthGuard()`) actually correct?**
   _`buildTestApp()` has 8 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `allow`, `PreToolUse`, `Stop` to the rest of the system?**
-  _4964 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **What connects `ensure-plugins.sh script`, `source`, `repo` to the rest of the system?**
+  _5550 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.042048517520215635 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.03945088631214181 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.058385093167701865 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05970149253731343 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.009478672985781991 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.008620689655172414 - nodes in this community are weakly interconnected._
