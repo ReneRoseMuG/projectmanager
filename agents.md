@@ -127,13 +127,13 @@ Neue Dateien, Routes, Services oder Strukturen werden nur angelegt, wenn der Auf
 
 ### 3.0 Planungs-Skill (Pflicht)
 
-Vor jeder Planerstellung im Chat oder im Plan-Modus nutzt der Agent den Repo-Skill `planungsleitplanken`.
+Vor jeder Planerstellung im Chat oder im Plan-Modus nutzt der Agent den Skill `planungsleitplanken` (Herkunft: §7.3).
 
 Der Skill ist ein Planungs-Gate und ersetzt diese Datei nicht. `agents.md` bleibt die maßgebliche Quelle; bei Widersprüchen gilt `agents.md`. Der Skill stellt sicher, dass Architekturentscheidungen, Rollen-/Permission-Regeln, Teststrategie, Branch-Hygiene, UI-Leitplanken und Abnahmekriterien bei jeder Planung geprüft werden.
 
 ### 3.0.1 Testentwurfs-Skill (Pflicht bei Tests)
 
-Sobald ein Auftrag Tests plant, ergänzt, ändert, bewertet oder ausführt, nutzt der Agent zusätzlich den Repo-Skill `test-entwurfsleitplanken`.
+Sobald ein Auftrag Tests plant, ergänzt, ändert, bewertet oder ausführt, nutzt der Agent zusätzlich den Skill `test-entwurfsleitplanken` (Herkunft: §7.3).
 
 Das gilt insbesondere bei Begriffen wie „Testsuite“, „Testabdeckung“, „echte Daten“, „Integrationstest“, „E2E“, „Abnahme“, „Testfälle“ oder „Testlauf“.
 
@@ -426,7 +426,7 @@ taskmanager/
 │   ├── fixtures/                      ← Test-Fixtures und Test-Helper
 │   ├── setup/                         ← Test-Setups
 │   └── .runtime/                      ← generierte Testlaufdaten (ignoriert)
-├── .claude/skills/                    ← projekteigene Skills (stackgebunden, Abschnitt 7.3)
+├── .claude/skills/                    ← projekteigene Skills (Herkunft aller Skills: Abschnitt 7.3)
 ├── .claude/hooks/                     ← Repo-Hooks (graphify-hint, leitfaden-check, ensure-plugins)
 ├── docs/
 │   ├── tasks/                         ← Aufgabendateien (Abschnitt 7.1)
@@ -474,18 +474,21 @@ Jede Aufgabendatei enthält einen Abschnitt **Testhinweise** mit:
 
 ### 7.3 Skill-Herkunft (verbindlich)
 
-Skills kommen aus zwei Quellen. Beide sind gleichrangig nutzbar; nur der Änderungsort unterscheidet sich.
+Skills kommen aus drei Quellen. Alle sind gleichrangig nutzbar; nur der Änderungsort unterscheidet sich.
 
 | Quelle | Skills | Änderung erfolgt |
 |---|---|---|
 | Plugin `pm-workflow-skills@skill-library` | `projekt-manager`, `mcp-code-auftrag`, `documentation`, `specification`, `feature-editorial`, `tagebuch` | im Repo `ReneRoseMuG/Skill-Library` unter `plugins/pm-workflow-skills/`, danach `claude plugin marketplace update skill-library` |
-| `.claude/skills/` in diesem Repo | `architektur`, `code-discipline`, `datenmodell`, `exploration`, `planungsleitplanken`, `test-entwurfsleitplanken`, `test-quality-review`, `leitfaden-pflege` | hier im Repo |
+| Plugin `dev-testing-skills@skill-library` | `architektur`, `code-discipline`, `datenmodell`, `exploration`, `planungsleitplanken`, `test-entwurfsleitplanken`, `test-quality-review` | im Repo `ReneRoseMuG/Skill-Library` unter `plugins/dev-testing-skills/`, danach `claude plugin marketplace update skill-library` und `claude plugin update dev-testing-skills@skill-library` |
+| `.claude/skills/` in diesem Repo | `leitfaden-pflege` | hier im Repo |
 
-Die projekteigenen Skills hängen am Technologiestack dieses Repos und bleiben deshalb hier. Ihre gemeinsame, stackfreie Wissensquelle liegt in der Skill Library unter `dev-testing/` — dort zuerst ändern, dann hier nachziehen. `leitfaden-pflege` ist projekteigen ohne Ebene-1-Quelle.
+Die Skills aus `dev-testing-skills` sind stackfrei formuliert. Konkrete Pfade, Schichten, Testkommandos und Konventionen dieses Repos lesen sie aus `.claude/project-context/tech-stack.md` — diese Datei ist bei Strukturänderungen mitzupflegen. Ihre gemeinsame Wissensquelle liegt in der Skill Library unter `dev-testing/`; Änderungen dort zuerst, dann in den Plugin-Skills nachziehen. `leitfaden-pflege` bleibt projekteigen ohne Ebene-1-Quelle.
 
-Das Plugin bringt zusätzlich den MCP-Server `projekt-manager` mit (`http://127.0.0.1:3010/mcp`). Marketplace und Plugin sind in `.claude/settings.json` eingetragen; der SessionStart-Hook `.claude/hooks/ensure-plugins.sh` installiert sie auf einem neuen Rechner selbsttätig nach.
+Das Plugin `pm-workflow-skills` bringt zusätzlich den MCP-Server `projekt-manager` mit (`http://127.0.0.1:3010/mcp`). Marketplace und Plugin sind in `.claude/settings.json` eingetragen; der SessionStart-Hook `.claude/hooks/ensure-plugins.sh` installiert sie auf einem neuen Rechner selbsttätig nach.
 
-Die Baupläne unter `docs/skill-documentation/` bleiben die projektbezogene Entwurfsbegründung — auch für Skills, die inzwischen aus dem Plugin kommen.
+Die Baupläne unter `docs/skill-documentation/` bleiben die projektbezogene Entwurfsbegründung — auch für Skills, die inzwischen aus einem Plugin kommen.
+
+Spezifikation und Anwenderdokumentation dieses Projekts entstehen im Wiki des Projekt Managers, nicht mehr als Feature- oder Use-Case-Datensätze. Wurzelseite, Seitenaufbau und Nummernvergabe stehen in `.claude/project-context/wiki.md`. Die Entitäten `features` und `useCases` bleiben davon unberührt Gegenstand des Codes, solange sie nicht ausgebaut sind.
 
 ---
 
@@ -683,7 +686,7 @@ Der Agent schreibt den Log-Eintrag gemäß Abschnitt 5 **immer** — ohne Rückf
 
 Zusätzlich zum dateibasierten Schritt-Log schreibt der Agent **einmal nach Abschluss der gesamten Aufgabe** — nicht nach einzelnen Teilschritten oder Unteraufgaben — **automatisch und ohne Rückfrage** einen kurzen Abschlusskommentar in die Projekt-Manager-App. Das gilt für jeden Änderungsauftrag der Klassen 4 und 5, unabhängig davon, ob der Auftrag von einer PM-Referenz ausging. Der dateibasierte Schritt-Log nach Abschnitt 5 bleibt davon unberührt und wird weiterhin pro Teilaufgabe geschrieben.
 
-- **Ziel:** das in `docs/projekt-kontext.md` hinterlegte Standard-Log-Ziel (aktuell `PROJ-3`). Ging der Auftrag von einer spezifischen Parent-Referenz aus (`PROJ`/`MS`/`TASK`/`TKT`/`FEAT`/`UC`), wird der Kommentar zusätzlich an diesen Parent geschrieben; dafür bleibt der Skill `mcp-code-auftrag` maßgeblich.
+- **Ziel:** das in `docs/projekt-kontext.md` hinterlegte Standard-Log-Ziel (aktuell `PROJ-3`). Ging der Auftrag von einer spezifischen Parent-Referenz aus (`PROJ`/`MS`/`TASK`/`TKT`), wird der Kommentar zusätzlich an diesen Parent geschrieben. Bezog sich der Auftrag auf eine Wiki-Seite, nennt der Kommentar am Projekt Seitentitel und Seiten-ID; dafür bleibt der Skill `mcp-code-auftrag` maßgeblich.
 - **Tool:** `add_comment_to_parent`. Ist das Tool nicht verfügbar, ersatzweise `add_note_to_parent` (als Log kennzeichnen).
 - **Inhalt** (gut lesbar für den Nutzer, keine technischen Dateilisten): was erledigt wurde, wichtige Entscheidungen oder Einschränkungen, durchgeführte Prüfungen oder Tests, offene Punkte oder Blocker, welches Ergebnis der Nutzer erwarten kann.
 - **Blocker:** Ist die MCP-/API-Anbindung nicht erreichbar oder fehlt das Schreibrecht, dokumentiert der Agent dies als Blocker im Schritt-Log und gibt den Kommentartext im Chat aus. Der Auftrag gilt trotzdem als abgeschlossen; der dateibasierte Schritt-Log bleibt die verbindliche Mindestdokumentation.

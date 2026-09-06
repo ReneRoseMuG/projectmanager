@@ -8,7 +8,8 @@
     }
   },
   "enabledPlugins": {
-    "pm-workflow-skills@skill-library": true
+    "pm-workflow-skills@skill-library": true,
+    "dev-testing-skills@skill-library": true
   },
   "permissions": {
     "allow": [

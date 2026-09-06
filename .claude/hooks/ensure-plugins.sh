@@ -6,4 +6,5 @@
 set -e
 claude plugin marketplace add ReneRoseMuG/Skill-Library >/dev/null 2>&1 || true
 claude plugin install pm-workflow-skills@skill-library >/dev/null 2>&1 || true
+claude plugin install dev-testing-skills@skill-library >/dev/null 2>&1 || true
 exit 0
